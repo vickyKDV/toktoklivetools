@@ -1,0 +1,3 @@
+UPDATE `Overlay`
+SET `type` = 'CUSTOM_OVERLAY'
+WHERE `type` IN ('BUILDER', 'CUSTOM_JSON');

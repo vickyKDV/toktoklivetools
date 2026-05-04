@@ -1,0 +1,226 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum WorkspaceRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum ConnectionStatus {
+  IDLE
+  CONNECTING
+  LIVE
+  STOPPED
+  ERROR
+}
+
+enum LiveEventType {
+  CHAT
+  GIFT
+  LIKE
+  SHARE
+  FOLLOW
+  MEMBER
+  SUBSCRIBE
+  VIEWER_COUNT
+  STREAM_END
+}
+
+enum RuleOperator {
+  EQUALS
+  CONTAINS
+  GREATER_THAN
+  LESS_THAN
+  EXISTS
+}
+
+enum OverlayKind {
+  CHAT
+  GIFT
+  LEADERBOARD
+  DOCK
+  CUSTOM
+}
+
+model User {
+  id           String            @id @default(cuid())
+  email        String            @unique
+  name         String?
+  passwordHash String
+  sessions     Session[]
+  memberships  WorkspaceMember[]
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model Workspace {
+  id                   String                @id @default(cuid())
+  name                 String
+  slug                 String
+  tiktokUsername       String?
+  overlayKey           String                @unique
+  members              WorkspaceMember[]
+  connection           TikTokConnection?
+  overlays             Overlay[]
+  rules                Rule[]
+  automationFlows      AutomationFlow[]
+  automationExecutions AutomationExecution[]
+  liveEvents           LiveEvent[]
+  actionLogs           ActionLog[]
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+
+  @@unique([slug])
+  @@index([createdAt])
+}
+
+model WorkspaceMember {
+  id          String        @id @default(cuid())
+  userId      String
+  workspaceId String
+  role        WorkspaceRole @default(MEMBER)
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdAt   DateTime      @default(now())
+
+  @@unique([userId, workspaceId])
+  @@index([workspaceId])
+}
+
+model TikTokConnection {
+  id             String           @id @default(cuid())
+  workspaceId    String           @unique
+  workspace      Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  tiktokUsername String
+  status         ConnectionStatus @default(IDLE)
+  startedAt      DateTime?
+  stoppedAt      DateTime?
+  lastError      String?          @db.Text
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+}
+
+model Overlay {
+  id              String      @id @default(cuid())
+  workspaceId     String
+  workspace       Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  kind            OverlayKind
+  name            String
+  draftSchema     Json
+  publishedSchema Json?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  publishedAt     DateTime?
+
+  @@index([workspaceId, kind])
+  @@index([updatedAt])
+}
+
+model Rule {
+  id             String        @id @default(cuid())
+  workspaceId    String
+  workspace      Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name           String
+  enabled        Boolean       @default(true)
+  triggerType    LiveEventType
+  conditionField String?
+  operator       RuleOperator?
+  conditionValue String?
+  actions        Json
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([workspaceId, triggerType])
+  @@index([enabled])
+}
+
+model AutomationFlow {
+  id          String                @id @default(cuid())
+  workspaceId String                @map("workspace_id")
+  workspace   Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name        String
+  description String?               @db.Text
+  isActive    Boolean               @default(true) @map("is_active")
+  nodes       Json
+  edges       Json
+  executions  AutomationExecution[]
+  createdAt   DateTime              @default(now()) @map("created_at")
+  updatedAt   DateTime              @updatedAt @map("updated_at")
+
+  @@index([workspaceId, isActive])
+  @@map("automation_flows")
+}
+
+model AutomationExecution {
+  id          String         @id @default(cuid())
+  flowId      String         @map("flow_id")
+  flow        AutomationFlow @relation(fields: [flowId], references: [id], onDelete: Cascade)
+  workspaceId String         @map("workspace_id")
+  workspace   Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  eventType   LiveEventType  @map("event_type")
+  payload     Json
+  status      String
+  executedAt  DateTime       @default(now()) @map("executed_at")
+
+  @@index([workspaceId, executedAt])
+  @@index([flowId, executedAt])
+  @@map("automation_executions")
+}
+
+model LiveEvent {
+  id           String        @id @default(cuid())
+  workspaceId  String
+  workspace    Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  type         LiveEventType
+  tiktokUserId String?
+  username     String?
+  displayName  String?
+  avatarUrl    String?       @db.Text
+  giftName     String?
+  giftId       String?
+  giftCount    Int?
+  repeatCount  Int?
+  comment      String?       @db.Text
+  likeCount    Int?
+  shareCount   Int?
+  viewerCount  Int?
+  rawJson      Json
+  receivedAt   DateTime      @default(now())
+
+  @@index([workspaceId, receivedAt])
+  @@index([workspaceId, type, receivedAt])
+  @@index([username])
+}
+
+model ActionLog {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  ruleId      String?
+  eventId     String?
+  actionType  String
+  payload     Json?
+  createdAt   DateTime  @default(now())
+
+  @@index([workspaceId, createdAt])
+  @@index([ruleId])
+}

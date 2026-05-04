@@ -1,0 +1,747 @@
+"use client";
+
+import { Copy, Eye, EyeOff, Lock, Trash2, Unlock } from "lucide-react";
+import type { ReactNode } from "react";
+import { componentRegistry, type ComponentSetting } from "@/features/overlay-builder/registry/componentRegistry";
+import type { OverlayComponentSchema, OverlayDesignSchema } from "@/features/overlay-builder/schema/overlaySchema";
+import { isContainerType } from "@/features/overlay-builder/utils/componentTree";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+
+type PropertyInspectorProps = {
+  designSchema: OverlayDesignSchema;
+  selectedComponent: OverlayComponentSchema | null;
+  onUpdateDesign: (patch: Partial<OverlayDesignSchema>) => void;
+  onUpdateCanvas: (patch: Partial<OverlayDesignSchema["canvas"]>) => void;
+  onUpdateComponent: (id: string, patch: Partial<OverlayComponentSchema>) => void;
+  onDeleteComponent: (id: string) => void;
+  onDuplicateComponent: (id: string) => void;
+  onMoveIntoContainer: (id: string, parentId: string) => void;
+  onRemoveFromContainer: (id: string) => void;
+  onBringToFront: (id: string) => void;
+  onSendToBack: (id: string) => void;
+  components: Array<OverlayComponentSchema & { parentId: string | null; absoluteX: number; absoluteY: number }>;
+};
+
+export function PropertyInspector({
+  designSchema,
+  selectedComponent,
+  onUpdateDesign,
+  onUpdateCanvas,
+  onUpdateComponent,
+  onDeleteComponent,
+  onDuplicateComponent,
+  onMoveIntoContainer,
+  onRemoveFromContainer,
+  onBringToFront,
+  onSendToBack,
+  components
+}: PropertyInspectorProps) {
+  if (!selectedComponent) {
+    return (
+      <div className="grid gap-4">
+        <Section title="Design">
+          <TextField label="Name" value={designSchema.name} onChange={(name) => onUpdateDesign({ name })} />
+        </Section>
+        <EventSourceFields designSchema={designSchema} onUpdateDesign={onUpdateDesign} />
+        <LayoutFields designSchema={designSchema} onUpdateDesign={onUpdateDesign} />
+        <CanvasFields designSchema={designSchema} onUpdateCanvas={onUpdateCanvas} />
+      </div>
+    );
+  }
+
+  const registryItem = componentRegistry[selectedComponent.type];
+  const selectedMeta = components.find((component) => component.id === selectedComponent.id);
+  const containerOptions = components.filter((component) => component.id !== selectedComponent.id && isContainerType(component.type));
+  const contentSettings = registryItem.settings.filter((setting) => setting.key.startsWith("props."));
+
+  return (
+    <div className="grid gap-4">
+      <Section title={selectedComponent.name}>
+        <div className="grid grid-cols-2 gap-2">
+          <Button type="button" variant="outline" onClick={() => onUpdateComponent(selectedComponent.id, { visible: !selectedComponent.visible })}>
+            {selectedComponent.visible ? <EyeOff /> : <Eye />}
+            {selectedComponent.visible ? "Hide" : "Show"}
+          </Button>
+          <Button type="button" variant="outline" onClick={() => onUpdateComponent(selectedComponent.id, { locked: !selectedComponent.locked })}>
+            {selectedComponent.locked ? <Unlock /> : <Lock />}
+            {selectedComponent.locked ? "Unlock" : "Lock"}
+          </Button>
+          <Button type="button" variant="outline" onClick={() => onDuplicateComponent(selectedComponent.id)}>
+            <Copy />
+            Duplicate
+          </Button>
+          <Button type="button" variant="destructive" onClick={() => onDeleteComponent(selectedComponent.id)}>
+            <Trash2 />
+            Delete
+          </Button>
+        </div>
+      </Section>
+
+      <EventSourceFields designSchema={designSchema} onUpdateDesign={onUpdateDesign} />
+      <LayoutFields designSchema={designSchema} onUpdateDesign={onUpdateDesign} />
+
+      <Section title="Actions">
+        <div className="grid gap-2">
+          <div className="space-y-2">
+            <Label>Move into container</Label>
+            <select
+              value=""
+              onChange={(event) => {
+                if (event.target.value) {
+                  onMoveIntoContainer(selectedComponent.id, event.target.value);
+                }
+              }}
+              className="flex h-10 w-full rounded-md border border-input bg-card px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <option value="">Select container</option>
+              {containerOptions.map((component) => (
+                <option key={component.id} value={component.id}>{component.name}</option>
+              ))}
+            </select>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <Button type="button" variant="outline" disabled={!selectedMeta?.parentId} onClick={() => onRemoveFromContainer(selectedComponent.id)}>
+              Remove from container
+            </Button>
+            <Button type="button" variant="outline" onClick={() => onBringToFront(selectedComponent.id)}>
+              Bring to front
+            </Button>
+            <Button type="button" variant="outline" onClick={() => onSendToBack(selectedComponent.id)}>
+              Send to back
+            </Button>
+          </div>
+        </div>
+      </Section>
+
+      <Section title="Layout">
+        <div className="grid grid-cols-2 gap-3">
+          <NumberField label="X" value={selectedComponent.x} onChange={(x) => onUpdateComponent(selectedComponent.id, { x })} />
+          <NumberField label="Y" value={selectedComponent.y} onChange={(y) => onUpdateComponent(selectedComponent.id, { y })} />
+          <NumberField label="Width" value={selectedComponent.width} min={1} onChange={(width) => onUpdateComponent(selectedComponent.id, { width })} />
+          <NumberField label="Height" value={selectedComponent.height} min={1} onChange={(height) => onUpdateComponent(selectedComponent.id, { height })} />
+          <NumberField label="Z Index" value={selectedComponent.zIndex} onChange={(zIndex) => onUpdateComponent(selectedComponent.id, { zIndex })} />
+          <NumberField label="Rotate" value={selectedComponent.rotation ?? 0} onChange={(rotation) => onUpdateComponent(selectedComponent.id, { rotation })} />
+        </div>
+      </Section>
+
+      {contentSettings.length ? (
+        <Section title="Content">
+          {contentSettings.map((setting) => (
+            <SettingField
+              key={setting.key}
+              setting={setting}
+              component={selectedComponent}
+              onChange={(value) => onUpdateComponent(selectedComponent.id, setPath(selectedComponent, setting.key, value))}
+            />
+          ))}
+        </Section>
+      ) : null}
+
+      <ComponentVisualFields component={selectedComponent} onUpdateComponent={onUpdateComponent} />
+    </div>
+  );
+}
+
+function EventSourceFields({
+  designSchema,
+  onUpdateDesign
+}: {
+  designSchema: OverlayDesignSchema;
+  onUpdateDesign: (patch: Partial<OverlayDesignSchema>) => void;
+}) {
+  const dataSource = designSchema.dataSource;
+  const enabledTypes = getEnabledEventTypes(designSchema);
+  const updateDataSource = (patch: Partial<OverlayDesignSchema["dataSource"]>) => onUpdateDesign({
+    dataSource: {
+      ...dataSource,
+      ...patch,
+      filters: {
+        ...dataSource.filters,
+        ...(patch.filters ?? {})
+      }
+    }
+  });
+
+  return (
+    <Section title="Event Source">
+      <SelectField
+        label="Source"
+        value={dataSource.type}
+        options={[
+          { label: "Manual / Focus Dock", value: "manual" },
+          { label: "Chat Events", value: "chat" },
+          { label: "Gift Events", value: "gift" },
+          { label: "Leaderboard Events", value: "leaderboard" },
+          { label: "Dock", value: "dock" }
+        ]}
+        onChange={(type) => updateDataSource({ type: type as OverlayDesignSchema["dataSource"]["type"] })}
+      />
+      <div className="grid grid-cols-2 gap-2">
+        {eventTypeOptions.map((option) => (
+          <ToggleField
+            key={option.value}
+            label={option.label}
+            checked={enabledTypes.includes(option.value)}
+            onChange={(checked) => {
+              const nextTypes = checked
+                ? [...enabledTypes, option.value]
+                : enabledTypes.filter((item) => item !== option.value);
+
+              updateDataSource({
+                filters: {
+                  eventTypes: nextTypes.length ? nextTypes : ["CHAT"]
+                }
+              });
+            }}
+          />
+        ))}
+      </div>
+    </Section>
+  );
+}
+
+function LayoutFields({
+  designSchema,
+  onUpdateDesign
+}: {
+  designSchema: OverlayDesignSchema;
+  onUpdateDesign: (patch: Partial<OverlayDesignSchema>) => void;
+}) {
+  const layout = designSchema.layout;
+
+  return (
+    <>
+      <Section title="List Layout">
+        <div className="grid grid-cols-2 gap-3">
+          <SelectField
+            label="Mode"
+            value={layout.mode}
+            options={[
+              { label: "Single", value: "single" },
+              { label: "List", value: "list" },
+              { label: "Ticker", value: "ticker" },
+              { label: "Dock", value: "dock" },
+              { label: "Grid", value: "grid" }
+            ]}
+            onChange={(mode) => onUpdateDesign({ layout: { ...layout, mode: mode as OverlayDesignSchema["layout"]["mode"] } })}
+          />
+          <NumberField label="Max Items" value={layout.maxItems} min={1} max={100} onChange={(maxItems) => onUpdateDesign({ layout: { ...layout, maxItems } })} />
+          <NumberField label="Gap" value={layout.gap} min={0} max={240} onChange={(gap) => onUpdateDesign({ layout: { ...layout, gap } })} />
+          <SelectField
+            label="Align"
+            value={layout.align}
+            options={[
+              { label: "Start", value: "start" },
+              { label: "Center", value: "center" },
+              { label: "End", value: "end" },
+              { label: "Stretch", value: "stretch" }
+            ]}
+            onChange={(align) => onUpdateDesign({ layout: { ...layout, align: align as OverlayDesignSchema["layout"]["align"] } })}
+          />
+        </div>
+        <ToggleField label="Reverse order" checked={layout.reverse} onChange={(reverse) => onUpdateDesign({ layout: { ...layout, reverse } })} />
+      </Section>
+      <Section title="Animation">
+        <div className="grid grid-cols-2 gap-3">
+          <SelectField
+            label="Enter"
+            value={layout.enterAnimation}
+            options={enterAnimationOptions}
+            onChange={(enterAnimation) => onUpdateDesign({ layout: { ...layout, enterAnimation } })}
+          />
+          <SelectField
+            label="Exit"
+            value={layout.exitAnimation}
+            options={exitAnimationOptions}
+            onChange={(exitAnimation) => onUpdateDesign({ layout: { ...layout, exitAnimation } })}
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <NumberField
+            label="Duration ms"
+            value={layout.animationDurationMs ?? 620}
+            min={120}
+            max={5000}
+            onChange={(animationDurationMs) => onUpdateDesign({ layout: { ...layout, animationDurationMs } })}
+          />
+          <NumberField
+            label="Auto Close ms"
+            value={layout.autoCloseMs ?? 0}
+            min={0}
+            max={600000}
+            onChange={(autoCloseMs) => onUpdateDesign({ layout: { ...layout, autoCloseMs } })}
+          />
+        </div>
+        <p className="text-xs text-muted-foreground">Auto Close 0 berarti overlay tidak ditutup otomatis.</p>
+      </Section>
+    </>
+  );
+}
+
+function CanvasFields({
+  designSchema,
+  onUpdateCanvas
+}: {
+  designSchema: OverlayDesignSchema;
+  onUpdateCanvas: (patch: Partial<OverlayDesignSchema["canvas"]>) => void;
+}) {
+  const canvas = designSchema.canvas;
+
+  return (
+    <>
+      <Section title="Canvas">
+        <div className="grid grid-cols-2 gap-3">
+          <NumberField label="Width" value={canvas.width} min={120} onChange={(width) => onUpdateCanvas({ width })} />
+          <NumberField label="Height" value={canvas.height} min={80} onChange={(height) => onUpdateCanvas({ height })} />
+          <NumberField label="Radius" value={canvas.radius} min={0} onChange={(radius) => onUpdateCanvas({ radius })} />
+          <NumberField label="Opacity" value={canvas.background.opacity} min={0} max={100} onChange={(opacity) => onUpdateCanvas({ background: { ...canvas.background, opacity } })} />
+        </div>
+        <ColorField label="Background" value={canvas.background.color} onChange={(color) => onUpdateCanvas({ background: { ...canvas.background, type: "solid", color } })} />
+      </Section>
+      <Section title="Canvas Stroke">
+        <ToggleField label="Enabled" checked={canvas.stroke.enabled} onChange={(enabled) => onUpdateCanvas({ stroke: { ...canvas.stroke, enabled } })} />
+        <ColorField label="Color" value={canvas.stroke.color} onChange={(color) => onUpdateCanvas({ stroke: { ...canvas.stroke, color } })} />
+        <NumberField label="Width" value={canvas.stroke.width} min={0} onChange={(width) => onUpdateCanvas({ stroke: { ...canvas.stroke, width } })} />
+      </Section>
+      <Section title="Canvas Shadow">
+        <ToggleField label="Enabled" checked={canvas.shadow.enabled} onChange={(enabled) => onUpdateCanvas({ shadow: { ...canvas.shadow, enabled } })} />
+        <ColorField label="Color" value={canvas.shadow.color} onChange={(color) => onUpdateCanvas({ shadow: { ...canvas.shadow, color } })} />
+        <div className="grid grid-cols-3 gap-2">
+          <NumberField label="Blur" value={canvas.shadow.blur} min={0} onChange={(blur) => onUpdateCanvas({ shadow: { ...canvas.shadow, blur } })} />
+          <NumberField label="X" value={canvas.shadow.x} onChange={(x) => onUpdateCanvas({ shadow: { ...canvas.shadow, x } })} />
+          <NumberField label="Y" value={canvas.shadow.y} onChange={(y) => onUpdateCanvas({ shadow: { ...canvas.shadow, y } })} />
+        </div>
+      </Section>
+    </>
+  );
+}
+
+function ComponentVisualFields({
+  component,
+  onUpdateComponent
+}: {
+  component: OverlayComponentSchema;
+  onUpdateComponent: (id: string, patch: Partial<OverlayComponentSchema>) => void;
+}) {
+  const background = normalizeComponentBackground(component);
+  const border = component.style.border ?? { enabled: false, color: "#ffffff", width: 0 };
+  const shadow = component.style.shadow ?? { enabled: false, color: "#00000055", blur: 0, x: 0, y: 0 };
+  const updateStyle = (style: Partial<OverlayComponentSchema["style"]>) => onUpdateComponent(component.id, { style: { ...component.style, ...style } });
+
+  return (
+    <>
+      <Section title="Background">
+        <SelectField
+          label="Background Type"
+          value={background.type}
+          options={[
+            { label: "Transparent", value: "transparent" },
+            { label: "Solid", value: "solid" },
+            { label: "Gradient", value: "gradient" },
+            { label: "Glass", value: "glass" }
+          ]}
+          onChange={(type) => updateStyle({ background: { ...background, type: type as NonNullable<OverlayComponentSchema["style"]["background"]>["type"] } })}
+        />
+        <ColorField label="Background Color" value={background.color} onChange={(color) => updateStyle({ background: { ...background, color } })} />
+        <NumberField label="Background Opacity" value={background.opacity} min={0} max={100} onChange={(opacity) => updateStyle({ background: { ...background, opacity } })} />
+        <ColorField label="Gradient From" value={background.from ?? background.color} onChange={(from) => updateStyle({ background: { ...background, from } })} />
+        <ColorField label="Gradient To" value={background.to ?? background.color} onChange={(to) => updateStyle({ background: { ...background, to } })} />
+        <NumberField label="Gradient Angle" value={background.angle ?? 135} min={0} max={360} onChange={(angle) => updateStyle({ background: { ...background, angle } })} />
+      </Section>
+
+      <Section title="Typography">
+        <div className="grid grid-cols-2 gap-3">
+          <NumberField label="Font Size" value={component.style.fontSize ?? 16} min={6} max={220} onChange={(fontSize) => updateStyle({ fontSize })} />
+          <SelectField
+            label="Weight"
+            value={String(component.style.fontWeight ?? 400)}
+            options={[
+              { label: "Regular", value: "400" },
+              { label: "Semi", value: "600" },
+              { label: "Bold", value: "700" },
+              { label: "Black", value: "900" }
+            ]}
+            onChange={(fontWeight) => updateStyle({ fontWeight: Number(fontWeight) })}
+          />
+          <ColorField label="Text Color" value={component.style.color ?? "#ffffff"} onChange={(color) => updateStyle({ color })} />
+          <SelectField
+            label="Align"
+            value={component.style.align ?? "left"}
+            options={[
+              { label: "Left", value: "left" },
+              { label: "Center", value: "center" },
+              { label: "Right", value: "right" }
+            ]}
+            onChange={(align) => updateStyle({ align: align as NonNullable<OverlayComponentSchema["style"]["align"]> })}
+          />
+          <NumberField label="Line Height" value={component.style.lineHeight ?? 1.2} min={0.6} max={4} step={0.05} onChange={(lineHeight) => updateStyle({ lineHeight })} />
+          <NumberField label="Max Lines" value={component.style.maxLines ?? component.style.lineClamp ?? 1} min={1} max={20} onChange={(maxLines) => updateStyle({ maxLines })} />
+        </div>
+        <SelectField
+          label="Text Overflow"
+          value={component.style.textOverflow ?? "clip"}
+          options={[
+            { label: "Clip", value: "clip" },
+            { label: "Ellipsis", value: "ellipsis" }
+          ]}
+          onChange={(textOverflow) => updateStyle({ textOverflow: textOverflow as NonNullable<OverlayComponentSchema["style"]["textOverflow"]> })}
+        />
+        <ToggleField label="Auto Fit Font Size" checked={component.style.autoFitFontSize === true} onChange={(autoFitFontSize) => updateStyle({ autoFitFontSize })} />
+      </Section>
+
+      <Section title="Shape">
+        <div className="grid grid-cols-2 gap-3">
+          <NumberField label="Radius" value={component.style.radius ?? 0} min={0} max={999} onChange={(radius) => updateStyle({ radius })} />
+          <NumberField label="Opacity" value={component.style.opacity ?? 100} min={0} max={100} onChange={(opacity) => updateStyle({ opacity })} />
+          <NumberField label="Blur" value={component.style.blur ?? 0} min={0} max={80} onChange={(blur) => updateStyle({ blur })} />
+          <NumberField label="Backdrop Blur" value={component.style.backdropBlur ?? 0} min={0} max={80} onChange={(backdropBlur) => updateStyle({ backdropBlur })} />
+        </div>
+        <SelectField
+          label="Overflow"
+          value={component.style.overflow ?? "hidden"}
+          options={[
+            { label: "Visible", value: "visible" },
+            { label: "Hidden", value: "hidden" }
+          ]}
+          onChange={(overflow) => updateStyle({ overflow: overflow as NonNullable<OverlayComponentSchema["style"]["overflow"]> })}
+        />
+        <SelectField
+          label="Object Fit"
+          value={component.style.objectFit ?? "cover"}
+          options={[
+            { label: "Cover", value: "cover" },
+            { label: "Contain", value: "contain" }
+          ]}
+          onChange={(objectFit) => updateStyle({ objectFit: objectFit as NonNullable<OverlayComponentSchema["style"]["objectFit"]> })}
+        />
+      </Section>
+
+      <Section title="Border">
+        <ToggleField
+          label="Enabled"
+          checked={border.enabled}
+          onChange={(enabled) => updateStyle({ border: { ...border, enabled } })}
+        />
+        <ColorField
+          label="Color"
+          value={border.color}
+          onChange={(color) => updateStyle({ border: { ...border, color } })}
+        />
+        <NumberField
+          label="Width"
+          value={border.width}
+          min={0}
+          onChange={(width) => updateStyle({ border: { ...border, width } })}
+        />
+      </Section>
+
+      <Section title="Shadow">
+        <ToggleField
+          label="Enabled"
+          checked={shadow.enabled}
+          onChange={(enabled) => updateStyle({ shadow: { ...shadow, enabled } })}
+        />
+        <ColorField
+          label="Color"
+          value={shadow.color}
+          onChange={(color) => updateStyle({ shadow: { ...shadow, color } })}
+        />
+        <div className="grid grid-cols-3 gap-2">
+          <NumberField
+            label="Blur"
+            value={shadow.blur}
+            min={0}
+            onChange={(blur) => updateStyle({ shadow: { ...shadow, blur } })}
+          />
+          <NumberField
+            label="X"
+            value={shadow.x}
+            onChange={(x) => updateStyle({ shadow: { ...shadow, x } })}
+          />
+          <NumberField
+            label="Y"
+            value={shadow.y}
+            onChange={(y) => updateStyle({ shadow: { ...shadow, y } })}
+          />
+        </div>
+      </Section>
+    </>
+  );
+}
+
+function normalizeComponentBackground(component: OverlayComponentSchema): NonNullable<OverlayComponentSchema["style"]["background"]> {
+  if (component.style.background) {
+    return {
+      type: component.style.background.type ?? "solid",
+      color: component.style.background.color ?? component.style.backgroundColor ?? "#ffffff",
+      opacity: component.style.background.opacity ?? 100,
+      from: component.style.background.from,
+      to: component.style.background.to,
+      angle: component.style.background.angle
+    };
+  }
+
+  if (component.style.backgroundColor) {
+    return {
+      type: "solid",
+      color: component.style.backgroundColor,
+      opacity: 100
+    };
+  }
+
+  return {
+    type: "transparent",
+    color: "transparent",
+    opacity: 0
+  };
+}
+
+function SettingField({
+  setting,
+  component,
+  onChange
+}: {
+  setting: ComponentSetting;
+  component: OverlayComponentSchema;
+  onChange: (value: string | number | boolean) => void;
+}) {
+  const value = getPath(component, setting.key);
+
+  if (setting.type === "toggle") {
+    return <ToggleField label={setting.label} checked={Boolean(value)} onChange={onChange} />;
+  }
+
+  if (setting.type === "color") {
+    return <ColorField label={setting.label} value={String(value ?? "#ffffff")} onChange={onChange} />;
+  }
+
+  if (setting.type === "select") {
+    return (
+      <div className="space-y-2">
+        <Label>{setting.label}</Label>
+        <select
+          value={String(value ?? "")}
+          onChange={(event) => {
+            const option = setting.options.find((item) => String(item.value) === event.target.value);
+            onChange(option?.value ?? event.target.value);
+          }}
+          className="flex h-10 w-full rounded-md border border-input bg-card px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          {setting.options.map((option) => (
+            <option key={String(option.value)} value={String(option.value)}>{option.label}</option>
+          ))}
+        </select>
+      </div>
+    );
+  }
+
+  if (setting.type === "number") {
+    return (
+      <NumberField
+        label={setting.label}
+        value={Number(value ?? 0)}
+        min={setting.min}
+        max={setting.max}
+        step={setting.step}
+        onChange={onChange}
+      />
+    );
+  }
+
+  return <TextField label={setting.label} value={String(value ?? "")} onChange={onChange} />;
+}
+
+function Section({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section className="grid gap-3 rounded-lg border bg-muted/20 p-3">
+      <p className="text-sm font-semibold">{title}</p>
+      {children}
+    </section>
+  );
+}
+
+function NumberField({
+  label,
+  value,
+  min = -10000,
+  max = 10000,
+  step = 1,
+  onChange
+}: {
+  label: string;
+  value: number;
+  min?: number;
+  max?: number;
+  step?: number;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <div className="space-y-2">
+      <Label>{label}</Label>
+      <Input type="number" value={value} min={min} max={max} step={step} onChange={(event) => onChange(Number(event.target.value))} />
+    </div>
+  );
+}
+
+function TextField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  return (
+    <div className="space-y-2">
+      <Label>{label}</Label>
+      <Input value={value} onChange={(event) => onChange(event.target.value)} />
+    </div>
+  );
+}
+
+function SelectField({
+  label,
+  value,
+  options,
+  onChange
+}: {
+  label: string;
+  value: string;
+  options: Array<{ label: string; value: string }>;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div className="space-y-2">
+      <Label>{label}</Label>
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="flex h-10 w-full rounded-md border border-input bg-card px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>{option.label}</option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+function ColorField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  return (
+    <div className="space-y-2">
+      <Label>{label}</Label>
+      <div className="grid grid-cols-[3rem_minmax(0,1fr)] gap-2">
+        <input
+          type="color"
+          value={toColorInput(value)}
+          onChange={(event) => onChange(event.target.value)}
+          className="h-10 w-12 rounded-md border border-input bg-card p-1"
+        />
+        <Input value={value} onChange={(event) => onChange(event.target.value)} />
+      </div>
+    </div>
+  );
+}
+
+function ToggleField({ label, checked, onChange }: { label: string; checked: boolean; onChange: (checked: boolean) => void }) {
+  return (
+    <label className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-medium">
+      <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} className="size-4 accent-primary" />
+      {label}
+    </label>
+  );
+}
+
+function setPath(component: OverlayComponentSchema, path: string, value: string | number | boolean): Partial<OverlayComponentSchema> {
+  const [root, ...keys] = path.split(".");
+
+  if (root === "props") {
+    return { props: setNestedValue(component.props, keys, value) };
+  }
+
+  return { style: setNestedValue(component.style, keys, value) };
+}
+
+function getPath(component: OverlayComponentSchema, path: string) {
+  const [root, ...keys] = path.split(".");
+  const source = root === "props" ? component.props : component.style;
+
+  return keys.reduce<unknown>((current, key) => (
+    typeof current === "object" && current !== null ? (current as Record<string, unknown>)[key] : undefined
+  ), source);
+}
+
+function setNestedValue<T extends Record<string, unknown>>(source: T, keys: string[], value: string | number | boolean): T {
+  const [key, ...rest] = keys;
+
+  if (!key) {
+    return source;
+  }
+
+  if (!rest.length) {
+    return {
+      ...source,
+      [key]: value
+    };
+  }
+
+  const current = typeof source[key] === "object" && source[key] !== null ? source[key] as Record<string, unknown> : {};
+
+  return {
+    ...source,
+    [key]: setNestedValue(current, rest, value)
+  };
+}
+
+function toColorInput(value: string) {
+  if (/^#[0-9a-f]{6}$/i.test(value)) {
+    return value;
+  }
+
+  if (/^#[0-9a-f]{8}$/i.test(value)) {
+    return value.slice(0, 7);
+  }
+
+  return "#ffffff";
+}
+
+const enterAnimationOptions = [
+  { label: "Fade In", value: "fade" },
+  { label: "Zoom In", value: "zoom-in" },
+  { label: "Slide Left In", value: "slide-left" },
+  { label: "Slide Right In", value: "slide-right" },
+  { label: "Slide Up In", value: "slide-up" },
+  { label: "Slide Down In", value: "slide-down" },
+  { label: "Pop In", value: "pop-in" }
+];
+
+const exitAnimationOptions = [
+  { label: "Fade Out", value: "fade" },
+  { label: "Zoom Out", value: "zoom-out" },
+  { label: "Slide Left Out", value: "slide-left" },
+  { label: "Slide Right Out", value: "slide-right" },
+  { label: "Slide Up Out", value: "slide-up" },
+  { label: "Slide Down Out", value: "slide-down" }
+];
+
+const eventTypeOptions = [
+  { label: "Chat", value: "CHAT" },
+  { label: "Join", value: "JOIN" },
+  { label: "Like", value: "LIKE" },
+  { label: "Share", value: "SHARE" },
+  { label: "Follow", value: "FOLLOW" },
+  { label: "Gift", value: "GIFT" }
+];
+
+function getEnabledEventTypes(schema: OverlayDesignSchema) {
+  const value = schema.dataSource.filters?.eventTypes;
+
+  if (Array.isArray(value)) {
+    return value.filter((item): item is string => typeof item === "string");
+  }
+
+  if (schema.dataSource.type === "gift") {
+    return ["GIFT"];
+  }
+
+  if (schema.dataSource.type === "leaderboard") {
+    return ["GIFT", "LIKE", "SHARE"];
+  }
+
+  return ["CHAT"];
+}

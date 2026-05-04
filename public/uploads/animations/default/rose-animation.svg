@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Rose animation">
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="48%" r="52%">
+      <stop offset="0%" stop-color="#fff1f2"/>
+      <stop offset="55%" stop-color="#fb7185" stop-opacity="0.7"/>
+      <stop offset="100%" stop-color="#be123c" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="petal" x1="18%" x2="82%" y1="12%" y2="88%">
+      <stop offset="0%" stop-color="#ffe4e6"/>
+      <stop offset="42%" stop-color="#fb7185"/>
+      <stop offset="100%" stop-color="#be123c"/>
+    </linearGradient>
+    <linearGradient id="stem" x1="0%" x2="100%">
+      <stop offset="0%" stop-color="#15803d"/>
+      <stop offset="100%" stop-color="#86efac"/>
+    </linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="16" stdDeviation="18" flood-color="#881337" flood-opacity="0.35"/>
+    </filter>
+    <style>
+      .rose {
+        transform-origin: 256px 236px;
+        animation: rose-pop 1.8s ease-in-out infinite;
+      }
+      .shine {
+        transform-origin: 256px 236px;
+        animation: rose-shine 1.8s ease-in-out infinite;
+      }
+      @keyframes rose-pop {
+        0%, 100% { transform: scale(0.96) rotate(-3deg); }
+        45% { transform: scale(1.05) rotate(3deg); }
+      }
+      @keyframes rose-shine {
+        0%, 100% { opacity: 0.55; transform: scale(0.9); }
+        45% { opacity: 1; transform: scale(1.08); }
+      }
+    </style>
+  </defs>
+  <rect width="512" height="512" fill="none"/>
+  <circle class="shine" cx="256" cy="236" r="210" fill="url(#glow)"/>
+  <g class="rose" filter="url(#shadow)">
+    <path d="M265 281c35 26 70 60 93 112" fill="none" stroke="url(#stem)" stroke-width="22" stroke-linecap="round"/>
+    <path d="M344 352c-46-2-78 11-101 41 49 9 86-2 115-36z" fill="#22c55e"/>
+    <path d="M211 355c38-7 68 1 91 29-38 15-73 8-105-18z" fill="#16a34a"/>
+    <path d="M252 88c-58 6-103 48-119 99 42-34 90-42 137-20 33-31 31-64-18-79z" fill="url(#petal)"/>
+    <path d="M297 102c58 14 91 61 95 111-35-39-80-55-134-41-24-38-9-66 39-70z" fill="#e11d48"/>
+    <path d="M181 166c-64 30-86 92-64 147 22-58 67-93 132-105 4-43-20-58-68-42z" fill="#fb7185"/>
+    <path d="M337 165c63 34 81 99 55 151-18-61-62-99-126-113-1-42 23-56 71-38z" fill="#be123c"/>
+    <path d="M159 257c15 88 94 134 175 103-72-12-117-51-137-119-31-5-44 0-38 16z" fill="#e11d48"/>
+    <path d="M356 250c-13 82-81 128-163 111 67-20 106-62 121-127 31-5 47 0 42 16z" fill="#9f1239"/>
+    <path d="M251 161c-48 17-72 57-64 105 20-39 52-61 99-64 6-32-4-47-35-41z" fill="#ffe4e6"/>
+    <path d="M286 167c43 20 61 59 51 104-17-39-46-64-90-70-3-30 9-43 39-34z" fill="#fb7185"/>
+    <path d="M209 231c19 57 72 83 127 61-46-6-75-31-91-75-24-4-38 1-36 14z" fill="#f43f5e"/>
+    <path d="M303 228c-8 54-49 85-104 75 43-13 69-41 77-86 23-7 31-3 27 11z" fill="#be123c"/>
+    <circle cx="256" cy="236" r="38" fill="#e11d48"/>
+    <path d="M237 224c18-24 43-25 62-5-28-3-47 5-59 29-13-8-14-16-3-24z" fill="#fff1f2" opacity="0.85"/>
+  </g>
+</svg>
