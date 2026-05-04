@@ -5,6 +5,7 @@ import { io, type Socket } from "socket.io-client";
 import {
   getOverlayAnimationName,
   getSampleChatRenderData,
+  overlayListExitDelayMs,
   overlayAnimationCss
 } from "@/features/overlay-builder/components/ChatStyleRenderer";
 import { OverlaySceneRenderer, OverlayViewportSceneRenderer } from "@/features/overlay-builder/components/OverlaySceneRenderer";
@@ -37,6 +38,7 @@ export function OverlayRuntimeClient({ schema, overlayKey, preview = false, debu
   const layout = schema.layout;
   const isList = layout.mode === "list" || schema.kind === "CHAT" || schema.kind === "LEADERBOARD" || schema.kind === "DOCK";
   const animationDurationMs = layout.animationDurationMs ?? 620;
+  const listExitDurationMs = Math.max(animationDurationMs, 720);
   const autoCloseMs = layout.autoCloseMs ?? 0;
   const enterAnimation = getOverlayAnimationName(layout.enterAnimation, "in");
   const exitAnimation = getOverlayAnimationName(layout.exitAnimation, "out");
@@ -77,7 +79,7 @@ export function OverlayRuntimeClient({ schema, overlayKey, preview = false, debu
         showSingleItem(data);
       }
       setItems((current) => {
-        const next = appendRuntimeItem(current, data, layout.maxItems, layout.reverse);
+        const next = appendRuntimeItem(current, data, layout.maxItems);
 
         if (debug) {
           console.log("items length after update", next.length);
@@ -117,10 +119,10 @@ export function OverlayRuntimeClient({ schema, overlayKey, preview = false, debu
 
     const timeout = window.setTimeout(() => {
       setItems((current) => current.filter((item) => !item.meta?.exiting));
-    }, animationDurationMs);
+    }, listExitDurationMs + overlayListExitDelayMs + 120);
 
     return () => window.clearTimeout(timeout);
-  }, [animationDurationMs, items]);
+  }, [items, listExitDurationMs]);
 
   useEffect(() => {
     if (!singleItem?.exiting) {
@@ -302,7 +304,7 @@ function getEventText(event: OverlayEventPayload) {
   }
 }
 
-function appendRuntimeItem(current: OverlayRenderData[], next: OverlayRenderData, maxItems: number, reverseOrder: boolean) {
+function appendRuntimeItem(current: OverlayRenderData[], next: OverlayRenderData, maxItems: number) {
   const nextId = next.meta?.id;
   const active = current.filter((item) => !item.meta?.exiting);
   const uniqueNext = {
@@ -312,16 +314,12 @@ function appendRuntimeItem(current: OverlayRenderData[], next: OverlayRenderData
       instanceId: `${nextId ?? "event"}-${Date.now()}-${runtimeItemSequence += 1}`
     }
   };
-  const combined = reverseOrder ? [uniqueNext, ...active] : [...active, uniqueNext];
+  const combined = [uniqueNext, ...active];
   const overflowCount = Math.max(0, combined.length - maxItems);
   const nextItems = overflowCount === 0
     ? combined
     : combined.map((item, index) => {
-      if (reverseOrder) {
-        return index >= maxItems ? { ...item, meta: { ...item.meta, exiting: true } } : item;
-      }
-
-      return index < overflowCount ? { ...item, meta: { ...item.meta, exiting: true } } : item;
+      return index >= maxItems ? { ...item, meta: { ...item.meta, exiting: true } } : item;
     });
 
   return nextItems;

@@ -163,7 +163,7 @@ export const overlayTemplates: OverlayTemplate[] = [
               visible: true,
               locked: false,
               props: { text: "{{comment.text}}" },
-              style: { fontSize: 24, fontWeight: 700, color: "#111111", lineHeight: 1.25, overflow: "hidden", textOverflow: "ellipsis", maxLines: 2 }
+              style: { fontSize: 24, fontWeight: 700, color: "#111111", lineHeight: 1.25, overflow: "hidden", textOverflow: "clip", autoFitFontSize: true }
             }
           ]
         }
@@ -202,7 +202,7 @@ export const overlayTemplates: OverlayTemplate[] = [
           props: { clipContent: true, padding: 18, layout: "free" },
           style: { background: { type: "solid", color: "#111827", opacity: 86 }, radius: 28, overflow: "hidden", shadow: { enabled: true, color: "#000000", opacity: 34, blur: 28, x: 0, y: 12 } },
           children: [
-            { id: "comment_1", type: "comment", name: "Komentar", x: 26, y: 22, width: 528, height: 58, zIndex: 1, visible: true, locked: false, props: { text: "{{comment.text}}" }, style: { fontSize: 25, fontWeight: 700, color: "#ffffff", lineHeight: 1.25, overflow: "hidden", textOverflow: "ellipsis", maxLines: 2 } }
+            { id: "comment_1", type: "comment", name: "Komentar", x: 26, y: 22, width: 528, height: 58, zIndex: 1, visible: true, locked: false, props: { text: "{{comment.text}}" }, style: { fontSize: 25, fontWeight: 700, color: "#ffffff", lineHeight: 1.25, overflow: "hidden", textOverflow: "clip", autoFitFontSize: true } }
           ]
         }
       ]
@@ -233,7 +233,7 @@ export const overlayTemplates: OverlayTemplate[] = [
           children: [
             { id: "badge_1", type: "viewer_badge", name: "Badge", x: 24, y: 18, width: 122, height: 26, zIndex: 1, visible: true, locked: false, props: { text: "{{viewer.badge}}" }, style: { backgroundColor: "#dc2626", radius: 999, fontSize: 12, fontWeight: 900, color: "#ffffff", align: "center" } },
             { id: "name_1", type: "viewer_name", name: "Nama", x: 162, y: 18, width: 250, height: 28, zIndex: 2, visible: true, locked: false, props: { text: "{{viewer.name}}" }, style: { fontSize: 21, fontWeight: 900, color: "#ffffff", lineHeight: 1.1 } },
-            { id: "comment_1", type: "comment", name: "Komentar", x: 24, y: 58, width: 580, height: 58, zIndex: 3, visible: true, locked: false, props: { text: "{{comment.text}}" }, style: { fontSize: 25, fontWeight: 800, color: "#ffffff", lineHeight: 1.25, overflow: "hidden", textOverflow: "ellipsis", maxLines: 2 } }
+            { id: "comment_1", type: "comment", name: "Komentar", x: 24, y: 58, width: 580, height: 58, zIndex: 3, visible: true, locked: false, props: { text: "{{comment.text}}" }, style: { fontSize: 25, fontWeight: 800, color: "#ffffff", lineHeight: 1.25, overflow: "hidden", textOverflow: "clip", autoFitFontSize: true } }
           ]
         }
       ]
@@ -263,7 +263,7 @@ export const overlayTemplates: OverlayTemplate[] = [
           props: { clipContent: true, padding: 14, layout: "free" },
           style: { background: { type: "glass", color: "#000000", opacity: 38 }, radius: 14, backdropBlur: 10, overflow: "hidden" },
           children: [
-            { id: "comment_1", type: "comment", name: "Komentar", x: 18, y: 17, width: 520, height: 38, zIndex: 1, visible: true, locked: false, props: { text: "{{viewer.name}}: {{comment.text}}" }, style: { fontSize: 22, fontWeight: 700, color: "#ffffff", lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis", maxLines: 1 } }
+            { id: "comment_1", type: "comment", name: "Komentar", x: 18, y: 17, width: 520, height: 38, zIndex: 1, visible: true, locked: false, props: { text: "{{viewer.name}}: {{comment.text}}" }, style: { fontSize: 22, fontWeight: 700, color: "#ffffff", lineHeight: 1.2, overflow: "hidden", textOverflow: "clip", autoFitFontSize: true } }
           ]
         }
       ]

@@ -230,7 +230,7 @@ export function CanvasEditor({
         setHoverContainerId(findContainerAtPoint(event.clientX, event.clientY, null));
       }}
       onDragLeave={() => setHoverContainerId(null)}
-      className="min-h-[560px] min-w-0 overflow-auto rounded-lg border bg-zinc-950/5 p-8 shadow-inner"
+      className="h-full min-h-[420px] min-w-0 overflow-auto rounded-lg border bg-zinc-950/5 p-8 shadow-inner"
     >
       <div className="flex min-h-full min-w-0 items-start justify-center">
         <div
@@ -253,6 +253,7 @@ export function CanvasEditor({
             <OverlayRenderer
               designJson={designSchema}
               data={data}
+              enableRuntimeLayout={previewMode}
               className={previewMode ? undefined : "outline outline-1 outline-primary/50"}
               getComponentProps={(component) => ({
                 role: "button",

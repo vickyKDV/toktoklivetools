@@ -1,12 +1,13 @@
 "use client";
 
-import { Fragment, useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { componentRegistry } from "@/features/overlay-builder/registry/componentRegistry";
 import type {
   OverlayComponentSchema,
   OverlayDesignSchema,
   OverlayRenderData
 } from "@/features/overlay-builder/schema/overlaySchema";
+import { getRuntimeComponentHeight } from "@/features/overlay-builder/utils/runtimeLayout";
 
 type OverlayRendererProps = {
   designJson: OverlayDesignSchema;
@@ -17,6 +18,7 @@ type OverlayRendererProps = {
   renderEditorOverlay?: (component: OverlayComponentSchema) => React.ReactNode;
   getComponentProps?: (component: OverlayComponentSchema) => React.HTMLAttributes<HTMLDivElement>;
   renderDropIndicator?: (component: OverlayComponentSchema) => React.ReactNode;
+  enableRuntimeLayout?: boolean;
 };
 
 export function OverlayRenderer({
@@ -27,7 +29,8 @@ export function OverlayRenderer({
   style,
   renderEditorOverlay,
   getComponentProps,
-  renderDropIndicator
+  renderDropIndicator,
+  enableRuntimeLayout = true
 }: OverlayRendererProps) {
   return (
     <div
@@ -42,7 +45,9 @@ export function OverlayRenderer({
         ...style
       }}
     >
-      {renderComponents(designJson.components, data, getComponentProps, renderEditorOverlay, renderDropIndicator)}
+      {renderEffectLayer(designJson.canvas.animation, designJson.canvas.radius, "canvas", "canvas-effect")}
+      {renderComponents(designJson.components, data, getComponentProps, renderEditorOverlay, renderDropIndicator, enableRuntimeLayout, "root")}
+      <style dangerouslySetInnerHTML={{ __html: overlayEffectCss }} />
 
       {debug ? (
         <>
@@ -59,50 +64,60 @@ function renderComponents(
   data: OverlayRenderData,
   getComponentProps?: (component: OverlayComponentSchema) => React.HTMLAttributes<HTMLDivElement>,
   renderEditorOverlay?: (component: OverlayComponentSchema) => React.ReactNode,
-  renderDropIndicator?: (component: OverlayComponentSchema) => React.ReactNode
+  renderDropIndicator?: (component: OverlayComponentSchema) => React.ReactNode,
+  enableRuntimeLayout = true,
+  keyPath = "root"
 ) {
   return [...(components ?? [])]
     .filter((component) => component.visible)
     .sort((a, b) => a.zIndex - b.zIndex)
-    .map((component) => {
+    .map((component, index) => {
       const registryItem = componentRegistry[component.type];
       const props = getComponentProps?.(component) ?? {};
+      const runtimeHeight = enableRuntimeLayout ? getRuntimeComponentHeight(component, data) : component.height;
+      const renderKey = `${keyPath}-${index}-${component.id}`;
 
       return (
         <div
+          key={renderKey}
           {...props}
-          key={component.id}
           data-overlay-component-id={component.id}
           data-overlay-component-type={component.type}
           className={props.className}
           style={{
             ...props.style,
-            ...getComponentStyle(component),
             position: "absolute",
             left: component.x,
             top: component.y,
             width: component.width,
-            height: component.height,
+            height: runtimeHeight,
+            minHeight: component.height,
             transform: `rotate(${component.rotation ?? 0}deg)`,
             transformOrigin: "center center",
             zIndex: component.zIndex,
-            boxSizing: "border-box"
+            boxSizing: "border-box",
+            overflow: "visible",
+            isolation: component.style.animation?.enabled ? "isolate" : undefined
           }}
         >
-          <Fragment key={`${component.id}-content`}>
+          {renderEffectLayer(component.style.animation, component.style.radius, "component", `${renderKey}-effect`)}
+          <div
+            style={{
+              ...getComponentStyle(component),
+              position: "relative",
+              width: "100%",
+              height: "100%",
+              minHeight: component.height,
+              boxSizing: "border-box"
+            }}
+          >
             {registryItem.render(component, data)}
-          </Fragment>
-          {component.children?.length ? (
-            <Fragment key={`${component.id}-children`}>
-              {renderComponents(component.children, data, getComponentProps, renderEditorOverlay, renderDropIndicator)}
-            </Fragment>
-          ) : null}
-          <Fragment key={`${component.id}-drop-indicator`}>
-            {renderDropIndicator?.(component)}
-          </Fragment>
-          <Fragment key={`${component.id}-editor-overlay`}>
-            {renderEditorOverlay?.(component)}
-          </Fragment>
+            {component.children?.length
+              ? renderComponents(component.children, data, getComponentProps, renderEditorOverlay, renderDropIndicator, enableRuntimeLayout, renderKey)
+              : null}
+          </div>
+          {renderDropIndicator?.(component)}
+          {renderEditorOverlay?.(component)}
         </div>
       );
     });
@@ -143,6 +158,26 @@ function getCanvasStyle(design: OverlayDesignSchema): CSSProperties {
   };
 }
 
+function renderEffectLayer(
+  animation: OverlayComponentSchema["style"]["animation"] | OverlayDesignSchema["canvas"]["animation"] | undefined,
+  radius: number | undefined,
+  scope: "canvas" | "component",
+  key: string
+) {
+  if (!animation?.enabled || animation.type === "none") {
+    return null;
+  }
+
+  return (
+    <span
+      key={key}
+      aria-hidden="true"
+      data-overlay-effect={animation.type}
+      style={getEffectLayerStyle(animation, radius, scope)}
+    />
+  );
+}
+
 function getComponentStyle(component: OverlayComponentSchema): CSSProperties {
   const style = component.style;
   const border = style.border?.enabled ? `${style.border.width}px solid ${style.border.color}` : undefined;
@@ -167,6 +202,114 @@ function getComponentStyle(component: OverlayComponentSchema): CSSProperties {
     overflow
   };
 }
+
+function getEffectLayerStyle(
+  animation: NonNullable<OverlayComponentSchema["style"]["animation"]>,
+  radius: number | undefined,
+  scope: "canvas" | "component"
+): CSSProperties {
+  const color = animation.color ?? "#22d3ee";
+  const color2 = animation.color2 ?? "#f43f5e";
+  const intensity = Math.min(Math.max(animation.intensity ?? 70, 0), 100);
+  const duration = `${animation.durationMs ?? 2400}ms`;
+  const glow = Math.round(8 + intensity * 0.28);
+  const borderWidth = Math.max(2, Math.round(1 + intensity / 30));
+  const base: CSSProperties = {
+    position: "absolute",
+    inset: scope === "canvas" ? 0 : -borderWidth,
+    borderRadius: radius ?? "inherit",
+    pointerEvents: "none",
+    zIndex: 2,
+    boxSizing: "border-box",
+    backfaceVisibility: "hidden",
+    willChange: "opacity, transform, box-shadow, filter"
+  };
+
+  if (animation.type === "rotate_neon") {
+    return {
+      ...base,
+      padding: borderWidth,
+      background: `conic-gradient(from 0deg, transparent 0deg, ${color} 70deg, ${color2} 150deg, transparent 260deg, ${color} 360deg)`,
+      WebkitMask: "linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)",
+      WebkitMaskComposite: "xor",
+      maskComposite: "exclude",
+      filter: `drop-shadow(0 0 ${Math.round(glow * 0.75)}px ${color})`,
+      animation: `overlayEffectSpin ${duration} linear infinite`
+    };
+  }
+
+  if (animation.type === "gradient_shift") {
+    return {
+      ...base,
+      opacity: Math.max(0.18, intensity / 180),
+      background: `linear-gradient(115deg, transparent 0%, ${color}55 32%, ${color2}66 50%, transparent 68%)`,
+      backgroundSize: "220% 220%",
+      mixBlendMode: "screen",
+      animation: `overlayEffectGradient ${duration} ease-in-out infinite`
+    };
+  }
+
+  const shadow = `0 0 ${glow}px ${color}, 0 0 ${glow * 2}px ${color2}`;
+
+  if (animation.type === "pulse") {
+    return {
+      ...base,
+      border: `${borderWidth}px solid ${color}`,
+      boxShadow: shadow,
+      animation: `overlayEffectPulse ${duration} ease-in-out infinite`
+    };
+  }
+
+  if (animation.type === "neon") {
+    return {
+      ...base,
+      border: `${borderWidth}px solid ${color}`,
+      boxShadow: shadow,
+      animation: `overlayEffectNeon ${duration} ease-in-out infinite`
+    };
+  }
+
+  if (animation.type === "float") {
+    return {
+      ...base,
+      inset: 0,
+      border: `${borderWidth}px solid ${color}`,
+      boxShadow: shadow,
+      animation: `overlayEffectFloat ${duration} ease-in-out infinite`
+    };
+  }
+
+  return {
+    ...base,
+    border: `${borderWidth}px solid ${color}`,
+    boxShadow: shadow,
+    opacity: Math.max(0.3, intensity / 100)
+  };
+}
+
+const overlayEffectCss = `
+@keyframes overlayEffectSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes overlayEffectPulse {
+  0%, 100% { opacity: .45; transform: scale(1); filter: saturate(1); }
+  50% { opacity: 1; transform: scale(1.012); filter: saturate(1.45); }
+}
+@keyframes overlayEffectNeon {
+  0%, 100% { opacity: .64; filter: brightness(1); }
+  45% { opacity: 1; filter: brightness(1.4); }
+  55% { opacity: .78; filter: brightness(1.1); }
+}
+@keyframes overlayEffectGradient {
+  0%, 100% { background-position: 0% 50%; opacity: .2; }
+  50% { background-position: 100% 50%; opacity: .75; }
+}
+@keyframes overlayEffectFloat {
+  0%, 100% { transform: translate3d(0, 0, 0); opacity: .55; }
+  50% { transform: translate3d(0, -4px, 0); opacity: 1; }
+}
+`;
 
 function getBackgroundStyle(
   background: OverlayComponentSchema["style"]["background"] | OverlayDesignSchema["canvas"]["background"] | undefined,

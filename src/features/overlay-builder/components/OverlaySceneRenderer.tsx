@@ -96,7 +96,7 @@ export function OverlayViewportSceneRenderer({ schema, data, items, debug = fals
 }
 
 export function isListSchema(schema: OverlayDesignSchema) {
-  return schema.layout.mode === "list" || schema.kind === "CHAT" || schema.kind === "LEADERBOARD" || schema.kind === "DOCK";
+  return schema.layout.mode === "list";
 }
 
 function getEnabledEventTypes(schema: OverlayDesignSchema) {

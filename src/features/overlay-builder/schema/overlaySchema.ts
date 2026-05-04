@@ -11,6 +11,7 @@ export const overlayComponentTypes = [
   "viewer_badge",
   "comment",
   "created_at",
+  "gift_text",
   "gift_name",
   "gift_count",
   "gift_image",
@@ -21,6 +22,8 @@ export const overlayKinds = ["CHAT", "GIFT", "LEADERBOARD", "DOCK", "CUSTOM"] as
 export type OverlayKind = (typeof overlayKinds)[number];
 export const overlayLayoutModes = ["single", "list", "ticker", "dock", "grid"] as const;
 export type OverlayLayoutMode = (typeof overlayLayoutModes)[number];
+export const overlayListStyles = ["stacked_card", "layered_list", "card_stack", "focus_stack", "depth_list"] as const;
+export type OverlayListStyle = (typeof overlayListStyles)[number];
 export type OverlayComponentType = (typeof overlayComponentTypes)[number];
 
 export const overlayBackgroundSchema = z.object({
@@ -53,6 +56,15 @@ export const overlayBorderSchema = z.object({
   width: z.number().min(0).max(80).default(0)
 });
 
+export const overlayAnimationEffectSchema = z.object({
+  type: z.enum(["none", "pulse", "glow", "neon", "rotate_neon", "gradient_shift", "float"]).default("none"),
+  enabled: z.boolean().default(false),
+  color: z.string().default("#22d3ee"),
+  color2: z.string().default("#f43f5e"),
+  durationMs: z.number().min(300).max(20000).default(2400),
+  intensity: z.number().min(0).max(100).default(70)
+});
+
 export const overlayComponentStyleSchema = z.object({
   background: overlayBackgroundSchema.optional(),
   radius: z.number().min(0).max(999).optional(),
@@ -68,11 +80,13 @@ export const overlayComponentStyleSchema = z.object({
   lineHeight: z.number().min(0.6).max(4).optional(),
   maxLines: z.number().min(1).max(20).optional(),
   textOverflow: z.enum(["clip", "ellipsis"]).optional(),
+  autoHeight: z.boolean().optional(),
   autoFitFontSize: z.boolean().optional(),
   lineClamp: z.number().min(1).max(20).optional(),
   backgroundColor: z.string().optional(),
   objectFit: z.enum(["cover", "contain", "fill"]).optional(),
-  overflow: z.enum(["visible", "hidden"]).optional()
+  overflow: z.enum(["visible", "hidden"]).optional(),
+  animation: overlayAnimationEffectSchema.optional()
 }).passthrough();
 
 const overlayComponentBaseSchema = z.object({
@@ -109,7 +123,8 @@ export const overlayDesignSchema = z.object({
     background: overlayBackgroundSchema.default({ type: "solid", color: "#4d85ff", opacity: 100 }),
     radius: z.number().min(0).max(999).default(0),
     stroke: overlayStrokeSchema.default({ enabled: false, color: "#ffffff", width: 0 }),
-    shadow: overlayShadowSchema.default({ enabled: false, color: "#00000055", blur: 0, x: 0, y: 0 })
+    shadow: overlayShadowSchema.default({ enabled: false, color: "#00000055", blur: 0, x: 0, y: 0 }),
+    animation: overlayAnimationEffectSchema.default({ type: "none", enabled: false, color: "#22d3ee", color2: "#f43f5e", durationMs: 2400, intensity: 70 })
   }),
   dataSource: z.object({
     type: z.enum(["chat", "gift", "leaderboard", "dock", "manual"]).default("manual"),
@@ -122,6 +137,7 @@ export const overlayDesignSchema = z.object({
     direction: z.enum(["vertical", "horizontal"]).default("vertical"),
     reverse: z.boolean().default(false),
     align: z.enum(["start", "center", "end", "stretch"]).default("start"),
+    listStyle: z.enum(overlayListStyles).default("stacked_card"),
     enterAnimation: z.string().default("fade"),
     exitAnimation: z.string().default("fade"),
     autoCloseMs: z.number().min(0).max(600000).default(0),
@@ -133,6 +149,7 @@ export const overlayDesignSchema = z.object({
     direction: "vertical",
     reverse: false,
     align: "start",
+    listStyle: "stacked_card",
     enterAnimation: "fade",
     exitAnimation: "fade",
     autoCloseMs: 0,
@@ -207,6 +224,14 @@ export const blankOverlayDesignSchema: OverlayDesignSchema = {
       blur: 0,
       x: 0,
       y: 0
+    },
+    animation: {
+      type: "none",
+      enabled: false,
+      color: "#22d3ee",
+      color2: "#f43f5e",
+      durationMs: 2400,
+      intensity: 70
     }
   },
   dataSource: {
@@ -220,6 +245,7 @@ export const blankOverlayDesignSchema: OverlayDesignSchema = {
     direction: "vertical",
     reverse: false,
     align: "start",
+    listStyle: "stacked_card",
     enterAnimation: "fade",
     exitAnimation: "fade",
     autoCloseMs: 0,

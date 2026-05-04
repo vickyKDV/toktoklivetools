@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { ComponentLibrary } from "@/features/overlay-builder/components/ComponentLibrary";
 import { CanvasEditor } from "@/features/overlay-builder/components/CanvasEditor";
 import { PropertyInspector } from "@/features/overlay-builder/components/PropertyInspector";
-import { getSampleChatRenderData, sampleChatRenderData } from "@/features/overlay-builder/components/ChatStyleRenderer";
+import { getSampleChatRenderData, overlayListExitDelayMs, sampleChatRenderData } from "@/features/overlay-builder/components/ChatStyleRenderer";
 import { OverlaySceneRenderer } from "@/features/overlay-builder/components/OverlaySceneRenderer";
 import { eventToRenderData } from "@/features/overlay-builder/components/OverlayRuntimeClient";
 import { componentRegistry } from "@/features/overlay-builder/registry/componentRegistry";
@@ -22,7 +22,8 @@ import {
   dummyOverlayData,
   type OverlayComponentSchema,
   type OverlayComponentType,
-  type OverlayDesignSchema
+  type OverlayDesignSchema,
+  type OverlayRenderData
 } from "@/features/overlay-builder/schema/overlaySchema";
 import { createDefaultComponent } from "@/features/overlay-builder/utils/createDefaultComponent";
 import type { OverlayEventPayload } from "@/types/live";
@@ -100,11 +101,12 @@ export function BuilderLayout({
     [designSchema.components, selectedComponentId]
   );
   const flatComponents = useMemo(() => flattenComponents(designSchema.components), [designSchema.components]);
-  const isListPreview = designSchema.layout.mode === "list" || designSchema.kind === "CHAT" || designSchema.kind === "LEADERBOARD" || designSchema.kind === "DOCK";
+  const isListPreview = designSchema.layout.mode === "list";
   const previewSampleItems = useMemo(
     () => getSampleChatRenderData(designSchema.layout.maxItems, getEnabledEventTypes(designSchema)),
     [designSchema]
   );
+  const listExitDurationMs = Math.max(designSchema.layout.animationDurationMs ?? 620, 720);
   const designOutputPath = designId ? `/overlay/${overlayKind.toLowerCase()}/${designId}` : "";
   const designOutputUrl = designOutputPath ? `${browserOrigin}${designOutputPath}` : "";
 
@@ -134,20 +136,7 @@ export function BuilderLayout({
     function handlePreviewEvent(event: OverlayEventPayload) {
       const data = eventToRenderData(event);
       setPreviewSingleData(data);
-      setPreviewItems((current) => {
-        const itemWithId = {
-          ...data,
-          meta: {
-            ...data.meta,
-            instanceId: `preview-${data.meta?.id ?? "event"}-${Date.now()}`
-          }
-        };
-        const next = designSchema.layout.reverse ? [itemWithId, ...current] : [...current, itemWithId];
-
-        return designSchema.layout.reverse
-          ? next.slice(0, designSchema.layout.maxItems)
-          : next.slice(-designSchema.layout.maxItems);
-      });
+      setPreviewItems((current) => appendPreviewItem(current, data, designSchema.layout.maxItems));
     }
 
     function handleFocusPreviewEvent(event: OverlayEventPayload) {
@@ -158,6 +147,20 @@ export function BuilderLayout({
       setPreviewSingleData(eventToRenderData(event));
     }
   }, [designSchema, previewDataMode, view, workspaceOverlayKey]);
+
+  useEffect(() => {
+    const hasExitingItems = previewItems.some((item) => item.meta?.exiting);
+
+    if (!hasExitingItems) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      setPreviewItems((current) => current.filter((item) => !item.meta?.exiting));
+    }, listExitDurationMs + overlayListExitDelayMs + 120);
+
+    return () => window.clearTimeout(timeout);
+  }, [listExitDurationMs, previewItems]);
 
   function commit(next: OverlayDesignSchema) {
     setHistory((current) => [...current.slice(-30), designSchema]);
@@ -501,11 +504,11 @@ export function BuilderLayout({
   }
 
   return (
-    <div className="grid gap-5">
+    <div className="grid gap-6 px-4 md:px-5">
       <Card>
-        <CardContent className="flex flex-col gap-4 p-5 xl:flex-row xl:items-center xl:justify-between">
+        <CardContent className="flex flex-col gap-4 px-5 py-5 xl:flex-row xl:items-center xl:justify-between xl:px-6">
           <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-3">
               <Button asChild variant="outline" size="sm">
                 <Link href="/dashboard">
                   <ArrowLeft />
@@ -519,39 +522,43 @@ export function BuilderLayout({
             <p className="mt-1 text-sm text-muted-foreground">Builder menyimpan schema JSON ke record Overlay resmi. Preview dan OBS membaca overlay yang sama.</p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <Button type="button" variant="outline" onClick={undo} disabled={!history.length}>
-              <Undo2 />
-            </Button>
-            <Button type="button" variant="outline" onClick={redo} disabled={!future.length}>
-              <Redo2 />
-            </Button>
-            <Button type="button" variant="outline" onClick={() => startBlankCanvas(true)}>
-              <FilePlus2 />
-              Blank Canvas
-            </Button>
-            <select
-              value={overlayKind}
-              onChange={(event) => {
-                const kind = normalizeKind(event.target.value);
-                setOverlayKind(kind);
-                setOverlayType(kind === "CHAT" ? "CHAT_STYLE" : "CUSTOM_OVERLAY");
-                updateDesign({ kind });
-              }}
-              className="flex h-10 rounded-md border border-input bg-card px-3 py-2 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              <option value="CHAT">Chat</option>
-              <option value="GIFT">Gift</option>
-              <option value="LEADERBOARD">Leaderboard</option>
-              <option value="DOCK">Dock</option>
-              <option value="CUSTOM">Custom</option>
-            </select>
-            <Button type="button" variant="outline" onClick={clearCanvas}>
-              <Trash2 />
-              Clear Canvas
-            </Button>
+          <div className="flex flex-wrap items-center justify-start gap-5 xl:justify-end">
+            <div className="flex flex-wrap items-center gap-3">
+              <Button type="button" variant="outline" onClick={undo} disabled={!history.length}>
+                <Undo2 />
+              </Button>
+              <Button type="button" variant="outline" onClick={redo} disabled={!future.length}>
+                <Redo2 />
+              </Button>
+            </div>
+            <div className="flex flex-wrap items-center gap-4">
+              <Button type="button" variant="outline" onClick={() => startBlankCanvas(true)}>
+                <FilePlus2 />
+                Blank Canvas
+              </Button>
+              <select
+                value={overlayKind}
+                onChange={(event) => {
+                  const kind = normalizeKind(event.target.value);
+                  setOverlayKind(kind);
+                  setOverlayType(kind === "CHAT" ? "CHAT_STYLE" : "CUSTOM_OVERLAY");
+                  updateDesign({ kind });
+                }}
+                className="flex h-10 rounded-md border border-input bg-card px-4 py-2 text-sm font-semibold outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <option value="CHAT">Chat</option>
+                <option value="GIFT">Gift</option>
+                <option value="LEADERBOARD">Leaderboard</option>
+                <option value="DOCK">Dock</option>
+                <option value="CUSTOM">Custom</option>
+              </select>
+              <Button type="button" variant="outline" onClick={clearCanvas}>
+                <Trash2 />
+                Clear Canvas
+              </Button>
+            </div>
             {designId ? (
-              <>
+              <div className="flex flex-wrap items-center gap-4">
                 <Button asChild variant="outline">
                   <Link href={`/overlay-preview/${designId}`} target="_blank">
                     <Eye />
@@ -564,24 +571,26 @@ export function BuilderLayout({
                     OBS
                   </Link>
                 </Button>
-              </>
+              </div>
             ) : null}
-            <Button type="button" onClick={saveDesign} disabled={saving}>
-              <Save />
-              {saving ? "Saving..." : "Save Draft"}
-            </Button>
-            <Button type="button" variant="outline" onClick={publishDesign} disabled={saving}>
-              <Monitor />
-              Publish
-            </Button>
+            <div className="flex flex-wrap items-center gap-4">
+              <Button type="button" onClick={saveDesign} disabled={saving}>
+                <Save />
+                {saving ? "Saving..." : "Save Draft"}
+              </Button>
+              <Button type="button" variant="outline" onClick={publishDesign} disabled={saving}>
+                <Monitor />
+                Publish
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
 
-      <div className="grid min-w-0 items-start gap-5 xl:grid-cols-[18rem_minmax(0,1fr)_24rem]">
+      <div className="grid min-w-0 items-start gap-6 xl:grid-cols-[18rem_minmax(0,1fr)_24rem]">
         <aside className="grid gap-4 xl:sticky xl:top-4">
           <ComponentLibrary onAddComponent={addComponent} onLoadTemplate={loadTemplate} onBlankCanvas={() => startBlankCanvas(true)} />
-          <section className="grid gap-2 rounded-lg border bg-card p-3">
+          <section className="grid gap-3 rounded-lg border bg-card p-4">
             <p className="text-sm font-semibold">Saved Designs</p>
             {savedDesigns.length ? (
               savedDesigns.map((design) => (
@@ -589,7 +598,7 @@ export function BuilderLayout({
                   key={design.id}
                   type="button"
                   onClick={() => loadSavedDesign(design.id)}
-                  className="rounded-md border bg-background p-3 text-left transition-colors hover:bg-muted"
+                  className="rounded-md border bg-background p-4 text-left transition-colors hover:bg-muted"
                 >
                   <span className="block truncate text-sm font-semibold">{design.name}</span>
                   <span className="mt-1 block text-xs text-muted-foreground">{design.kind} · {design.publishedAt ? "Published" : "Draft"}</span>
@@ -601,9 +610,9 @@ export function BuilderLayout({
           </section>
         </aside>
 
-        <main className="grid min-w-0 gap-4">
+        <main className="grid min-w-0 gap-5">
           <Card>
-            <CardContent className="grid gap-3 p-4">
+            <CardContent className="grid gap-4 px-5 py-5">
               <div>
                 <p className="text-sm font-semibold">OBS Browser Source URL</p>
                 <p className="text-xs text-muted-foreground">
@@ -611,7 +620,7 @@ export function BuilderLayout({
                 </p>
               </div>
               {designOutputPath ? (
-                <div className="grid gap-2 lg:grid-cols-[minmax(0,1fr)_auto]">
+                <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto]">
                   <Input readOnly value={designOutputUrl} />
                   <CopyButton value={designOutputUrl} />
                 </div>
@@ -620,9 +629,9 @@ export function BuilderLayout({
           </Card>
 
           <Card>
-            <CardContent className="grid gap-3 p-4 md:grid-cols-[minmax(0,1fr)_auto_auto]">
+            <CardContent className="grid gap-4 px-5 py-5 md:grid-cols-[minmax(0,1fr)_auto_auto]">
               <Input value={designSchema.name} onChange={(event) => updateDesign({ name: event.target.value })} />
-              <div className="grid grid-cols-3 gap-1 rounded-lg border bg-muted/30 p-1">
+              <div className="grid grid-cols-3 gap-2 rounded-lg border bg-muted/30 p-1.5">
                 {([
                   ["editor", "Editor"],
                   ["json", "JSON"],
@@ -702,7 +711,7 @@ export function BuilderLayout({
 
         <aside className="grid gap-4 xl:sticky xl:top-4 xl:max-h-[calc(100vh-2rem)] xl:overflow-y-auto">
           <Card>
-            <CardContent className="p-4">
+            <CardContent className="p-5">
               <PropertyInspector
                 designSchema={designSchema}
                 selectedComponent={selectedComponent}
@@ -748,6 +757,27 @@ function getEnabledEventTypes(schema: OverlayDesignSchema) {
   }
 
   return ["CHAT"];
+}
+
+function appendPreviewItem(current: OverlayRenderData[], next: OverlayRenderData, maxItems: number) {
+  const active = current.filter((item) => !item.meta?.exiting);
+  const itemWithId = {
+    ...next,
+    meta: {
+      ...next.meta,
+      instanceId: `preview-${next.meta?.id ?? "event"}-${Date.now()}`
+    }
+  };
+  const combined = [itemWithId, ...active];
+  const overflowCount = Math.max(0, combined.length - maxItems);
+
+  if (overflowCount === 0) {
+    return combined;
+  }
+
+  return combined.map((item, index) => {
+    return index >= maxItems ? { ...item, meta: { ...item.meta, exiting: true } } : item;
+  });
 }
 
 function acceptsFocusDock(schema: OverlayDesignSchema) {

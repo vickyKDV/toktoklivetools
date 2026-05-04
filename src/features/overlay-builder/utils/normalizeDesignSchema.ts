@@ -46,7 +46,7 @@ function inferRuntimeDefaults(value: unknown) {
     ...record,
     kind: "CHAT",
     dataSource: record.dataSource ?? { type: "chat", filters: {} },
-    layout: record.layout ?? { mode: "list", maxItems: 10, gap: 12, direction: "vertical", reverse: true, align: "start", enterAnimation: "slide-up", exitAnimation: "fade", autoCloseMs: 0, animationDurationMs: 620 }
+    layout: record.layout ?? { mode: "list", maxItems: 10, gap: 12, direction: "vertical", reverse: true, align: "start", listStyle: "stacked_card", enterAnimation: "slide-up", exitAnimation: "fade", autoCloseMs: 0, animationDurationMs: 620 }
   };
 }
 
@@ -131,6 +131,14 @@ function migrateLegacyDesign(value: LegacyDesign, name: string): OverlayDesignSc
         blur: 0,
         x: 0,
         y: 0
+      },
+      animation: {
+        type: "none",
+        enabled: false,
+        color: "#22d3ee",
+        color2: "#f43f5e",
+        durationMs: 2400,
+        intensity: 70
       }
     },
     dataSource: {
@@ -144,6 +152,7 @@ function migrateLegacyDesign(value: LegacyDesign, name: string): OverlayDesignSc
       direction: "vertical",
       reverse: true,
       align: "start",
+      listStyle: "stacked_card",
       enterAnimation: "slide-up",
       exitAnimation: "fade",
       autoCloseMs: 0,
@@ -157,34 +166,34 @@ function fallbackSchemaByKind(kind: OverlayDesignSchema["kind"]): Pick<OverlayDe
   if (kind === "CHAT") {
     return {
       dataSource: { type: "chat", filters: {} },
-      layout: { mode: "list", maxItems: 10, gap: 12, direction: "vertical", reverse: true, align: "start", enterAnimation: "slide-up", exitAnimation: "fade", autoCloseMs: 0, animationDurationMs: 620 }
+      layout: { mode: "list", maxItems: 10, gap: 12, direction: "vertical", reverse: true, align: "start", listStyle: "stacked_card", enterAnimation: "slide-up", exitAnimation: "fade", autoCloseMs: 0, animationDurationMs: 620 }
     };
   }
 
   if (kind === "GIFT") {
     return {
       dataSource: { type: "gift", filters: {} },
-      layout: { mode: "single", maxItems: 1, gap: 12, direction: "vertical", reverse: false, align: "start", enterAnimation: "pop", exitAnimation: "fade", autoCloseMs: 0, animationDurationMs: 620 }
+      layout: { mode: "single", maxItems: 1, gap: 12, direction: "vertical", reverse: false, align: "start", listStyle: "stacked_card", enterAnimation: "pop", exitAnimation: "fade", autoCloseMs: 0, animationDurationMs: 620 }
     };
   }
 
   if (kind === "LEADERBOARD") {
     return {
       dataSource: { type: "leaderboard", filters: {} },
-      layout: { mode: "list", maxItems: 10, gap: 8, direction: "vertical", reverse: false, align: "stretch", enterAnimation: "fade", exitAnimation: "fade", autoCloseMs: 0, animationDurationMs: 620 }
+      layout: { mode: "list", maxItems: 10, gap: 8, direction: "vertical", reverse: false, align: "stretch", listStyle: "layered_list", enterAnimation: "fade", exitAnimation: "fade", autoCloseMs: 0, animationDurationMs: 620 }
     };
   }
 
   if (kind === "DOCK") {
     return {
       dataSource: { type: "dock", filters: {} },
-      layout: { mode: "dock", maxItems: 20, gap: 8, direction: "vertical", reverse: true, align: "stretch", enterAnimation: "fade", exitAnimation: "fade", autoCloseMs: 0, animationDurationMs: 620 }
+      layout: { mode: "dock", maxItems: 20, gap: 8, direction: "vertical", reverse: true, align: "stretch", listStyle: "stacked_card", enterAnimation: "fade", exitAnimation: "fade", autoCloseMs: 0, animationDurationMs: 620 }
     };
   }
 
   return {
     dataSource: { type: "manual", filters: {} },
-    layout: { mode: "single", maxItems: 1, gap: 12, direction: "vertical", reverse: false, align: "start", enterAnimation: "fade", exitAnimation: "fade", autoCloseMs: 0, animationDurationMs: 620 }
+    layout: { mode: "single", maxItems: 1, gap: 12, direction: "vertical", reverse: false, align: "start", listStyle: "stacked_card", enterAnimation: "fade", exitAnimation: "fade", autoCloseMs: 0, animationDurationMs: 620 }
   };
 }
 

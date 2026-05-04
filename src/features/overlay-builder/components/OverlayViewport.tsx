@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { OverlayDesignSchema } from "@/features/overlay-builder/schema/overlaySchema";
 
 type OverlayViewportProps = {
@@ -10,29 +10,45 @@ type OverlayViewportProps = {
 };
 
 export function OverlayViewport({ schema, children, debug = false }: OverlayViewportProps) {
+  const viewportRef = useRef<HTMLDivElement | null>(null);
   const [viewport, setViewport] = useState({
-    width: schema.canvas.width,
-    height: schema.canvas.height
+    width: 800,
+    height: 600
   });
-  const designWidth = schema.canvas.width;
-  const designHeight = schema.canvas.height;
-  const widthRatio = viewport.width / designWidth;
-  const heightRatio = viewport.height / designHeight;
-  const scale = Math.min(widthRatio, heightRatio);
-  const isNativeSize = Math.abs(widthRatio - 1) < 0.001 && Math.abs(heightRatio - 1) < 0.001;
+  const designWidth = schema.canvas.width ?? 1080;
+  const designHeight = schema.canvas.height ?? 1920;
+  const viewportWidth = viewport.width;
+  const viewportHeight = viewport.height;
+  const scale = Math.min(viewportWidth / designWidth, viewportHeight / designHeight);
+  const scaledWidth = designWidth * scale;
+  const scaledHeight = designHeight * scale;
+  const offsetX = (viewportWidth - scaledWidth) / 2;
+  const offsetY = (viewportHeight - scaledHeight) / 2;
 
   useEffect(() => {
     function updateViewport() {
+      const container = viewportRef.current;
+
       setViewport({
-        width: window.innerWidth,
-        height: window.innerHeight
+        width: container?.clientWidth || window.innerWidth || 800,
+        height: container?.clientHeight || window.innerHeight || 600
       });
     }
 
     updateViewport();
     window.addEventListener("resize", updateViewport);
+    const resizeObserver = typeof ResizeObserver !== "undefined" && viewportRef.current
+      ? new ResizeObserver(updateViewport)
+      : null;
 
-    return () => window.removeEventListener("resize", updateViewport);
+    if (resizeObserver && viewportRef.current) {
+      resizeObserver.observe(viewportRef.current);
+    }
+
+    return () => {
+      window.removeEventListener("resize", updateViewport);
+      resizeObserver?.disconnect();
+    };
   }, []);
 
   useEffect(() => {
@@ -41,26 +57,22 @@ export function OverlayViewport({ schema, children, debug = false }: OverlayView
     }
 
     console.table({
-      mode: "viewport",
-      viewportWidth: viewport.width,
-      viewportHeight: viewport.height,
+      viewportWidth,
+      viewportHeight,
       designWidth,
       designHeight,
       scale,
-      scaleX: widthRatio,
-      scaleY: heightRatio
+      scaledWidth,
+      scaledHeight,
+      viewportRatio: viewportWidth / viewportHeight,
+      designRatio: designWidth / designHeight
     });
-
-    if (Math.abs(widthRatio - heightRatio) > 0.001) {
-      console.warn("Non-uniform scale detected. This will make overlay gepeng if it is used for transform.", {
-        scaleX: widthRatio,
-        scaleY: heightRatio
-      });
-    }
-  }, [debug, designHeight, designWidth, heightRatio, scale, viewport.height, viewport.width, widthRatio]);
+  }, [debug, designHeight, designWidth, scale, scaledHeight, scaledWidth, viewportHeight, viewportWidth]);
 
   return (
     <div
+      ref={viewportRef}
+      className="obsViewport"
       style={{
         position: "fixed",
         inset: 0,
@@ -71,14 +83,15 @@ export function OverlayViewport({ schema, children, debug = false }: OverlayView
       }}
     >
       <div
+        className="designCanvas"
         style={{
           position: "absolute",
-          left: isNativeSize ? 0 : "50%",
-          top: isNativeSize ? 0 : "50%",
+          left: 0,
+          top: 0,
           width: designWidth,
           height: designHeight,
-          transform: isNativeSize ? undefined : `translate(-50%, -50%) scale(${scale})`,
-          transformOrigin: isNativeSize ? "top left" : "center center",
+          transform: `translate(${offsetX}px, ${offsetY}px) scale(${scale})`,
+          transformOrigin: "top left",
           backfaceVisibility: "hidden",
           willChange: "transform"
         }}

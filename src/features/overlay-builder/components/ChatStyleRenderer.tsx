@@ -4,10 +4,11 @@ import { useEffect, type CSSProperties } from "react";
 import { OverlayRenderer } from "@/features/overlay-builder/components/OverlayRenderer";
 import {
   dummyOverlayData,
-  type OverlayComponentSchema,
+  type OverlayListStyle,
   type OverlayDesignSchema,
   type OverlayRenderData
 } from "@/features/overlay-builder/schema/overlaySchema";
+import { getRuntimeComponentBounds } from "@/features/overlay-builder/utils/runtimeLayout";
 
 type ChatStyleRendererProps = {
   designJson: OverlayDesignSchema;
@@ -18,6 +19,8 @@ type ChatStyleRendererProps = {
   height?: CSSProperties["height"];
 };
 
+export const overlayListExitDelayMs = 90;
+
 export function ChatStyleRenderer({
   designJson,
   items = sampleChatRenderData,
@@ -26,15 +29,20 @@ export function ChatStyleRenderer({
   alignRight = false,
   height
 }: ChatStyleRendererProps) {
-  const bounds = getListItemBounds(designJson.components, designJson.canvas.width, designJson.canvas.height);
+  const itemBounds = items.map((item) => getRuntimeComponentBounds(designJson.components, item, designJson.canvas.width, designJson.canvas.height));
+  const bounds = itemBounds[0] ?? getRuntimeComponentBounds(designJson.components, dummyOverlayData, designJson.canvas.width, designJson.canvas.height);
   const viewportWidth = designJson.canvas.width;
   const viewportHeight = typeof height === "number" ? height : designJson.canvas.height;
-  const renderedItemWidth = bounds.width;
-  const renderedItemHeight = bounds.height;
+  const renderedItemWidth = Math.max(bounds.width, ...itemBounds.map((item) => item.width));
   const enterAnimation = getOverlayAnimationName(designJson.layout.enterAnimation, "in");
   const exitAnimation = getOverlayAnimationName(designJson.layout.exitAnimation, "out");
   const animationDurationMs = designJson.layout.animationDurationMs ?? 620;
-  const listHeight = Math.max(renderedItemHeight, viewportHeight - bounds.top);
+  const listStyle = designJson.layout.listStyle ?? "stacked_card";
+  const renderGap = getListRenderGap(listStyle, gap);
+  const listHeight = Math.max(bounds.height, viewportHeight - bounds.top);
+  const smoothDurationMs = Math.max(animationDurationMs, 720);
+  const fallbackItemHeight = bounds.height;
+  const visibleStackHeight = getVisibleStackHeight(itemBounds, designJson.layout.maxItems, renderGap, fallbackItemHeight);
 
   useEffect(() => {
     if (!debug) {
@@ -50,6 +58,7 @@ export function ChatStyleRenderer({
       elementWidth: bounds.width,
       elementHeight: bounds.height,
       maxItems: designJson.layout.maxItems,
+      listStyle,
       renderedItems: items.length,
       reverseOrder: designJson.layout.reverse
     });
@@ -62,6 +71,7 @@ export function ChatStyleRenderer({
     designJson.canvas.height,
     designJson.canvas.width,
     designJson.layout.maxItems,
+    listStyle,
     designJson.layout.reverse,
     items.length
   ]);
@@ -82,53 +92,77 @@ export function ChatStyleRenderer({
           top: bounds.top,
           width: renderedItemWidth,
           height: listHeight,
-          overflow: "visible",
-          display: "flex",
-          flexDirection: "column",
-          justifyContent: "flex-start",
-          alignItems: alignRight ? "flex-end" : "flex-start",
-          gap
+          overflow: "visible"
         }}
       >
-        {items.map((item, index) => (
-          <div
-            key={item.meta?.instanceId ?? `${item.meta?.id ?? item.viewer?.username ?? "viewer"}-${item.comment?.createdAt ?? index}-${index}`}
-            data-exiting={item.meta?.exiting ? "true" : "false"}
-            style={{
-              position: "relative",
-              width: renderedItemWidth,
-              height: renderedItemHeight,
-              minWidth: renderedItemWidth,
-              minHeight: renderedItemHeight,
-              maxWidth: renderedItemWidth,
-              maxHeight: renderedItemHeight,
-              flex: "0 0 auto",
-              overflow: "visible",
-              transform: "none",
-              animation: `${item.meta?.exiting ? exitAnimation : enterAnimation} ${animationDurationMs}ms cubic-bezier(.22, 1, .36, 1) both`
-            }}
-          >
-            <div
-              style={{
-                width: renderedItemWidth,
-                height: renderedItemHeight,
-                overflow: "visible"
-              }}
-            >
+        <div style={{ position: "relative", width: renderedItemWidth, height: listHeight, overflow: "visible" }}>
+          {items.map((item, index) => {
+            const currentBounds = itemBounds[index] ?? bounds;
+            const renderedItemHeight = currentBounds.height;
+            const isExiting = Boolean(item.meta?.exiting);
+            const exitMaskDirection = designJson.layout.reverse ? "to bottom" : "to top";
+            const exitMask = `linear-gradient(${exitMaskDirection}, transparent 0%, rgba(0, 0, 0, 0.2) 28%, #000 68%)`;
+            const animationDelayMs = isExiting ? overlayListExitDelayMs : 0;
+            const exitY = designJson.layout.reverse ? "-30px" : "30px";
+            const visualStyle = getListVisualStyle(listStyle, index, designJson.layout.maxItems, alignRight);
+            const targetY = designJson.layout.reverse
+              ? getReverseItemY(itemBounds, index, visibleStackHeight, renderGap)
+              : getNormalItemY(itemBounds, index, renderGap);
+
+            return (
               <div
+                key={item.meta?.instanceId ?? `${item.meta?.id ?? item.viewer?.username ?? "viewer"}-${item.comment?.createdAt ?? index}-${index}`}
+                data-exiting={isExiting ? "true" : "false"}
                 style={{
-                  width: designJson.canvas.width,
-                  height: designJson.canvas.height,
-                  transform: `translate(${-bounds.left}px, ${-bounds.top}px)`,
-                  transformOrigin: "top left"
+                  position: "absolute",
+                  left: alignRight ? "auto" : 0,
+                  right: alignRight ? 0 : "auto",
+                  top: 0,
+                  width: renderedItemWidth,
+                  height: renderedItemHeight,
+                  minWidth: renderedItemWidth,
+                  minHeight: renderedItemHeight,
+                  maxWidth: renderedItemWidth,
+                  maxHeight: renderedItemHeight,
+                  overflow: "visible",
+                  transform: `translate3d(${visualStyle.x}px, ${targetY}px, 0) scale(${visualStyle.scale})`,
+                  transformOrigin: alignRight ? "top right" : "top left",
+                  opacity: visualStyle.opacity,
+                  filter: visualStyle.filter,
+                  zIndex: visualStyle.zIndex,
+                  transition: `transform ${smoothDurationMs}ms cubic-bezier(.16, 1, .3, 1), opacity ${smoothDurationMs}ms cubic-bezier(.16, 1, .3, 1), filter ${smoothDurationMs}ms cubic-bezier(.16, 1, .3, 1)`,
+                  willChange: "transform, opacity, filter",
+                  pointerEvents: isExiting ? "none" : undefined
                 }}
               >
-                <OverlayRenderer designJson={designJson} data={item} debug={debug} />
+                <div
+                  style={{
+                    width: renderedItemWidth,
+                    height: renderedItemHeight,
+                    overflow: "visible",
+                    WebkitMaskImage: isExiting ? exitMask : undefined,
+                    maskImage: isExiting ? exitMask : undefined,
+                    "--overlay-list-exit-y": exitY,
+                    animation: `${isExiting ? exitAnimation : enterAnimation} ${smoothDurationMs}ms cubic-bezier(.16, 1, .3, 1) ${animationDelayMs}ms both`,
+                    willChange: "opacity, transform, filter"
+                  } as CSSProperties}
+                >
+                  <div
+                    style={{
+                      width: designJson.canvas.width,
+                      height: designJson.canvas.height,
+                      transform: `translate(${-currentBounds.left}px, ${-currentBounds.top}px)`,
+                      transformOrigin: "top left"
+                    }}
+                  >
+                    <OverlayRenderer designJson={designJson} data={item} debug={debug} />
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
-        ))}
-        <style dangerouslySetInnerHTML={{ __html: overlayAnimationCss }} />
+            );
+          })}
+          <style dangerouslySetInnerHTML={{ __html: overlayAnimationCss }} />
+        </div>
       </div>
     </div>
   );
@@ -234,83 +268,83 @@ export function getSampleChatRenderData(count: number, enabledTypes: string[] = 
   return samples;
 }
 
-function getListItemBounds(components: OverlayComponentSchema[] | undefined, canvasWidth: number, canvasHeight: number) {
-  const bounds = collectBounds(components ?? [], 0, 0, canvasWidth, canvasHeight);
+function getVisibleStackHeight(bounds: Array<{ height: number }>, maxItems: number, gap: number, fallbackHeight: number) {
+  const visibleBounds = Array.from({ length: maxItems }, (_, index) => bounds[index] ?? { height: fallbackHeight });
 
-  if (!bounds) {
-    return { left: 0, top: 0, width: canvasWidth, height: canvasHeight };
-  }
-
-  const padding = 10;
-  const left = Math.max(0, bounds.left - padding);
-  const top = Math.max(0, bounds.top - padding);
-  const right = Math.min(canvasWidth, bounds.right + padding);
-  const bottom = Math.min(canvasHeight, bounds.bottom + padding);
-
-  return {
-    left,
-    top,
-    width: Math.max(1, right - left),
-    height: Math.max(1, bottom - top)
-  };
+  return visibleBounds.reduce((height, item, index) => height + item.height + (index === 0 ? 0 : gap), 0);
 }
 
-function collectBounds(
-  components: OverlayComponentSchema[],
-  parentX: number,
-  parentY: number,
-  canvasWidth: number,
-  canvasHeight: number
-): { left: number; top: number; right: number; bottom: number } | null {
-  let left = Number.POSITIVE_INFINITY;
-  let top = Number.POSITIVE_INFINITY;
-  let right = Number.NEGATIVE_INFINITY;
-  let bottom = Number.NEGATIVE_INFINITY;
+function getNormalItemY(bounds: Array<{ height: number }>, index: number, gap: number) {
+  return bounds.slice(0, index).reduce((top, item) => top + item.height + gap, 0);
+}
 
-  for (const component of components) {
-    if (!component.visible) {
-      continue;
-    }
+function getReverseItemY(bounds: Array<{ height: number }>, index: number, visibleStackHeight: number, gap: number) {
+  const heightThroughCurrent = bounds.slice(0, index + 1).reduce((height, item, itemIndex) => {
+    return height + item.height + (itemIndex === 0 ? 0 : gap);
+  }, 0);
 
-    const absoluteX = parentX + component.x;
-    const absoluteY = parentY + component.y;
-    const blur = component.style.shadow?.enabled ? component.style.shadow.blur : 0;
-    const x = absoluteX - blur;
-    const y = absoluteY - blur;
-    const componentRight = absoluteX + component.width + blur;
-    const componentBottom = absoluteY + component.height + blur;
-    const isFullCanvasFrame = parentX === 0
-      && parentY === 0
-      && component.x <= 2
-      && component.y <= 2
-      && component.width >= canvasWidth * 0.9
-      && component.height >= canvasHeight * 0.9
-      && ["container", "bubble_card", "glass_card", "gradient_card"].includes(component.type);
+  return visibleStackHeight - heightThroughCurrent;
+}
 
-    if (!isFullCanvasFrame) {
-      left = Math.min(left, x);
-      top = Math.min(top, y);
-      right = Math.max(right, componentRight);
-      bottom = Math.max(bottom, componentBottom);
-    }
-
-    if (component.children?.length) {
-      const childBounds = collectBounds(component.children, absoluteX, absoluteY, canvasWidth, canvasHeight);
-
-      if (childBounds) {
-        left = Math.min(left, childBounds.left);
-        top = Math.min(top, childBounds.top);
-        right = Math.max(right, childBounds.right);
-        bottom = Math.max(bottom, childBounds.bottom);
-      }
-    }
+function getListRenderGap(style: OverlayListStyle, gap: number) {
+  if (style === "depth_list") {
+    return Math.max(0, Math.round(gap * 0.25));
   }
 
-  if (!Number.isFinite(left) || !Number.isFinite(top) || !Number.isFinite(right) || !Number.isFinite(bottom)) {
-    return null;
+  return gap;
+}
+
+function getListVisualStyle(style: OverlayListStyle, index: number, maxItems: number, alignRight: boolean) {
+  const depth = Math.max(0, Math.min(index, Math.max(0, maxItems - 1)));
+  const direction = alignRight ? -1 : 1;
+
+  if (style === "layered_list") {
+    return {
+      x: direction * depth * 14,
+      scale: Math.max(0.92, 1 - depth * 0.012),
+      opacity: Math.max(0.72, 1 - depth * 0.035),
+      filter: undefined,
+      zIndex: maxItems - depth
+    };
   }
 
-  return { left, top, right, bottom };
+  if (style === "card_stack") {
+    return {
+      x: direction * depth * 8,
+      scale: Math.max(0.88, 1 - depth * 0.026),
+      opacity: Math.max(0.66, 1 - depth * 0.05),
+      filter: depth > 3 ? "saturate(.92)" : undefined,
+      zIndex: maxItems - depth
+    };
+  }
+
+  if (style === "focus_stack") {
+    return {
+      x: direction * depth * 5,
+      scale: depth === 0 ? 1.02 : Math.max(0.9, 1 - depth * 0.03),
+      opacity: depth === 0 ? 1 : Math.max(0.54, 0.86 - depth * 0.07),
+      filter: depth > 0 ? `saturate(${Math.max(0.72, 1 - depth * 0.06)})` : undefined,
+      zIndex: maxItems - depth
+    };
+  }
+
+  if (style === "depth_list") {
+    return {
+      x: direction * depth * 18,
+      scale: Math.max(0.58, 1 - depth * 0.085),
+      opacity: Math.max(0.34, 1 - depth * 0.12),
+      filter: depth > 0 ? `blur(${Math.min(2.6, depth * 0.38)}px) saturate(${Math.max(0.55, 1 - depth * 0.07)})` : undefined,
+      zIndex: maxItems - depth
+    };
+  }
+
+  return {
+    x: direction * depth * 6,
+    scale: Math.max(0.94, 1 - depth * 0.014),
+    opacity: Math.max(0.78, 1 - depth * 0.03),
+    filter: undefined,
+    zIndex: maxItems - depth
+  };
 }
 
 export function getOverlayAnimationName(value: string, direction: "in" | "out") {
@@ -344,17 +378,17 @@ export function getOverlayAnimationName(value: string, direction: "in" | "out") 
 }
 
 export const overlayAnimationCss = `
-@keyframes overlayFadeIn { from { opacity: 0; filter: blur(2px); } to { opacity: 1; filter: blur(0); } }
-@keyframes overlayFadeOut { from { opacity: 1; filter: blur(0); } to { opacity: 0; filter: blur(2px); } }
-@keyframes overlayZoomIn { from { opacity: 0; transform: scale(.92); filter: blur(2px); } to { opacity: 1; transform: scale(1); filter: blur(0); } }
-@keyframes overlayZoomOut { from { opacity: 1; transform: scale(1); filter: blur(0); } to { opacity: 0; transform: scale(.92); filter: blur(2px); } }
-@keyframes overlayPopIn { 0% { opacity: 0; transform: scale(.86); } 68% { opacity: 1; transform: scale(1.025); } 100% { opacity: 1; transform: scale(1); } }
-@keyframes overlaySlideLeftIn { from { opacity: 0; transform: translate3d(-36px, 0, 0); filter: blur(2px); } to { opacity: 1; transform: translate3d(0, 0, 0); filter: blur(0); } }
-@keyframes overlaySlideLeftOut { from { opacity: 1; transform: translate3d(0, 0, 0); filter: blur(0); } to { opacity: 0; transform: translate3d(-36px, 0, 0); filter: blur(2px); } }
-@keyframes overlaySlideRightIn { from { opacity: 0; transform: translate3d(36px, 0, 0); filter: blur(2px); } to { opacity: 1; transform: translate3d(0, 0, 0); filter: blur(0); } }
-@keyframes overlaySlideRightOut { from { opacity: 1; transform: translate3d(0, 0, 0); filter: blur(0); } to { opacity: 0; transform: translate3d(36px, 0, 0); filter: blur(2px); } }
-@keyframes overlaySlideUpIn { from { opacity: 0; transform: translate3d(0, 28px, 0); filter: blur(2px); } to { opacity: 1; transform: translate3d(0, 0, 0); filter: blur(0); } }
-@keyframes overlaySlideUpOut { from { opacity: 1; transform: translate3d(0, 0, 0); filter: blur(0); } to { opacity: 0; transform: translate3d(0, -28px, 0); filter: blur(2px); } }
-@keyframes overlaySlideDownIn { from { opacity: 0; transform: translate3d(0, -28px, 0); filter: blur(2px); } to { opacity: 1; transform: translate3d(0, 0, 0); filter: blur(0); } }
-@keyframes overlaySlideDownOut { from { opacity: 1; transform: translate3d(0, 0, 0); filter: blur(0); } to { opacity: 0; transform: translate3d(0, 28px, 0); filter: blur(2px); } }
+@keyframes overlayFadeIn { 0% { opacity: 0; transform: translate3d(0, 18px, 0) scale(.985); filter: blur(3px); } 60% { opacity: 1; filter: blur(.6px); } 100% { opacity: 1; transform: translate3d(0, 0, 0) scale(1); filter: blur(0); } }
+@keyframes overlayFadeOut { 0% { opacity: 1; transform: translate3d(0, 0, 0) scale(1); filter: blur(0); } 55% { opacity: .42; filter: blur(1.4px); } 100% { opacity: 0; transform: translate3d(0, var(--overlay-list-exit-y, -30px), 0) scale(.985); filter: blur(3px); } }
+@keyframes overlayZoomIn { 0% { opacity: 0; transform: scale(.92); filter: blur(3px); } 64% { opacity: 1; transform: scale(1.012); filter: blur(.6px); } 100% { opacity: 1; transform: scale(1); filter: blur(0); } }
+@keyframes overlayZoomOut { 0% { opacity: 1; transform: scale(1); filter: blur(0); } 100% { opacity: 0; transform: scale(.94) translate3d(0, var(--overlay-list-exit-y, -18px), 0); filter: blur(3px); } }
+@keyframes overlayPopIn { 0% { opacity: 0; transform: scale(.86); filter: blur(3px); } 68% { opacity: 1; transform: scale(1.025); filter: blur(.5px); } 100% { opacity: 1; transform: scale(1); filter: blur(0); } }
+@keyframes overlaySlideLeftIn { 0% { opacity: 0; transform: translate3d(-42px, 0, 0); filter: blur(3px); } 100% { opacity: 1; transform: translate3d(0, 0, 0); filter: blur(0); } }
+@keyframes overlaySlideLeftOut { 0% { opacity: 1; transform: translate3d(0, 0, 0); filter: blur(0); } 100% { opacity: 0; transform: translate3d(-42px, -12px, 0); filter: blur(3px); } }
+@keyframes overlaySlideRightIn { 0% { opacity: 0; transform: translate3d(42px, 0, 0); filter: blur(3px); } 100% { opacity: 1; transform: translate3d(0, 0, 0); filter: blur(0); } }
+@keyframes overlaySlideRightOut { 0% { opacity: 1; transform: translate3d(0, 0, 0); filter: blur(0); } 100% { opacity: 0; transform: translate3d(42px, -12px, 0); filter: blur(3px); } }
+@keyframes overlaySlideUpIn { 0% { opacity: 0; transform: translate3d(0, 34px, 0); filter: blur(3px); } 100% { opacity: 1; transform: translate3d(0, 0, 0); filter: blur(0); } }
+@keyframes overlaySlideUpOut { 0% { opacity: 1; transform: translate3d(0, 0, 0); filter: blur(0); } 100% { opacity: 0; transform: translate3d(0, -34px, 0); filter: blur(3px); } }
+@keyframes overlaySlideDownIn { 0% { opacity: 0; transform: translate3d(0, -34px, 0); filter: blur(3px); } 100% { opacity: 1; transform: translate3d(0, 0, 0); filter: blur(0); } }
+@keyframes overlaySlideDownOut { 0% { opacity: 1; transform: translate3d(0, 0, 0); filter: blur(0); } 100% { opacity: 0; transform: translate3d(0, 34px, 0); filter: blur(3px); } }
 `;

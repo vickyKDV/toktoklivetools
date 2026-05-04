@@ -5,6 +5,11 @@ import type {
   OverlayRenderData
 } from "@/features/overlay-builder/schema/overlaySchema";
 import { resolveBindings } from "@/features/overlay-builder/utils/resolveBindings";
+import {
+  getAutoFitFontSize,
+  getResolvedComponentText,
+  getRuntimeComponentHeight
+} from "@/features/overlay-builder/utils/runtimeLayout";
 
 export type ComponentSetting =
   | { key: string; label: string; type: "text" }
@@ -43,8 +48,22 @@ export const componentRegistry: Record<OverlayComponentType, ComponentRegistryIt
     ...textItem("viewer_badge", "Badge", "{{viewer.badge}}", 150, 30, 13, 900),
     defaultStyle: { radius: 8, opacity: 100, fontSize: 13, fontWeight: 900, color: "#ffffff", align: "center", backgroundColor: "#dc2626" }
   },
-  comment: textItem("comment", "Komentar", "{{comment.text}}", 440, 82, 24, 700),
+  comment: {
+    ...textItem("comment", "Komentar", "{{comment.text}}", 440, 82, 24, 700),
+    defaultStyle: { opacity: 100, fontSize: 24, fontWeight: 700, color: "#ffffff", align: "left", lineHeight: 1.2, autoHeight: false, autoFitFontSize: true }
+  },
   created_at: textItem("created_at", "Timestamp", "{{comment.createdAt}}", 90, 24, 13, 700),
+  gift_text: {
+    ...textItem("gift_text", "Gift Text", "{{prefix}} x{{gift.count}} {{gift.name}}", 360, 42, 24, 900),
+    defaultProps: { prefix: "Mengirim", text: "{{prefix}} x{{gift.count}} {{gift.name}}" },
+    defaultStyle: { opacity: 100, fontSize: 24, fontWeight: 900, color: "#ffffff", align: "left", lineHeight: 1.1, autoFitFontSize: true },
+    render: renderGiftText,
+    settings: [
+      { key: "props.prefix", label: "Prefix", type: "text" },
+      { key: "props.text", label: "Format", type: "text" },
+      ...textSettings()
+    ]
+  },
   gift_name: textItem("gift_name", "Nama Gift", "{{gift.name}}", 220, 34, 22, 800),
   gift_count: textItem("gift_count", "Jumlah Gift", "x{{gift.count}}", 90, 34, 22, 900),
   gift_image: {
@@ -79,36 +98,43 @@ function textItem(
     render: renderText,
     settings: [
       { key: "props.text", label: "Text", type: "text" },
-      { key: "style.fontSize", label: "Font Size", type: "number", min: 6, max: 180, step: 1 },
-      { key: "style.fontWeight", label: "Weight", type: "select", options: [
-        { label: "Regular", value: 400 },
-        { label: "Semi", value: 600 },
-        { label: "Bold", value: 700 },
-        { label: "Black", value: 900 }
-      ] },
-      { key: "style.color", label: "Color", type: "color" },
-      { key: "style.align", label: "Align", type: "select", options: [
-        { label: "Left", value: "left" },
-        { label: "Center", value: "center" },
-        { label: "Right", value: "right" }
-      ] },
-      { key: "style.lineHeight", label: "Line Height", type: "number", min: 0.7, max: 3, step: 0.05 },
-      { key: "style.maxLines", label: "Max Lines", type: "number", min: 1, max: 20, step: 1 },
-      { key: "style.textOverflow", label: "Text Overflow", type: "select", options: [
-        { label: "Clip", value: "clip" },
-        { label: "Ellipsis", value: "ellipsis" }
-      ] },
-      { key: "style.autoFitFontSize", label: "Auto Fit Font Size", type: "toggle" },
-      { key: "style.lineClamp", label: "Line Clamp", type: "number", min: 1, max: 20, step: 1 },
-      { key: "style.backgroundColor", label: "Background", type: "color" },
-      { key: "style.overflow", label: "Overflow", type: "select", options: [
-        { label: "Visible", value: "visible" },
-        { label: "Hidden", value: "hidden" }
-      ] },
-      { key: "style.radius", label: "Radius", type: "number", min: 0, max: 999, step: 1 },
-      { key: "style.opacity", label: "Opacity", type: "number", min: 0, max: 100, step: 1 }
+      ...textSettings()
     ]
   };
+}
+
+function textSettings(): ComponentSetting[] {
+  return [
+    { key: "style.fontSize", label: "Font Size", type: "number", min: 6, max: 180, step: 1 },
+    { key: "style.fontWeight", label: "Weight", type: "select", options: [
+      { label: "Regular", value: 400 },
+      { label: "Semi", value: 600 },
+      { label: "Bold", value: 700 },
+      { label: "Black", value: 900 }
+    ] },
+    { key: "style.color", label: "Color", type: "color" },
+    { key: "style.align", label: "Align", type: "select", options: [
+      { label: "Left", value: "left" },
+      { label: "Center", value: "center" },
+      { label: "Right", value: "right" }
+    ] },
+    { key: "style.lineHeight", label: "Line Height", type: "number", min: 0.7, max: 3, step: 0.05 },
+    { key: "style.maxLines", label: "Max Lines", type: "number", min: 1, max: 20, step: 1 },
+    { key: "style.textOverflow", label: "Text Overflow", type: "select", options: [
+      { label: "Clip", value: "clip" },
+      { label: "Ellipsis", value: "ellipsis" }
+    ] },
+    { key: "style.autoHeight", label: "Auto Height", type: "toggle" },
+    { key: "style.autoFitFontSize", label: "Auto Fit Font Size", type: "toggle" },
+    { key: "style.lineClamp", label: "Line Clamp", type: "number", min: 1, max: 20, step: 1 },
+    { key: "style.backgroundColor", label: "Background", type: "color" },
+    { key: "style.overflow", label: "Overflow", type: "select", options: [
+      { label: "Visible", value: "visible" },
+      { label: "Hidden", value: "hidden" }
+    ] },
+    { key: "style.radius", label: "Radius", type: "number", min: 0, max: 999, step: 1 },
+    { key: "style.opacity", label: "Opacity", type: "number", min: 0, max: 100, step: 1 }
+  ];
 }
 
 function cardItem(
@@ -177,29 +203,53 @@ function baseImageSettings(): ComponentSetting[] {
 function renderText(component: OverlayComponentSchema, data: OverlayRenderData) {
   const maxLines = component.style.lineClamp ?? component.style.maxLines;
   const ellipsis = component.style.textOverflow === "ellipsis";
+  const shouldClamp = ellipsis && maxLines != null && maxLines > 0;
+  const runtimeHeight = getRuntimeComponentHeight(component, data);
+  const text = getResolvedComponentText(component, data);
+  const fontSize = getAutoFitFontSize(component, text);
   const textStyle: CSSProperties = {
     width: component.width,
-    height: component.height,
+    minHeight: component.height,
+    height: runtimeHeight,
     overflow: component.style.overflow === "visible" ? "visible" : "hidden",
     overflowWrap: "anywhere",
     whiteSpace: component.type === "running_text" ? "nowrap" : "normal",
-    textOverflow: ellipsis ? "ellipsis" : "clip"
+    textOverflow: ellipsis ? "ellipsis" : "clip",
+    fontSize
   };
 
-  if (maxLines) {
+  if (shouldClamp) {
     textStyle.display = "-webkit-box";
     textStyle.WebkitLineClamp = maxLines;
     textStyle.WebkitBoxOrient = "vertical";
   }
 
-  if (component.style.autoFitFontSize) {
-    textStyle.fontSize = "clamp(8px, 100%, inherit)";
-  }
-
   return createElement(
     "div",
     { style: textStyle },
-    resolveBindings(component.props.text, data)
+    text
+  );
+}
+
+function renderGiftText(component: OverlayComponentSchema, data: OverlayRenderData) {
+  const text = getResolvedComponentText(component, data).replace(/\s+/g, " ").trim();
+  const fontSize = getAutoFitFontSize(component, text);
+
+  return createElement(
+    "div",
+    {
+      style: {
+        width: component.width,
+        height: component.height,
+        minHeight: component.height,
+        overflow: "hidden",
+        whiteSpace: "nowrap",
+        textOverflow: "clip",
+        fontSize,
+        lineHeight: component.style.lineHeight ?? 1.1
+      } satisfies CSSProperties
+    },
+    text
   );
 }
 

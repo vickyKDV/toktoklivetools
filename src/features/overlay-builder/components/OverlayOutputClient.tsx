@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { io, type Socket } from "socket.io-client";
-import { getSampleChatRenderData } from "@/features/overlay-builder/components/ChatStyleRenderer";
+import { getSampleChatRenderData, overlayListExitDelayMs } from "@/features/overlay-builder/components/ChatStyleRenderer";
 import { OverlayViewportSceneRenderer } from "@/features/overlay-builder/components/OverlaySceneRenderer";
 import {
   dummyOverlayData,
@@ -30,6 +30,7 @@ export function OverlayOutputClient({
 }: OverlayOutputClientProps) {
   const [data, setData] = useState<OverlayRenderData>(dummyOverlayData);
   const [chatItems, setChatItems] = useState<OverlayRenderData[]>([]);
+  const listExitDurationMs = Math.max(designJson.layout.animationDurationMs ?? 620, 720);
 
   useEffect(() => {
     if (preview) {
@@ -48,7 +49,7 @@ export function OverlayOutputClient({
       setData(nextData);
 
       if (event.type === "CHAT" || event.comment) {
-        setChatItems((current) => appendOutputItem(current, nextData, designJson.layout.maxItems, designJson.layout.reverse));
+        setChatItems((current) => appendOutputItem(current, nextData, designJson.layout.maxItems));
       }
     });
     socket.on("overlay:focus-chat", (event: OverlayEventPayload) => {
@@ -70,6 +71,20 @@ export function OverlayOutputClient({
     };
   }, [designJson, overlayKey, preview]);
 
+  useEffect(() => {
+    const hasExitingItems = chatItems.some((item) => item.meta?.exiting);
+
+    if (!hasExitingItems) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      setChatItems((current) => current.filter((item) => !item.meta?.exiting));
+    }, listExitDurationMs + overlayListExitDelayMs + 120);
+
+    return () => window.clearTimeout(timeout);
+  }, [chatItems, listExitDurationMs]);
+
   if (overlayType === "CHAT_STYLE") {
     const items = preview ? getSampleChatRenderData(designJson.layout.maxItems) : chatItems;
 
@@ -79,7 +94,8 @@ export function OverlayOutputClient({
   return <OverlayViewportSceneRenderer schema={designJson} data={data} debug={debug} />;
 }
 
-function appendOutputItem(current: OverlayRenderData[], next: OverlayRenderData, maxItems: number, reverseOrder: boolean) {
+function appendOutputItem(current: OverlayRenderData[], next: OverlayRenderData, maxItems: number) {
+  const active = current.filter((item) => !item.meta?.exiting);
   const itemWithId = {
     ...next,
     meta: {
@@ -87,10 +103,16 @@ function appendOutputItem(current: OverlayRenderData[], next: OverlayRenderData,
       instanceId: `${next.meta?.id ?? "event"}-${Date.now()}-${outputItemSequence += 1}`
     }
   };
-  const nextItems = reverseOrder ? [itemWithId, ...current] : [...current, itemWithId];
-  const sliced = reverseOrder ? nextItems.slice(0, maxItems) : nextItems.slice(-maxItems);
+  const combined = [itemWithId, ...active];
+  const overflowCount = Math.max(0, combined.length - maxItems);
 
-  return sliced;
+  if (overflowCount === 0) {
+    return combined;
+  }
+
+  return combined.map((item, index) => {
+    return index >= maxItems ? { ...item, meta: { ...item.meta, exiting: true } } : item;
+  });
 }
 
 function acceptsFocusDock(schema: OverlayDesignSchema) {

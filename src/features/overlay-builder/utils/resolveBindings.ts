@@ -9,7 +9,10 @@ const bindingMap: Record<string, (data: OverlayRenderData) => string> = {
   "comment.createdAt": (data) => data.comment?.createdAt ?? "",
   "gift.name": (data) => data.gift?.name ?? "",
   "gift.count": (data) => String(data.gift?.count ?? ""),
-  "gift.image": (data) => data.gift?.image ?? ""
+  "gift.image": (data) => data.gift?.image ?? "",
+  "giftName": (data) => data.gift?.name ?? "",
+  "GiftName": (data) => data.gift?.name ?? "",
+  "count": (data) => String(data.gift?.count ?? "")
 };
 
 export function resolveBindings(value: unknown, data: OverlayRenderData): string {
