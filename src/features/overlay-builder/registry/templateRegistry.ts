@@ -86,7 +86,66 @@ export const moderatorStackTemplate: OverlayTemplate = {
   }
 };
 
+const leaderboardTemplates: OverlayTemplate[] = [
+  createLeaderboardTemplate({
+    id: "leaderboard-neon-rank",
+    name: "Neon Rank Board",
+    description: "Leaderboard neon gelap dengan ranking besar dan score kontras.",
+    cardType: "gradient_card",
+    canvasColor: "#030712",
+    from: "#0f172a",
+    to: "#0891b2",
+    accent: "#22d3ee",
+    text: "#ecfeff"
+  }),
+  createLeaderboardTemplate({
+    id: "leaderboard-gold-podium",
+    name: "Gold Podium List",
+    description: "List leader premium dengan aksen gold untuk top gifter.",
+    cardType: "bubble_card",
+    canvasColor: "#17120a",
+    from: "#78350f",
+    to: "#f59e0b",
+    accent: "#fde68a",
+    text: "#fffbeb"
+  }),
+  createLeaderboardTemplate({
+    id: "leaderboard-glass-arena",
+    name: "Glass Arena",
+    description: "Glass leaderboard bersih untuk overlay vertical modern.",
+    cardType: "glass_card",
+    canvasColor: "#020617",
+    from: "#1e293b",
+    to: "#475569",
+    accent: "#cbd5e1",
+    text: "#f8fafc"
+  }),
+  createLeaderboardTemplate({
+    id: "leaderboard-arcade-score",
+    name: "Arcade Scoreboard",
+    description: "Scoreboard energetic dengan warna arcade dan score besar.",
+    cardType: "gradient_card",
+    canvasColor: "#16021f",
+    from: "#7c3aed",
+    to: "#e11d48",
+    accent: "#f0abfc",
+    text: "#fff7ed"
+  }),
+  createLeaderboardTemplate({
+    id: "leaderboard-minimal-slate",
+    name: "Minimal Slate",
+    description: "Leaderboard minimal, tipis, dan fokus ke nama serta score.",
+    cardType: "container",
+    canvasColor: "#020617",
+    from: "#111827",
+    to: "#1f2937",
+    accent: "#60a5fa",
+    text: "#f8fafc"
+  })
+];
+
 export const overlayTemplates: OverlayTemplate[] = [
+  ...leaderboardTemplates,
   {
     id: "profile-outside-card",
     name: "Profile Outside Card",
@@ -379,3 +438,143 @@ export const overlayTemplates: OverlayTemplate[] = [
     }
   }
 ];
+
+function createLeaderboardTemplate({
+  id,
+  name,
+  description,
+  cardType,
+  canvasColor,
+  from,
+  to,
+  accent,
+  text
+}: {
+  id: string;
+  name: string;
+  description: string;
+  cardType: "container" | "bubble_card" | "glass_card" | "gradient_card";
+  canvasColor: string;
+  from: string;
+  to: string;
+  accent: string;
+  text: string;
+}): OverlayTemplate {
+  return {
+    id,
+    name,
+    description,
+    schema: {
+      version: 2,
+      kind: "LEADERBOARD",
+      name,
+      canvas: {
+        width: 800,
+        height: 600,
+        background: { type: "solid", color: canvasColor, opacity: 0 },
+        radius: 0,
+        stroke: { enabled: false, color: "#ffffff", width: 0 },
+        shadow: { enabled: false, color: "#000000", blur: 0, x: 0, y: 0 },
+        animation: { type: "none", enabled: false, color: accent, color2: to, durationMs: 2400, intensity: 70 }
+      },
+      dataSource: {
+        type: "leaderboard",
+        filters: { metric: "gift" }
+      },
+      layout: {
+        mode: "list",
+        maxItems: 5,
+        gap: 10,
+        direction: "vertical",
+        reverse: false,
+        align: "start",
+        listStyle: "stacked_card",
+        enterAnimation: "slide-up",
+        exitAnimation: "fade",
+        autoCloseMs: 0,
+        animationDurationMs: 620
+      },
+      components: [
+        {
+          id: `${id}_row`,
+          type: cardType,
+          name: "Leaderboard Row",
+          x: 54,
+          y: 58,
+          width: 690,
+          height: 78,
+          zIndex: 1,
+          visible: true,
+          locked: true,
+          props: { clipContent: true, padding: 14, layout: "free" },
+          style: {
+            background: { type: "gradient", color: from, from, to, angle: 135, opacity: 92 },
+            radius: cardType === "container" ? 14 : 22,
+            overflow: "hidden",
+            border: { enabled: true, color: accent, width: 2 },
+            shadow: { enabled: true, color: accent, opacity: 24, blur: 18, x: 0, y: 8 },
+            animation: { type: "glow", enabled: id.includes("neon"), color: accent, color2: to, durationMs: 2200, intensity: 50 }
+          },
+          children: [
+            {
+              id: `${id}_rank`,
+              type: "viewer_badge",
+              name: "Rank",
+              x: 18,
+              y: 16,
+              width: 56,
+              height: 46,
+              zIndex: 1,
+              visible: true,
+              locked: true,
+              props: { text: "{{viewer.badge}}" },
+              style: { backgroundColor: accent, radius: 14, fontSize: 22, fontWeight: 900, color: canvasColor, align: "center", lineHeight: 1 }
+            },
+            {
+              id: `${id}_name`,
+              type: "viewer_name",
+              name: "Leader Name",
+              x: 92,
+              y: 14,
+              width: 330,
+              height: 30,
+              zIndex: 2,
+              visible: true,
+              locked: true,
+              props: { text: "{{viewer.name}}" },
+              style: { fontSize: 23, fontWeight: 900, color: text, align: "left", lineHeight: 1.05, textOverflow: "ellipsis" }
+            },
+            {
+              id: `${id}_metric`,
+              type: "comment",
+              name: "Metric Label",
+              x: 92,
+              y: 45,
+              width: 330,
+              height: 22,
+              zIndex: 3,
+              visible: true,
+              locked: true,
+              props: { text: "{{comment.text}}" },
+              style: { fontSize: 15, fontWeight: 700, color: text, opacity: 80, align: "left", lineHeight: 1.1, textOverflow: "ellipsis" }
+            },
+            {
+              id: `${id}_score`,
+              type: "gift_count",
+              name: "Score",
+              x: 476,
+              y: 14,
+              width: 176,
+              height: 48,
+              zIndex: 4,
+              visible: true,
+              locked: true,
+              props: { text: "{{gift.count}}" },
+              style: { fontSize: 34, fontWeight: 1000, color: text, align: "right", lineHeight: 1, autoFitFontSize: true }
+            }
+          ]
+        }
+      ]
+    }
+  };
+}

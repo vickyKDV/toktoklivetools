@@ -7,6 +7,8 @@ const automationNodeTypes = new Set<AutomationNodeType>([
   "followTrigger",
   "condition",
   "showAnimation",
+  "show3dText",
+  "showConfetti",
   "playSound",
   "replyComment"
 ]);

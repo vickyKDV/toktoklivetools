@@ -9,6 +9,7 @@ import {
   type OverlayDesignSchema,
   type OverlayRenderData
 } from "@/features/overlay-builder/schema/overlaySchema";
+import { getRuntimeCanvasSize } from "@/features/overlay-builder/utils/runtimeCanvas";
 
 type OverlaySceneRendererProps = {
   schema: OverlayDesignSchema;
@@ -32,6 +33,7 @@ export function OverlaySceneRenderer({
   style
 }: OverlaySceneRendererProps) {
   const isList = isListSchema(schema);
+  const runtimeCanvas = getRuntimeCanvasSize(schema);
   const renderItems = isList ? items ?? getSampleChatRenderData(schema.layout.maxItems, getEnabledEventTypes(schema)) : undefined;
 
   useEffect(() => {
@@ -41,13 +43,13 @@ export function OverlaySceneRenderer({
 
     console.table({
       mode: isList ? "list" : "single",
-      designWidth: schema.canvas.width,
-      designHeight: schema.canvas.height,
+      designWidth: runtimeCanvas.width,
+      designHeight: runtimeCanvas.height,
       scale,
       maxItems: schema.layout.maxItems,
       renderedItems: renderItems?.length ?? 1
     });
-  }, [debug, isList, renderItems?.length, scale, schema.canvas.height, schema.canvas.width, schema.layout.maxItems]);
+  }, [debug, isList, renderItems?.length, runtimeCanvas.height, runtimeCanvas.width, scale, schema.layout.maxItems]);
 
   const scene = isList ? (
     <ChatStyleRenderer
@@ -55,7 +57,7 @@ export function OverlaySceneRenderer({
       items={renderItems}
       gap={schema.layout.gap}
       alignRight={schema.layout.align === "end"}
-      height={schema.canvas.height}
+      height={runtimeCanvas.height}
       debug={debug}
     />
   ) : (
@@ -66,16 +68,16 @@ export function OverlaySceneRenderer({
     <div
       className={className}
       style={{
-        width: schema.canvas.width * scale,
-        height: schema.canvas.height * scale,
+        width: runtimeCanvas.width * scale,
+        height: runtimeCanvas.height * scale,
         overflow: "visible",
         ...style
       }}
     >
       <div
         style={{
-          width: schema.canvas.width,
-          height: schema.canvas.height,
+          width: runtimeCanvas.width,
+          height: runtimeCanvas.height,
           transform: scale === 1 ? undefined : `scale(${scale})`,
           transformOrigin: "top left",
           overflow: "visible"
@@ -111,7 +113,21 @@ function getEnabledEventTypes(schema: OverlayDesignSchema) {
   }
 
   if (schema.dataSource.type === "leaderboard") {
-    return ["GIFT", "LIKE", "SHARE"];
+    const metric = schema.dataSource.filters?.metric;
+
+    if (metric === "like") {
+      return ["LEADERBOARD_LIKE"];
+    }
+
+    if (metric === "share") {
+      return ["LEADERBOARD_SHARE"];
+    }
+
+    if (metric === "chat") {
+      return ["LEADERBOARD_CHAT"];
+    }
+
+    return ["LEADERBOARD_GIFT"];
   }
 
   return ["CHAT"];

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { OverlayDesignSchema } from "@/features/overlay-builder/schema/overlaySchema";
+import { getRuntimeCanvasSize } from "@/features/overlay-builder/utils/runtimeCanvas";
 
 type OverlayViewportProps = {
   schema: OverlayDesignSchema;
@@ -15,8 +16,9 @@ export function OverlayViewport({ schema, children, debug = false }: OverlayView
     width: 800,
     height: 600
   });
-  const designWidth = schema.canvas.width ?? 1080;
-  const designHeight = schema.canvas.height ?? 1920;
+  const runtimeCanvas = getRuntimeCanvasSize(schema);
+  const designWidth = runtimeCanvas.width;
+  const designHeight = runtimeCanvas.height;
   const viewportWidth = viewport.width;
   const viewportHeight = viewport.height;
   const scale = Math.min(viewportWidth / designWidth, viewportHeight / designHeight);

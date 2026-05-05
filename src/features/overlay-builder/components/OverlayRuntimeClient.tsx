@@ -44,6 +44,14 @@ export function OverlayRuntimeClient({ schema, overlayKey, preview = false, debu
   const exitAnimation = getOverlayAnimationName(layout.exitAnimation, "out");
   const showSingleItem = useCallback((data: OverlayRenderData) => {
     setSingleItem((current) => {
+      if (current && !current.exiting) {
+        const mergedGift = mergeGiftRenderData(current.data, data);
+
+        if (mergedGift) {
+          return { ...current, data: mergedGift };
+        }
+      }
+
       if (current) {
         setQueuedSingleData(data);
 
@@ -68,6 +76,11 @@ export function OverlayRuntimeClient({ schema, overlayKey, preview = false, debu
     socket.on("connect", () => socket.emit("overlay:join", overlayKey));
     socket.on("overlay:live-event", (event: OverlayEventPayload) => {
       if (!liveEventMatchesSchema(event, schema)) {
+        return;
+      }
+
+      if (schema.dataSource.type === "leaderboard") {
+        setItems((current) => updateLeaderboardItems(current, event, layout.maxItems, getLeaderboardMetric(schema)));
         return;
       }
 
@@ -210,7 +223,7 @@ function liveEventMatchesSchema(event: OverlayEventPayload, schema: OverlayDesig
   }
 
   if (sourceType === "leaderboard") {
-    return event.type === "GIFT" || event.type === "LIKE" || event.type === "SHARE";
+    return eventMatchesLeaderboardMetric(event, getLeaderboardMetric(schema));
   }
 
   if (sourceType === "dock") {
@@ -232,7 +245,21 @@ function getEnabledEventTypes(schema: OverlayDesignSchema) {
   }
 
   if (schema.dataSource.type === "leaderboard") {
-    return ["GIFT", "LIKE", "SHARE"];
+    const metric = getLeaderboardMetric(schema);
+
+    if (metric === "like") {
+      return ["LEADERBOARD_LIKE"];
+    }
+
+    if (metric === "share") {
+      return ["LEADERBOARD_SHARE"];
+    }
+
+    if (metric === "chat") {
+      return ["LEADERBOARD_CHAT"];
+    }
+
+    return ["LEADERBOARD_GIFT"];
   }
 
   return ["CHAT"];
@@ -282,7 +309,7 @@ export function eventToRenderData(event: OverlayEventPayload): OverlayRenderData
     gift: {
       name: event.giftName ?? "",
       count: event.giftCount ?? "",
-      image: ""
+      image: event.giftImageUrl ?? ""
     }
   };
 }
@@ -307,6 +334,18 @@ function getEventText(event: OverlayEventPayload) {
 function appendRuntimeItem(current: OverlayRenderData[], next: OverlayRenderData, maxItems: number) {
   const nextId = next.meta?.id;
   const active = current.filter((item) => !item.meta?.exiting);
+  const mergeIndex = active.findIndex((item) => Boolean(mergeGiftRenderData(item, next)));
+
+  if (mergeIndex >= 0) {
+    return active.map((item, index) => {
+      if (index !== mergeIndex) {
+        return item;
+      }
+
+      return mergeGiftRenderData(item, next) ?? item;
+    });
+  }
+
   const uniqueNext = {
     ...next,
     meta: {
@@ -319,10 +358,173 @@ function appendRuntimeItem(current: OverlayRenderData[], next: OverlayRenderData
   const nextItems = overflowCount === 0
     ? combined
     : combined.map((item, index) => {
-      return index >= maxItems ? { ...item, meta: { ...item.meta, exiting: true } } : item;
+      const shouldExit = index >= maxItems;
+
+      return shouldExit ? { ...item, meta: { ...item.meta, exiting: true } } : item;
     });
 
   return nextItems;
+}
+
+function updateLeaderboardItems(current: OverlayRenderData[], event: OverlayEventPayload, maxItems: number, metric: string) {
+  const active = current.filter((item) => !item.meta?.exiting);
+  const username = event.username || event.displayName || "viewer";
+  const eventScore = getLeaderboardEventScore(event, metric);
+  const existingIndex = active.findIndex((item) => (item.viewer?.username || item.viewer?.name) === username);
+  const nextItems = existingIndex >= 0
+    ? active.map((item, index) => {
+      if (index !== existingIndex) {
+        return item;
+      }
+
+      const score = toGiftCount(item.gift?.count) + eventScore;
+
+      return createLeaderboardRenderData(event, metric, score, item.meta?.instanceId);
+    })
+    : [
+      createLeaderboardRenderData(event, metric, eventScore, `leader-${metric}-${username}-${Date.now()}-${runtimeItemSequence += 1}`),
+      ...active
+    ];
+  const sorted = nextItems
+    .sort((a, b) => toGiftCount(b.gift?.count) - toGiftCount(a.gift?.count))
+    .map((item, index) => ({
+      ...item,
+      viewer: {
+        ...item.viewer,
+        badge: `#${index + 1}`
+      }
+    }));
+  const limit = Math.min(50, Math.max(1, maxItems));
+
+  return sorted.slice(0, limit);
+}
+
+function createLeaderboardRenderData(event: OverlayEventPayload, metric: string, score: number, instanceId?: string | null): OverlayRenderData {
+  return {
+    meta: {
+      id: `leader-${metric}-${event.username || event.displayName || "viewer"}`,
+      instanceId
+    },
+    viewer: {
+      name: event.displayName ?? event.username ?? "Viewer",
+      username: event.username ?? event.displayName ?? "viewer",
+      avatar: event.avatarUrl ?? "",
+      badge: "#1"
+    },
+    comment: {
+      text: formatLeaderboardMetric(score, metric),
+      createdAt: new Date(event.receivedAt).toLocaleTimeString("id-ID", {
+        hour: "2-digit",
+        minute: "2-digit"
+      })
+    },
+    gift: {
+      name: metric,
+      count: score,
+      image: event.giftImageUrl ?? ""
+    }
+  };
+}
+
+function eventMatchesLeaderboardMetric(event: OverlayEventPayload, metric: string) {
+  const type = normalizeEventType(event);
+
+  if (metric === "gift") {
+    return type === "GIFT";
+  }
+
+  if (metric === "like") {
+    return type === "LIKE";
+  }
+
+  if (metric === "share") {
+    return type === "SHARE";
+  }
+
+  if (metric === "chat") {
+    return type === "CHAT" && Boolean(event.comment);
+  }
+
+  return type === "GIFT";
+}
+
+function getLeaderboardMetric(schema: OverlayDesignSchema) {
+  const metric = schema.dataSource.filters?.metric;
+
+  return typeof metric === "string" ? metric : "gift";
+}
+
+function getLeaderboardEventScore(event: OverlayEventPayload, metric: string) {
+  if (metric === "gift") {
+    return Number(event.giftCount) > 0 ? Number(event.giftCount) : 1;
+  }
+
+  if (metric === "like") {
+    return Number(event.likeCount) > 0 ? Number(event.likeCount) : 1;
+  }
+
+  return 1;
+}
+
+function formatLeaderboardMetric(score: number, metric: string) {
+  if (metric === "like") {
+    return `${score.toLocaleString("id-ID")} likes`;
+  }
+
+  if (metric === "share") {
+    return `${score.toLocaleString("id-ID")} shares`;
+  }
+
+  if (metric === "chat") {
+    return `${score.toLocaleString("id-ID")} comments`;
+  }
+
+  return `${score.toLocaleString("id-ID")} gifts`;
+}
+
+function mergeGiftRenderData(current: OverlayRenderData, next: OverlayRenderData) {
+  const currentGiftName = current.gift?.name?.trim();
+  const nextGiftName = next.gift?.name?.trim();
+  const currentUser = current.viewer?.username || current.viewer?.name;
+  const nextUser = next.viewer?.username || next.viewer?.name;
+
+  if (!currentGiftName || !nextGiftName || currentGiftName !== nextGiftName || !currentUser || currentUser !== nextUser) {
+    return null;
+  }
+
+  const mergedCount = toGiftCount(current.gift?.count) + toGiftCount(next.gift?.count);
+  const giftName = next.gift?.name ?? current.gift?.name ?? "";
+
+  return {
+    ...current,
+    viewer: {
+      ...current.viewer,
+      ...next.viewer
+    },
+    comment: {
+      ...current.comment,
+      createdAt: next.comment?.createdAt ?? current.comment?.createdAt,
+      text: mergedCount > 0 ? `sent ${giftName} x${mergedCount}` : current.comment?.text
+    },
+    gift: {
+      ...current.gift,
+      ...next.gift,
+      name: giftName,
+      count: mergedCount || next.gift?.count || current.gift?.count,
+      image: next.gift?.image || current.gift?.image || ""
+    },
+    meta: {
+      ...current.meta,
+      id: next.meta?.id ?? current.meta?.id,
+      instanceId: current.meta?.instanceId ?? next.meta?.instanceId
+    }
+  } satisfies OverlayRenderData;
+}
+
+function toGiftCount(value: number | string | null | undefined) {
+  const numeric = Number(value);
+
+  return Number.isFinite(numeric) ? numeric : 0;
 }
 
 function roleLabel(role: string) {

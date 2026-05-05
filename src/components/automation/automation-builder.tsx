@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { createElement, useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
   addEdge,
   Background,
@@ -27,15 +27,19 @@ import {
   Gift,
   MessageCircle,
   MousePointer2,
+  PartyPopper,
   Plus,
   Reply,
   Save,
   Sparkles,
   Trash2,
+  Type,
   Volume2,
   Zap
 } from "lucide-react";
 import Link from "next/link";
+import { io } from "socket.io-client";
+import { ThreeTextOverlay } from "@/app/overlay-action/[overlayKey]/three-text-overlay";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -182,7 +186,60 @@ const nodeDefinitions: NodeDefinition[] = [
       durationMs: 3000,
       useMediaDuration: false,
       position: "center",
-      size: 420
+      size: 420,
+      mediaFit: "auto",
+      mediaFrame: "square",
+      mediaWidth: 420,
+      mediaHeight: 420,
+      actionLayer: "back"
+    }
+  },
+  {
+    type: "show3dText",
+    title: "Text Overlay",
+    description: "Tampilkan teks CSS ringan untuk ucapan gift.",
+    group: "Action",
+    icon: Type,
+    defaultData: {
+      label: "Thank You Text",
+      text3dTemplate: "Terima kasih {{displayName}}!",
+      text3dSubtitle: "{{giftName}} x{{giftCount}}",
+      text3dEffect: "neon",
+      text3dColor: "#f8fafc",
+      text3dAccentColor: "#22d3ee",
+      text3dDepth: 0.22,
+      text3dBevel: 0.035,
+      text3dMetalness: 0.45,
+      text3dRoughness: 0.2,
+      text3dSpin: true,
+      text3dFloat: true,
+      text3dOffsetX: 0,
+      text3dOffsetY: 0,
+      durationMs: 4500,
+      position: "center",
+      size: 560,
+      actionLayer: "front"
+    }
+  },
+  {
+    type: "showConfetti",
+    title: "Confetti Overlay",
+    description: "Tampilkan confetti sebagai overlay terpisah.",
+    group: "Action",
+    icon: PartyPopper,
+    defaultData: {
+      label: "Confetti Overlay",
+      confettiMode: "once",
+      confettiPresets: ["basicCannon", "realisticLook"],
+      confettiLayer: "front",
+      confettiParticleCount: 140,
+      confettiSpread: 85,
+      confettiStartVelocity: 45,
+      confettiScalar: 1,
+      confettiIntervalMs: 900,
+      confettiOriginY: 0.55,
+      confettiDurationMs: 4500,
+      confettiEmoji: "🎁"
     }
   },
   {
@@ -217,6 +274,8 @@ const nodeTypes: NodeTypes = {
   followTrigger: AutomationNodeCard,
   condition: AutomationNodeCard,
   showAnimation: AutomationNodeCard,
+  show3dText: AutomationNodeCard,
+  showConfetti: AutomationNodeCard,
   playSound: AutomationNodeCard,
   replyComment: AutomationNodeCard
 };
@@ -226,6 +285,18 @@ const soundOptions = [
   { value: "/api/assets/sounds/message_sound_alert.mp3", label: "Message Alert 1" },
   { value: "/api/assets/sounds/message_sound_alert_2.mp3", label: "Message Alert 2" },
   { value: "/api/assets/sounds/message_sound_alert_3.mp3", label: "Message Alert 3" }
+];
+
+const confettiPresetOptions = [
+  { value: "basicCannon", label: "Basic Cannon" },
+  { value: "randomDirection", label: "Random Direction" },
+  { value: "realisticLook", label: "Realistic Look" },
+  { value: "fireworks", label: "Fireworks" },
+  { value: "stars", label: "Stars" },
+  { value: "snow", label: "Snow" },
+  { value: "schoolPride", label: "School Pride" },
+  { value: "customShapes", label: "Custom Shapes" },
+  { value: "emoji", label: "Emoji" }
 ];
 
 const emptyDraft = createDefaultDraft();
@@ -432,6 +503,61 @@ function AutomationBuilderCanvas({
     setSelectedNodeId(null);
   }
 
+  async function testAnimationTrigger() {
+    const actionNodes = getTestActionNodes(nodes, edges);
+
+    if (!actionNodes.length) {
+      setStatusMessage("Tambahkan node Show Animation, Text Overlay, atau Confetti Overlay dulu sebelum test.");
+      return;
+    }
+
+    if (actionNodes.some((node) => node.type === "showAnimation" && !node.data.animationUrl)) {
+      setStatusMessage("Tambahkan atau pilih node Show Animation yang punya asset dulu sebelum test.");
+      return;
+    }
+
+    const payloads = actionNodes.map((node, index) => createTestActionPayload(node, selectedFlowId, index));
+
+    setStatusMessage("Mengirim test trigger...");
+
+    try {
+      for (const payload of payloads) {
+        const response = await fetch(`/api/action-test-events/${overlayKey}`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+          setStatusMessage("Gagal mengirim test trigger lewat HTTP fallback.");
+          return;
+        }
+      }
+    } catch {
+      setStatusMessage("Gagal mengirim test trigger. Pastikan Next dev server aktif.");
+      return;
+    }
+
+    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || window.location.origin;
+    const socket = io(socketUrl, {
+      transports: ["websocket", "polling"],
+      timeout: 1000
+    });
+
+    socket.on("connect", () => {
+      for (const payload of payloads) {
+        socket.emit("automation:test-animation", overlayKey, payload);
+      }
+      window.setTimeout(() => socket.disconnect(), 300);
+    });
+    socket.on("connect_error", () => {
+      socket.disconnect();
+    });
+    setStatusMessage(`Test trigger dikirim ke overlay action (${payloads.length} action).`);
+  }
+
   async function uploadAnimationAsset(file: File) {
     setAssetMessage(null);
     setIsUploadingAsset(true);
@@ -577,6 +703,10 @@ function AutomationBuilderCanvas({
           <Button type="button" variant="outline" onClick={toggleActive} disabled={isPending}>
             <CircleDot />
             {flowActive ? "Disable" : "Enable"}
+          </Button>
+          <Button type="button" variant="outline" onClick={testAnimationTrigger}>
+            <Sparkles />
+            Test Trigger
           </Button>
           <Button type="button" onClick={saveFlow} disabled={isPending}>
             <Save />
@@ -888,6 +1018,7 @@ function NodeSettingsPanel({
               onChange={(value) => onChange("field", value)}
               options={[
                 { value: "giftName", label: "Gift name" },
+                { value: "giftId", label: "Gift ID" },
                 { value: "giftCount", label: "Gift value/count" },
                 { value: "comment", label: "Comment text" },
                 { value: "username", label: "Username" },
@@ -974,14 +1105,31 @@ function NodeSettingsPanel({
                 { value: "bottom-right", label: "Bottom Right" }
               ]}
             />
+            <LayerSelect
+              id="animationLayer"
+              value={String(node.data.actionLayer ?? "back")}
+              onChange={(value) => onChange("actionLayer", value as AutomationNodeData["actionLayer"])}
+            />
             <NumberInput
               id="animationSize"
-              label="Ukuran px"
+              label="Legacy size px"
               value={Number(node.data.size ?? 420)}
               min={80}
               max={1200}
               step={20}
               onChange={(value) => onChange("size", value)}
+            />
+            <MediaFrameSettings data={node.data} onChange={onChange} />
+            <SelectInput
+              id="animationFit"
+              label="Media Fit"
+              value={String(node.data.mediaFit ?? "auto")}
+              onChange={(value) => onChange("mediaFit", value as AutomationNodeData["mediaFit"])}
+              options={[
+                { value: "auto", label: "Contain - tampil utuh" },
+                { value: "cover", label: "Fulfill / Cover - penuh frame" },
+                { value: "fill", label: "Stretch - paksa isi frame" }
+              ]}
             />
             <SelectInput
               id="animationSound"
@@ -990,6 +1138,184 @@ function NodeSettingsPanel({
               onChange={(value) => onChange("soundUrl", value)}
               options={soundOptions}
             />
+          </>
+        ) : null}
+
+        {node.type === "show3dText" ? (
+          <>
+            <ThreeTextPreview data={node.data} />
+            <div className="rounded-md border bg-muted/40 p-3 text-xs leading-relaxed text-muted-foreground">
+              Placeholder tersedia: {"{{displayName}}"}, {"{{username}}"}, {"{{giftName}}"}, {"{{giftCount}}"}, {"{{comment}}"}.
+            </div>
+            <TextInput
+              id="text3dTemplate"
+              label="Main Text"
+              value={String(node.data.text3dTemplate ?? "Terima kasih {{displayName}}!")}
+              onChange={(value) => onChange("text3dTemplate", value)}
+              placeholder="Terima kasih {{displayName}}!"
+            />
+            <TextInput
+              id="text3dSubtitle"
+              label="Subtitle"
+              value={String(node.data.text3dSubtitle ?? "{{giftName}} x{{giftCount}}")}
+              onChange={(value) => onChange("text3dSubtitle", value)}
+              placeholder="{{giftName}} x{{giftCount}}"
+            />
+            <SelectInput
+              id="text3dEffect"
+              label="Text Effect"
+              value={String(node.data.text3dEffect ?? "neon")}
+              onChange={(value) => onChange("text3dEffect", value as AutomationNodeData["text3dEffect"])}
+              options={[
+                { value: "neon", label: "Neon Glow" },
+                { value: "gold", label: "Gold Pop" },
+                { value: "hologram", label: "Hologram Shine" },
+                { value: "glitch", label: "Cyber Glitch" },
+                { value: "bubble", label: "Bubble Pop" },
+                { value: "cyber", label: "Cyber Gradient" },
+                { value: "fire", label: "Fire Stroke" }
+              ]}
+            />
+            <SelectInput
+              id="text3dPosition"
+              label="Posisi"
+              value={String(node.data.position ?? "center")}
+              onChange={(value) => onChange("position", value)}
+              options={[
+                { value: "top-left", label: "Top Left" },
+                { value: "top-center", label: "Top Center" },
+                { value: "top-right", label: "Top Right" },
+                { value: "center", label: "Center" },
+                { value: "bottom-left", label: "Bottom Left" },
+                { value: "bottom-center", label: "Bottom Center" },
+                { value: "bottom-right", label: "Bottom Right" }
+              ]}
+            />
+            <LayerSelect
+              id="text3dLayer"
+              value={String(node.data.actionLayer ?? "front")}
+              onChange={(value) => onChange("actionLayer", value as AutomationNodeData["actionLayer"])}
+            />
+            <div className="grid grid-cols-2 gap-3">
+              <NumberInput
+                id="text3dOffsetX"
+                label="Offset X px"
+                value={Number(node.data.text3dOffsetX ?? 0)}
+                min={-1200}
+                max={1200}
+                step={10}
+                onChange={(value) => onChange("text3dOffsetX", value)}
+              />
+              <NumberInput
+                id="text3dOffsetY"
+                label="Offset Y px"
+                value={Number(node.data.text3dOffsetY ?? 0)}
+                min={-1200}
+                max={1200}
+                step={10}
+                onChange={(value) => onChange("text3dOffsetY", value)}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <NumberInput
+                id="text3dSize"
+                label="Text scale"
+                value={Number(node.data.size ?? 560)}
+                min={180}
+                max={1000}
+                step={20}
+                onChange={(value) => onChange("size", value)}
+              />
+              <NumberInput
+                id="text3dDuration"
+                label="Durasi ms"
+                value={Number(node.data.durationMs ?? 4500)}
+                min={800}
+                max={30000}
+                step={500}
+                onChange={(value) => onChange("durationMs", value)}
+              />
+              <NumberInput
+                id="text3dDepth"
+                label="Glow strength"
+                value={Number(node.data.text3dDepth ?? 0.22)}
+                min={0.02}
+                max={1}
+                step={0.01}
+                onChange={(value) => onChange("text3dDepth", value)}
+              />
+              <NumberInput
+                id="text3dBevel"
+                label="Stroke"
+                value={Number(node.data.text3dBevel ?? 0.035)}
+                min={0}
+                max={0.2}
+                step={0.005}
+                onChange={(value) => onChange("text3dBevel", value)}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <ColorInput
+                id="text3dColor"
+                label="Text Color"
+                value={String(node.data.text3dColor ?? "#f8fafc")}
+                onChange={(value) => onChange("text3dColor", value)}
+              />
+              <ColorInput
+                id="text3dAccentColor"
+                label="Accent Color"
+                value={String(node.data.text3dAccentColor ?? "#22d3ee")}
+                onChange={(value) => onChange("text3dAccentColor", value)}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <NumberInput
+                id="text3dMetalness"
+                label="Legacy metalness"
+                value={Number(node.data.text3dMetalness ?? 0.45)}
+                min={0}
+                max={1}
+                step={0.05}
+                onChange={(value) => onChange("text3dMetalness", value)}
+              />
+              <NumberInput
+                id="text3dRoughness"
+                label="Legacy roughness"
+                value={Number(node.data.text3dRoughness ?? 0.2)}
+                min={0}
+                max={1}
+                step={0.05}
+                onChange={(value) => onChange("text3dRoughness", value)}
+              />
+            </div>
+            <SwitchField
+              id="text3dSpin"
+              label="Rotate 3D"
+              checked={node.data.text3dSpin !== false}
+              onChange={(checked) => onChange("text3dSpin", checked)}
+            />
+            <SwitchField
+              id="text3dFloat"
+              label="Floating Motion"
+              checked={node.data.text3dFloat !== false}
+              onChange={(checked) => onChange("text3dFloat", checked)}
+            />
+            <SelectInput
+              id="text3dSound"
+              label="Sound optional"
+              value={String(node.data.soundUrl ?? "")}
+              onChange={(value) => onChange("soundUrl", value)}
+              options={soundOptions}
+            />
+          </>
+        ) : null}
+
+        {node.type === "showConfetti" ? (
+          <>
+            <div className="rounded-md border bg-muted/40 p-3 text-xs leading-relaxed text-muted-foreground">
+              Confetti ini adalah overlay terpisah. Hubungkan node ini setelah condition atau paralel dengan Animation/3D Text untuk ditumpuk.
+            </div>
+            <ConfettiSettings data={node.data} onChange={onChange} />
           </>
         ) : null}
 
@@ -1170,6 +1496,13 @@ function AnimationAssetField({
   const knownValue = assets.some((asset) => asset.url === value);
   const defaultAssets = assets.filter((asset) => asset.source === "default");
   const workspaceAssets = assets.filter((asset) => asset.source === "workspace");
+  const selectedAsset = assets.find((asset) => asset.url === value) ?? null;
+
+  useEffect(() => {
+    if (assets.some((asset) => asset.type === "lottie")) {
+      void import("@lottiefiles/dotlottie-wc");
+    }
+  }, [assets]);
 
   return (
     <div className="space-y-3">
@@ -1208,6 +1541,34 @@ function AnimationAssetField({
         </select>
       </div>
 
+      {assets.length ? (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <Label>Preview asset</Label>
+            {selectedAsset ? <span className="truncate text-xs text-muted-foreground">{selectedAsset.label}</span> : null}
+          </div>
+          <div className="grid max-h-72 grid-cols-2 gap-3 overflow-y-auto rounded-lg border bg-muted/20 p-3">
+            {assets.map((asset) => (
+              <button
+                key={asset.id}
+                type="button"
+                onClick={() => onChange(asset.url)}
+                className={`group overflow-hidden rounded-lg border bg-card text-left transition-colors hover:border-primary ${asset.url === value ? "border-primary ring-2 ring-primary/30" : ""}`}
+                title={asset.label}
+              >
+                <div className="grid aspect-video place-items-center overflow-hidden bg-zinc-950/90">
+                  <AnimationAssetPreview asset={asset} />
+                </div>
+                <div className="grid gap-0.5 p-2">
+                  <span className="truncate text-xs font-semibold">{asset.label}</span>
+                  <span className="text-[11px] text-muted-foreground">{asset.sourceLabel} · {asset.type}</span>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
       <div className="space-y-2">
         <Label htmlFor="animationUrl">Animation file URL</Label>
         <Input
@@ -1243,6 +1604,480 @@ function AnimationAssetField({
   );
 }
 
+function AnimationAssetPreview({ asset }: { asset: AnimationAsset }) {
+  if (asset.type === "video") {
+    return (
+      <video
+        src={asset.url}
+        muted
+        autoPlay
+        loop
+        playsInline
+        preload="metadata"
+        className="h-full w-full object-contain"
+      />
+    );
+  }
+
+  if (asset.type === "lottie") {
+    return createElement("dotlottie-wc", {
+      src: asset.url,
+      autoplay: true,
+      loop: true,
+      style: {
+        display: "block",
+        width: "100%",
+        height: "100%"
+      }
+    });
+  }
+
+  return (
+    <span
+      aria-hidden="true"
+      className="block h-full w-full bg-contain bg-center bg-no-repeat"
+      style={{ backgroundImage: `url("${asset.url}")` }}
+    />
+  );
+}
+
+function ConfettiSettings({
+  data,
+  onChange
+}: {
+  data: AutomationNodeData;
+  onChange: <K extends keyof AutomationNodeData>(key: K, value: AutomationNodeData[K]) => void;
+}) {
+  const selectedPresets = readConfettiPresets(data.confettiPresets);
+
+  return (
+    <div className="grid grid-cols-2 gap-3 rounded-md border bg-muted/20 p-3">
+      <div className="col-span-2 grid gap-2">
+        <Label>Styles</Label>
+        <div className="grid grid-cols-2 gap-2">
+          {confettiPresetOptions.map((preset) => {
+            const selected = selectedPresets.includes(preset.value);
+
+            return (
+              <button
+                key={preset.value}
+                type="button"
+                onClick={() => {
+                  const next = selected
+                    ? selectedPresets.filter((item) => item !== preset.value)
+                    : [...selectedPresets, preset.value];
+
+                  onChange("confettiPresets", next.length ? next : ["basicCannon"]);
+                }}
+                className={[
+                  "rounded-md border px-2 py-2 text-left text-xs font-semibold transition-colors",
+                  selected ? "border-primary bg-primary/10 text-primary" : "bg-card hover:bg-muted"
+                ].join(" ")}
+              >
+                {preset.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      <div className="col-span-2">
+        <SelectInput
+          id="confettiMode"
+          label="Confetti Mode"
+          value={String(data.confettiMode ?? "once")}
+          onChange={(value) => onChange("confettiMode", value as AutomationNodeData["confettiMode"])}
+          options={[
+            { value: "once", label: "Once" },
+            { value: "repeat", label: "Repeat with auto close" },
+            { value: "repeatUntilOverlayEnd", label: "Repeat until overlay ends" }
+          ]}
+        />
+      </div>
+      <div className="col-span-2">
+        <SelectInput
+          id="confettiLayer"
+          label="Layer"
+          value={String(data.confettiLayer ?? "front")}
+          onChange={(value) => onChange("confettiLayer", value as AutomationNodeData["confettiLayer"])}
+          options={[
+            { value: "front", label: "Bring to front" },
+            { value: "back", label: "Send to back" }
+          ]}
+        />
+      </div>
+      <TextInput
+        id="confettiEmoji"
+        label="Emoji"
+        value={String(data.confettiEmoji ?? "🎁")}
+        onChange={(value) => onChange("confettiEmoji", value)}
+        placeholder="🎁"
+      />
+      <NumberInput
+        id="confettiParticleCount"
+        label="Particles"
+        value={Number(data.confettiParticleCount ?? 140)}
+        min={20}
+        max={500}
+        step={10}
+        onChange={(value) => onChange("confettiParticleCount", value)}
+      />
+      <NumberInput
+        id="confettiSpread"
+        label="Spread"
+        value={Number(data.confettiSpread ?? 85)}
+        min={20}
+        max={180}
+        step={5}
+        onChange={(value) => onChange("confettiSpread", value)}
+      />
+      <NumberInput
+        id="confettiStartVelocity"
+        label="Velocity"
+        value={Number(data.confettiStartVelocity ?? 45)}
+        min={10}
+        max={100}
+        step={5}
+        onChange={(value) => onChange("confettiStartVelocity", value)}
+      />
+      <NumberInput
+        id="confettiScalar"
+        label="Size"
+        value={Number(data.confettiScalar ?? 1)}
+        min={0.3}
+        max={2.5}
+        step={0.1}
+        onChange={(value) => onChange("confettiScalar", value)}
+      />
+      {data.confettiMode === "repeat" || data.confettiMode === "repeatUntilOverlayEnd" ? (
+        <NumberInput
+          id="confettiIntervalMs"
+          label="Delay tiap burst ms"
+          value={Number(data.confettiIntervalMs ?? 900)}
+          min={250}
+          max={5000}
+          step={50}
+          onChange={(value) => onChange("confettiIntervalMs", value)}
+        />
+      ) : null}
+      {data.confettiMode === "repeat" || data.confettiMode === "repeatUntilOverlayEnd" ? (
+        <NumberInput
+          id="confettiDurationMs"
+          label={data.confettiMode === "repeat" ? "Auto close ms" : "Fallback duration ms"}
+          value={Number(data.confettiDurationMs ?? 4500)}
+          min={500}
+          max={30000}
+          step={500}
+          onChange={(value) => onChange("confettiDurationMs", value)}
+        />
+      ) : null}
+      <NumberInput
+        id="confettiOriginY"
+        label="Origin Y"
+        value={Number(data.confettiOriginY ?? 0.55)}
+        min={0}
+        max={1}
+        step={0.05}
+        onChange={(value) => onChange("confettiOriginY", value)}
+      />
+      <Button
+        type="button"
+        variant="outline"
+        className="col-span-2"
+        onClick={() => previewConfetti(data)}
+      >
+        Preview Confetti
+      </Button>
+    </div>
+  );
+}
+
+function LayerSelect({
+  id,
+  value,
+  onChange
+}: {
+  id: string;
+  value: string;
+  onChange: (value: "front" | "back") => void;
+}) {
+  return (
+    <SelectInput
+      id={id}
+      label="Layer"
+      value={value}
+      onChange={(nextValue) => onChange(nextValue === "back" ? "back" : "front")}
+      options={[
+        { value: "front", label: "Bring to front" },
+        { value: "back", label: "Send to back" }
+      ]}
+    />
+  );
+}
+
+function MediaFrameSettings({
+  data,
+  onChange
+}: {
+  data: AutomationNodeData;
+  onChange: <K extends keyof AutomationNodeData>(key: K, value: AutomationNodeData[K]) => void;
+}) {
+  const frame = String(data.mediaFrame ?? "square");
+
+  function setFrame(nextFrame: string) {
+    onChange("mediaFrame", nextFrame as AutomationNodeData["mediaFrame"]);
+
+    const dimensions = getMediaFrameDimensions(nextFrame, Number(data.size ?? 420));
+
+    if (dimensions) {
+      onChange("mediaWidth", dimensions.width);
+      onChange("mediaHeight", dimensions.height);
+    }
+  }
+
+  return (
+    <div className="grid gap-3 rounded-md border bg-muted/20 p-3">
+      <SelectInput
+        id="mediaFrame"
+        label="Video Frame"
+        value={frame}
+        onChange={setFrame}
+        options={[
+          { value: "square", label: "Square 420x420" },
+          { value: "portrait", label: "Portrait 1080x1920" },
+          { value: "landscape", label: "Landscape 1920x1080" },
+          { value: "obsDefault", label: "OBS Default 800x600" },
+          { value: "fullscreen", label: "Fullscreen / OBS Source" },
+          { value: "custom", label: "Custom size" }
+        ]}
+      />
+      <div className="grid grid-cols-2 gap-3">
+        <NumberInput
+          id="mediaWidth"
+          label="Frame width"
+          value={Number(data.mediaWidth ?? getMediaFrameDimensions(frame, Number(data.size ?? 420))?.width ?? data.size ?? 420)}
+          min={80}
+          max={3840}
+          step={10}
+          disabled={frame === "fullscreen"}
+          onChange={(value) => {
+            onChange("mediaFrame", "custom");
+            onChange("mediaWidth", value);
+          }}
+        />
+        <NumberInput
+          id="mediaHeight"
+          label="Frame height"
+          value={Number(data.mediaHeight ?? getMediaFrameDimensions(frame, Number(data.size ?? 420))?.height ?? data.size ?? 420)}
+          min={80}
+          max={3840}
+          step={10}
+          disabled={frame === "fullscreen"}
+          onChange={(value) => {
+            onChange("mediaFrame", "custom");
+            onChange("mediaHeight", value);
+          }}
+        />
+      </div>
+      <p className="text-xs leading-relaxed text-muted-foreground">
+        Frame menentukan area video. Media Fit menentukan video tampil utuh, memenuhi frame, atau dipaksa stretch.
+      </p>
+    </div>
+  );
+}
+
+function getMediaFrameDimensions(frame: string, fallbackSize: number) {
+  if (frame === "portrait") {
+    return { width: 1080, height: 1920 };
+  }
+
+  if (frame === "landscape") {
+    return { width: 1920, height: 1080 };
+  }
+
+  if (frame === "obsDefault") {
+    return { width: 800, height: 600 };
+  }
+
+  if (frame === "fullscreen") {
+    return { width: 0, height: 0 };
+  }
+
+  if (frame === "square") {
+    return { width: fallbackSize, height: fallbackSize };
+  }
+
+  return null;
+}
+
+function ThreeTextPreview({ data }: { data: AutomationNodeData }) {
+  const action = {
+    id: "preview-3d-text",
+    type: "GIFT",
+    username: "vicky_viewer",
+    displayName: "Vicky Viewer",
+    giftName: "Mawar",
+    giftCount: 100,
+    receivedAt: new Date(0).toISOString(),
+    action: "SHOW_3D_TEXT",
+    animationSize: 300,
+    text3dTemplate: String(data.text3dTemplate ?? "Terima kasih {{displayName}}!"),
+    text3dSubtitle: String(data.text3dSubtitle ?? "{{giftName}} x{{giftCount}}"),
+    text3dEffect: String(data.text3dEffect ?? "neon"),
+    text3dColor: String(data.text3dColor ?? "#f8fafc"),
+    text3dAccentColor: String(data.text3dAccentColor ?? "#22d3ee"),
+    text3dDepth: Number(data.text3dDepth ?? 0.22),
+    text3dBevel: Number(data.text3dBevel ?? 0.035),
+    text3dMetalness: Number(data.text3dMetalness ?? 0.45),
+    text3dRoughness: Number(data.text3dRoughness ?? 0.2),
+    text3dSpin: data.text3dSpin !== false,
+    text3dFloat: data.text3dFloat !== false,
+    text3dOffsetX: Number(data.text3dOffsetX ?? 0),
+    text3dOffsetY: Number(data.text3dOffsetY ?? 0)
+  };
+
+  return (
+    <div className="overflow-hidden rounded-lg border bg-zinc-950 p-3">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <Label className="text-xs text-zinc-200">Text Preview</Label>
+        <span className="text-[11px] text-zinc-400">sample gift x100</span>
+      </div>
+      <div className="grid h-48 place-items-center overflow-hidden rounded-md bg-[radial-gradient(circle_at_center,rgba(34,211,238,.22),transparent_58%)]">
+        <div
+          className="h-full w-full"
+          style={{
+            transform: `translate(${Number(action.text3dOffsetX ?? 0) * 0.25}px, ${Number(action.text3dOffsetY ?? 0) * 0.25}px)`
+          }}
+        >
+          <ThreeTextOverlay
+            action={action}
+            title={resolveTemplate(action.text3dTemplate, action)}
+            subtitle={resolveTemplate(action.text3dSubtitle, action)}
+            fit="container"
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function previewConfetti(data: AutomationNodeData) {
+  void import("canvas-confetti").then(({ default: confetti }) => {
+    const base = {
+      particleCount: Number(data.confettiParticleCount ?? 140),
+      spread: Number(data.confettiSpread ?? 85),
+      startVelocity: Number(data.confettiStartVelocity ?? 45),
+      scalar: Number(data.confettiScalar ?? 1),
+      zIndex: data.confettiLayer === "back" ? 0 : 2147483647,
+      origin: {
+        x: 0.5,
+        y: Number(data.confettiOriginY ?? 0.55)
+      },
+      colors: ["#22d3ee", "#f8fafc", "#f43f5e", "#facc15", "#34d399"]
+    };
+
+    for (const preset of readConfettiPresets(data.confettiPresets)) {
+      firePreviewConfettiPreset(confetti, preset, base, String(data.confettiEmoji ?? "🎁"));
+    }
+  });
+}
+
+function resolveTemplate(template: string, values: Record<string, unknown>) {
+  return template.replace(/\{\{\s*([a-zA-Z0-9_.-]+)\s*\}\}/g, (_match, key: string) => String(values[key] ?? ""));
+}
+
+type CanvasConfetti = typeof import("canvas-confetti");
+type ConfettiOptions = NonNullable<Parameters<CanvasConfetti>[0]>;
+
+function firePreviewConfettiPreset(confetti: CanvasConfetti, preset: string, base: ConfettiOptions, emoji: string) {
+  if (preset === "emoji") {
+    void confetti({
+      ...base,
+      shapes: [confetti.shapeFromText({ text: emoji || "🎁", scalar: 1.8 })],
+      scalar: Number(base.scalar ?? 1) * 1.8
+    });
+    return;
+  }
+
+  if (preset === "stars") {
+    void confetti({ ...base, shapes: ["star"] });
+    return;
+  }
+
+  if (preset === "snow") {
+    void confetti({ ...base, startVelocity: 0, gravity: 0.35, spread: 120, origin: { x: Math.random(), y: -0.1 } });
+    return;
+  }
+
+  if (preset === "fireworks") {
+    void confetti({ ...base, spread: 360, origin: { x: Math.random(), y: 0.35 } });
+    return;
+  }
+
+  if (preset === "randomDirection") {
+    void confetti({ ...base, angle: Math.random() * 90 + 45, origin: { x: Math.random(), y: Number(base.origin?.y ?? 0.55) } });
+    return;
+  }
+
+  if (preset === "realisticLook" || preset === "schoolPride") {
+    const colors = preset === "schoolPride" ? ["#2563eb", "#facc15"] : base.colors;
+    void confetti({ ...base, angle: 60, spread: 55, origin: { x: 0, y: Number(base.origin?.y ?? 0.6) }, colors });
+    void confetti({ ...base, angle: 120, spread: 55, origin: { x: 1, y: Number(base.origin?.y ?? 0.6) }, colors });
+    return;
+  }
+
+  if (preset === "customShapes") {
+    void confetti({ ...base, shapes: ["circle", "square", "star"] });
+    return;
+  }
+
+  void confetti(base);
+}
+
+function readConfettiPresets(value: unknown) {
+  if (!Array.isArray(value)) {
+    return ["basicCannon"];
+  }
+
+  const presets = value.filter((item): item is string => typeof item === "string");
+
+  return presets.length ? presets : ["basicCannon"];
+}
+
+function ColorInput({
+  id,
+  label,
+  value,
+  onChange
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const normalizedValue = /^#[0-9a-f]{6}$/i.test(value) ? value : "#ffffff";
+
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={id}>{label}</Label>
+      <div className="flex items-center gap-2 rounded-md border bg-card p-1.5">
+        <input
+          id={id}
+          type="color"
+          value={normalizedValue}
+          onChange={(event) => onChange(event.target.value)}
+          className="h-8 w-10 shrink-0 cursor-pointer rounded border bg-transparent p-0"
+        />
+        <Input
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          className="h-8 min-w-0 border-0 bg-transparent px-2 text-xs focus-visible:ring-0"
+          placeholder="#ffffff"
+        />
+      </div>
+    </div>
+  );
+}
+
 function TextInput({
   id,
   label,
@@ -1271,6 +2106,7 @@ function NumberInput({
   min,
   max,
   step,
+  disabled = false,
   onChange
 }: {
   id: string;
@@ -1279,6 +2115,7 @@ function NumberInput({
   min: number;
   max: number;
   step: number;
+  disabled?: boolean;
   onChange: (value: number) => void;
 }) {
   return (
@@ -1291,6 +2128,7 @@ function NumberInput({
         min={min}
         max={max}
         step={step}
+        disabled={disabled}
         onChange={(event) => onChange(Number(event.target.value))}
       />
     </div>
@@ -1431,7 +2269,12 @@ function createDefaultDraft(): AutomationFlowRecord {
         durationMs: 3000,
         useMediaDuration: false,
         position: "center",
-        size: 420
+        size: 420,
+        mediaFit: "auto",
+        mediaFrame: "square",
+        mediaWidth: 420,
+        mediaHeight: 420,
+        actionLayer: "back"
       }
     }
   ];
@@ -1470,6 +2313,116 @@ function createNode(type: AutomationNodeType, position: { x: number; y: number }
       ...(definition?.defaultData ?? {}),
       label: definition?.defaultData.label ?? definition?.title ?? type
     }
+  };
+}
+
+function getTestActionNodes(nodes: FlowNode[], edges: FlowEdge[]) {
+  const nodeById = new Map(nodes.map((node) => [node.id, node]));
+  const triggerNodes = nodes.filter((node) => isTriggerNode(node.type));
+  const startNodes = triggerNodes.length ? triggerNodes : nodes;
+  const found = new Map<string, FlowNode>();
+
+  for (const startNode of startNodes) {
+    collectDownstreamActionNodes(startNode, nodeById, edges, found, new Set<string>());
+  }
+
+  if (!found.size) {
+    for (const node of nodes) {
+      if (isActionOverlayNode(node.type)) {
+        found.set(node.id, node);
+      }
+    }
+  }
+
+  return Array.from(found.values());
+}
+
+function collectDownstreamActionNodes(
+  node: FlowNode,
+  nodeById: Map<string, FlowNode>,
+  edges: FlowEdge[],
+  found: Map<string, FlowNode>,
+  visited: Set<string>
+) {
+  if (visited.has(node.id)) {
+    return;
+  }
+
+  visited.add(node.id);
+
+  if (isActionOverlayNode(node.type)) {
+    found.set(node.id, node);
+  }
+
+  for (const edge of edges) {
+    if (edge.source !== node.id) {
+      continue;
+    }
+
+    const nextNode = nodeById.get(edge.target);
+
+    if (nextNode) {
+      collectDownstreamActionNodes(nextNode, nodeById, edges, found, new Set(visited));
+    }
+  }
+}
+
+function isActionOverlayNode(type: string | undefined) {
+  return type === "showAnimation" || type === "show3dText" || type === "showConfetti";
+}
+
+function createTestActionPayload(node: FlowNode, flowId: string | null, index: number) {
+  const is3dText = node.type === "show3dText";
+  const isConfetti = node.type === "showConfetti";
+
+  return {
+    id: `test-animation-${Date.now()}-${node.id}-${index}`,
+    type: "GIFT",
+    username: "automation_test",
+    displayName: "Vicky Viewer",
+    giftName: "Mawar",
+    giftCount: 100,
+    receivedAt: new Date().toISOString(),
+    action: isConfetti ? "SHOW_CONFETTI" : is3dText ? "SHOW_3D_TEXT" : "SHOW_ANIMATION",
+    flowId,
+    testMode: true,
+    animationUrl: is3dText || isConfetti ? null : String(node.data.animationUrl),
+    animationPosition: String(node.data.position ?? "center"),
+    animationSize: Number(node.data.size ?? (is3dText ? 560 : 420)),
+    animationFit: String(node.data.mediaFit ?? "auto"),
+    mediaFrame: String(node.data.mediaFrame ?? "square"),
+    mediaWidth: Number(node.data.mediaWidth ?? node.data.size ?? 420),
+    mediaHeight: Number(node.data.mediaHeight ?? node.data.size ?? 420),
+    actionLayer: String(node.data.actionLayer ?? (is3dText ? "front" : "back")),
+    text3dTemplate: String(node.data.text3dTemplate ?? "Terima kasih {{displayName}}!"),
+    text3dSubtitle: String(node.data.text3dSubtitle ?? "{{giftName}} x{{giftCount}}"),
+    text3dEffect: String(node.data.text3dEffect ?? "neon"),
+    text3dColor: String(node.data.text3dColor ?? "#f8fafc"),
+    text3dAccentColor: String(node.data.text3dAccentColor ?? "#22d3ee"),
+    text3dDepth: Number(node.data.text3dDepth ?? 0.22),
+    text3dBevel: Number(node.data.text3dBevel ?? 0.035),
+    text3dMetalness: Number(node.data.text3dMetalness ?? 0.45),
+    text3dRoughness: Number(node.data.text3dRoughness ?? 0.2),
+    text3dSpin: node.data.text3dSpin !== false,
+    text3dFloat: node.data.text3dFloat !== false,
+    text3dOffsetX: Number(node.data.text3dOffsetX ?? 0),
+    text3dOffsetY: Number(node.data.text3dOffsetY ?? 0),
+    confettiEnabled: isConfetti,
+    confettiMode: String(node.data.confettiMode ?? "once"),
+    confettiPresets: readConfettiPresets(node.data.confettiPresets),
+    confettiLayer: String(node.data.confettiLayer ?? "front"),
+    confettiParticleCount: Number(node.data.confettiParticleCount ?? 140),
+    confettiSpread: Number(node.data.confettiSpread ?? 85),
+    confettiStartVelocity: Number(node.data.confettiStartVelocity ?? 45),
+    confettiScalar: Number(node.data.confettiScalar ?? 1),
+    confettiIntervalMs: Number(node.data.confettiIntervalMs ?? 900),
+    confettiOriginY: Number(node.data.confettiOriginY ?? 0.55),
+    confettiDurationMs: Number(node.data.confettiDurationMs ?? 4500),
+    confettiEmoji: String(node.data.confettiEmoji ?? "🎁"),
+    soundUrl: typeof node.data.soundUrl === "string" ? node.data.soundUrl : null,
+    volume: Number(node.data.volume ?? 1),
+    durationMs: Number(node.data.durationMs ?? (is3dText ? 4500 : 3000)),
+    useMediaDuration: node.data.useMediaDuration === true
   };
 }
 
@@ -1574,6 +2527,10 @@ function getNodeColorClass(type: AutomationNodeType) {
     return "bg-rose-600 text-white";
   }
 
+  if (type === "show3dText") {
+    return "bg-cyan-600 text-white";
+  }
+
   return "bg-violet-600 text-white";
 }
 
@@ -1592,6 +2549,10 @@ function nodeSubtitle(type: AutomationNodeType, data: AutomationNodeData) {
     }
 
     return `${String(data.position ?? "center")} | ${Number(data.durationMs ?? 3000)}ms`;
+  }
+
+  if (type === "show3dText") {
+    return `${String(data.position ?? "center")} | ${Number(data.durationMs ?? 4500)}ms`;
   }
 
   if (type === "playSound") {

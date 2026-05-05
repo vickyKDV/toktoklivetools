@@ -2,14 +2,19 @@ import Link from "next/link";
 import {
   Activity,
   Blocks,
+  Box,
   Cable,
+  Gift,
   LayoutDashboard,
   ListTree,
   LogOut,
+  MessageSquareText,
   MonitorUp,
+  PanelBottom,
   Palette,
   Settings,
   Sparkles,
+  Trophy,
   Workflow
 } from "lucide-react";
 import { logoutAction } from "@/app/(auth)/actions";
@@ -21,6 +26,7 @@ type SidebarWorkspace = {
   id: string;
   name: string;
   tiktokUsername: string | null;
+  overlayKey: string;
 };
 
 type DashboardSidebarProps = {
@@ -38,6 +44,34 @@ const navItems = [
     href: "/dashboard/workspaces",
     label: "Workspaces",
     icon: Blocks
+  }
+];
+
+const overlaySubItems = [
+  {
+    hrefSuffix: "CHAT",
+    label: "Chat",
+    icon: MessageSquareText
+  },
+  {
+    hrefSuffix: "LEADERBOARD",
+    label: "Leaderboard",
+    icon: Trophy
+  },
+  {
+    hrefSuffix: "GIFT",
+    label: "Gift",
+    icon: Gift
+  },
+  {
+    hrefSuffix: "DOCK",
+    label: "Dock",
+    icon: PanelBottom
+  },
+  {
+    hrefSuffix: "CUSTOM",
+    label: "Custom",
+    icon: Box
   }
 ];
 
@@ -112,6 +146,16 @@ export function DashboardSidebar({ user, workspaces }: DashboardSidebarProps) {
                 Overlays
               </Link>
             </Button>
+            <div className="ml-6 grid gap-1 border-l pl-2">
+              {overlaySubItems.map((item) => (
+                <Button key={item.hrefSuffix} asChild variant="ghost" size="sm" className="h-8 justify-start px-2 text-xs text-muted-foreground">
+                  <Link href={`/dashboard/workspaces/${workspaces[0].id}/overlays?kind=${item.hrefSuffix}`}>
+                    <item.icon className="size-3.5" />
+                    {item.label}
+                  </Link>
+                </Button>
+              ))}
+            </div>
             <Button asChild variant="ghost" className="justify-start">
               <Link href={`/dashboard/workspaces/${workspaces[0].id}/overlay-design-builder`}>
                 <Palette />

@@ -40,6 +40,19 @@ export function bindSocketServer(io: Server) {
 
       io.to(overlayRoom(overlayKey)).emit("overlay:clear-focus-chat");
     });
+
+    socket.on("automation:test-animation", (overlayKey: string, payload: OverlayEventPayload) => {
+      if (!overlayKey || !payload || !["SHOW_ANIMATION", "SHOW_3D_TEXT", "SHOW_CONFETTI"].includes(String(payload.action))) {
+        return;
+      }
+
+      io.to(overlayRoom(overlayKey)).emit("overlay:event", {
+        ...payload,
+        id: payload.id || `test-animation-${Date.now()}`,
+        type: payload.type || "GIFT",
+        receivedAt: payload.receivedAt || new Date().toISOString()
+      });
+    });
   });
 }
 

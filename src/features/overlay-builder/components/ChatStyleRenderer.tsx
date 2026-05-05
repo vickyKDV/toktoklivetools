@@ -8,6 +8,7 @@ import {
   type OverlayDesignSchema,
   type OverlayRenderData
 } from "@/features/overlay-builder/schema/overlaySchema";
+import { getRuntimeCanvasSize } from "@/features/overlay-builder/utils/runtimeCanvas";
 import { getRuntimeComponentBounds } from "@/features/overlay-builder/utils/runtimeLayout";
 
 type ChatStyleRendererProps = {
@@ -29,10 +30,11 @@ export function ChatStyleRenderer({
   alignRight = false,
   height
 }: ChatStyleRendererProps) {
-  const itemBounds = items.map((item) => getRuntimeComponentBounds(designJson.components, item, designJson.canvas.width, designJson.canvas.height));
-  const bounds = itemBounds[0] ?? getRuntimeComponentBounds(designJson.components, dummyOverlayData, designJson.canvas.width, designJson.canvas.height);
-  const viewportWidth = designJson.canvas.width;
-  const viewportHeight = typeof height === "number" ? height : designJson.canvas.height;
+  const runtimeCanvas = getRuntimeCanvasSize(designJson);
+  const itemBounds = items.map((item) => getRuntimeComponentBounds(designJson.components, item, runtimeCanvas.width, runtimeCanvas.height));
+  const bounds = itemBounds[0] ?? getRuntimeComponentBounds(designJson.components, dummyOverlayData, runtimeCanvas.width, runtimeCanvas.height);
+  const viewportWidth = runtimeCanvas.width;
+  const viewportHeight = typeof height === "number" ? Math.max(height, runtimeCanvas.height) : runtimeCanvas.height;
   const renderedItemWidth = Math.max(bounds.width, ...itemBounds.map((item) => item.width));
   const enterAnimation = getOverlayAnimationName(designJson.layout.enterAnimation, "in");
   const exitAnimation = getOverlayAnimationName(designJson.layout.exitAnimation, "out");
@@ -41,8 +43,6 @@ export function ChatStyleRenderer({
   const renderGap = getListRenderGap(listStyle, gap);
   const listHeight = Math.max(bounds.height, viewportHeight - bounds.top);
   const smoothDurationMs = Math.max(animationDurationMs, 720);
-  const fallbackItemHeight = bounds.height;
-  const visibleStackHeight = getVisibleStackHeight(itemBounds, designJson.layout.maxItems, renderGap, fallbackItemHeight);
 
   useEffect(() => {
     if (!debug) {
@@ -51,8 +51,8 @@ export function ChatStyleRenderer({
 
     console.table({
       mode: "list",
-      designWidth: designJson.canvas.width,
-      designHeight: designJson.canvas.height,
+      designWidth: runtimeCanvas.width,
+      designHeight: runtimeCanvas.height,
       elementX: bounds.left,
       elementY: bounds.top,
       elementWidth: bounds.width,
@@ -68,12 +68,12 @@ export function ChatStyleRenderer({
     bounds.top,
     bounds.width,
     debug,
-    designJson.canvas.height,
-    designJson.canvas.width,
     designJson.layout.maxItems,
     listStyle,
     designJson.layout.reverse,
-    items.length
+    items.length,
+    runtimeCanvas.height,
+    runtimeCanvas.width
   ]);
 
   return (
@@ -106,7 +106,7 @@ export function ChatStyleRenderer({
             const exitY = designJson.layout.reverse ? "-30px" : "30px";
             const visualStyle = getListVisualStyle(listStyle, index, designJson.layout.maxItems, alignRight);
             const targetY = designJson.layout.reverse
-              ? getReverseItemY(itemBounds, index, visibleStackHeight, renderGap)
+              ? getReverseItemY(itemBounds, index, listHeight, renderGap)
               : getNormalItemY(itemBounds, index, renderGap);
 
             return (
@@ -201,25 +201,31 @@ export const sampleChatRenderData: OverlayRenderData[] = [
 export function getSampleChatRenderData(count: number, enabledTypes: string[] = ["CHAT"]) {
   const eventTypes = enabledTypes.length ? enabledTypes : ["CHAT"];
   const samples = Array.from({ length: Math.max(1, count) }, (_, index) => {
-    const type = eventTypes[index % eventTypes.length];
+    const rawType = eventTypes[index % eventTypes.length];
+    const isLeaderboardSample = rawType.startsWith("LEADERBOARD_");
+    const type = isLeaderboardSample ? rawType.replace("LEADERBOARD_", "") : rawType;
     const base = sampleChatRenderData[index % sampleChatRenderData.length];
     const sequence = index + 1;
 
     if (type === "LIKE") {
+      const score = isLeaderboardSample ? 9800 - sequence * 470 : 0;
+
       return {
         meta: { id: `sample-like-${sequence}`, instanceId: `sample-like-${sequence}` },
-        viewer: { name: `Like Viewer ${sequence}`, username: `like_${sequence}`, avatar: "", badge: "" },
-        comment: { text: "liked the LIVE", createdAt: `12.${String(30 + sequence).padStart(2, "0")}` },
-        gift: { name: "", count: "", image: "" }
+        viewer: { name: `Like Viewer ${sequence}`, username: `like_${sequence}`, avatar: "", badge: isLeaderboardSample ? `#${sequence}` : "" },
+        comment: { text: isLeaderboardSample ? `${score.toLocaleString("id-ID")} likes` : "liked the LIVE", createdAt: `12.${String(30 + sequence).padStart(2, "0")}` },
+        gift: { name: isLeaderboardSample ? "like" : "", count: isLeaderboardSample ? score : "", image: "" }
       };
     }
 
     if (type === "SHARE") {
+      const score = isLeaderboardSample ? 420 - sequence * 18 : 0;
+
       return {
         meta: { id: `sample-share-${sequence}`, instanceId: `sample-share-${sequence}` },
-        viewer: { name: `Share Viewer ${sequence}`, username: `share_${sequence}`, avatar: "", badge: "" },
-        comment: { text: "shared the LIVE", createdAt: `12.${String(30 + sequence).padStart(2, "0")}` },
-        gift: { name: "", count: "", image: "" }
+        viewer: { name: `Share Viewer ${sequence}`, username: `share_${sequence}`, avatar: "", badge: isLeaderboardSample ? `#${sequence}` : "" },
+        comment: { text: isLeaderboardSample ? `${score.toLocaleString("id-ID")} shares` : "shared the LIVE", createdAt: `12.${String(30 + sequence).padStart(2, "0")}` },
+        gift: { name: isLeaderboardSample ? "share" : "", count: isLeaderboardSample ? score : "", image: "" }
       };
     }
 
@@ -233,11 +239,13 @@ export function getSampleChatRenderData(count: number, enabledTypes: string[] = 
     }
 
     if (type === "GIFT") {
+      const score = isLeaderboardSample ? 1200 - sequence * 83 : 3;
+
       return {
         meta: { id: `sample-gift-${sequence}`, instanceId: `sample-gift-${sequence}` },
-        viewer: { name: `Gift Viewer ${sequence}`, username: `gift_${sequence}`, avatar: "", badge: "Top Gifter" },
-        comment: { text: "sent Rose x3", createdAt: `12.${String(30 + sequence).padStart(2, "0")}` },
-        gift: { name: "Rose", count: 3, image: "" }
+        viewer: { name: `Gift Viewer ${sequence}`, username: `gift_${sequence}`, avatar: "", badge: isLeaderboardSample ? `#${sequence}` : "Top Gifter" },
+        comment: { text: isLeaderboardSample ? `${score.toLocaleString("id-ID")} gifts` : "sent Rose x3", createdAt: `12.${String(30 + sequence).padStart(2, "0")}` },
+        gift: { name: isLeaderboardSample ? "gift" : "Rose", count: score, image: "" }
       };
     }
 
@@ -256,34 +264,31 @@ export function getSampleChatRenderData(count: number, enabledTypes: string[] = 
       viewer: {
         ...base.viewer,
         name: sequence === 1 ? base.viewer?.name : `${base.viewer?.name ?? "Viewer"} ${sequence}`,
-        username: `${base.viewer?.username ?? "viewer"}_${sequence}`
+        username: `${base.viewer?.username ?? "viewer"}_${sequence}`,
+        badge: isLeaderboardSample ? `#${sequence}` : base.viewer?.badge
       },
       comment: {
         ...base.comment,
+        text: isLeaderboardSample ? `${(320 - sequence * 9).toLocaleString("id-ID")} comments` : base.comment?.text,
         createdAt: `12.${String(30 + sequence).padStart(2, "0")}`
-      }
+      },
+      gift: isLeaderboardSample ? { name: "chat", count: 320 - sequence * 9, image: "" } : base.gift
     };
   });
 
   return samples;
 }
 
-function getVisibleStackHeight(bounds: Array<{ height: number }>, maxItems: number, gap: number, fallbackHeight: number) {
-  const visibleBounds = Array.from({ length: maxItems }, (_, index) => bounds[index] ?? { height: fallbackHeight });
-
-  return visibleBounds.reduce((height, item, index) => height + item.height + (index === 0 ? 0 : gap), 0);
-}
-
 function getNormalItemY(bounds: Array<{ height: number }>, index: number, gap: number) {
   return bounds.slice(0, index).reduce((top, item) => top + item.height + gap, 0);
 }
 
-function getReverseItemY(bounds: Array<{ height: number }>, index: number, visibleStackHeight: number, gap: number) {
+function getReverseItemY(bounds: Array<{ height: number }>, index: number, listHeight: number, gap: number) {
   const heightThroughCurrent = bounds.slice(0, index + 1).reduce((height, item, itemIndex) => {
     return height + item.height + (itemIndex === 0 ? 0 : gap);
   }, 0);
 
-  return visibleStackHeight - heightThroughCurrent;
+  return listHeight - heightThroughCurrent;
 }
 
 function getListRenderGap(style: OverlayListStyle, gap: number) {
@@ -350,6 +355,10 @@ function getListVisualStyle(style: OverlayListStyle, index: number, maxItems: nu
 export function getOverlayAnimationName(value: string, direction: "in" | "out") {
   const normalized = value.toLowerCase();
 
+  if (normalized.includes("bounce")) {
+    return direction === "in" ? "overlayBounceIn" : "overlayBounceOut";
+  }
+
   if (normalized.includes("zoom")) {
     return direction === "in" ? "overlayZoomIn" : "overlayZoomOut";
   }
@@ -383,6 +392,8 @@ export const overlayAnimationCss = `
 @keyframes overlayZoomIn { 0% { opacity: 0; transform: scale(.92); filter: blur(3px); } 64% { opacity: 1; transform: scale(1.012); filter: blur(.6px); } 100% { opacity: 1; transform: scale(1); filter: blur(0); } }
 @keyframes overlayZoomOut { 0% { opacity: 1; transform: scale(1); filter: blur(0); } 100% { opacity: 0; transform: scale(.94) translate3d(0, var(--overlay-list-exit-y, -18px), 0); filter: blur(3px); } }
 @keyframes overlayPopIn { 0% { opacity: 0; transform: scale(.86); filter: blur(3px); } 68% { opacity: 1; transform: scale(1.025); filter: blur(.5px); } 100% { opacity: 1; transform: scale(1); filter: blur(0); } }
+@keyframes overlayBounceIn { 0% { opacity: 0; transform: translate3d(0, 38px, 0) scale(.86); filter: blur(3px); } 48% { opacity: 1; transform: translate3d(0, -10px, 0) scale(1.045); filter: blur(.5px); } 68% { transform: translate3d(0, 5px, 0) scale(.985); filter: blur(0); } 84% { transform: translate3d(0, -2px, 0) scale(1.008); } 100% { opacity: 1; transform: translate3d(0, 0, 0) scale(1); filter: blur(0); } }
+@keyframes overlayBounceOut { 0% { opacity: 1; transform: translate3d(0, 0, 0) scale(1); filter: blur(0); } 22% { opacity: 1; transform: translate3d(0, -8px, 0) scale(1.035); filter: blur(.2px); } 42% { transform: translate3d(0, 4px, 0) scale(.985); } 100% { opacity: 0; transform: translate3d(0, var(--overlay-list-exit-y, -34px), 0) scale(.84); filter: blur(3px); } }
 @keyframes overlaySlideLeftIn { 0% { opacity: 0; transform: translate3d(-42px, 0, 0); filter: blur(3px); } 100% { opacity: 1; transform: translate3d(0, 0, 0); filter: blur(0); } }
 @keyframes overlaySlideLeftOut { 0% { opacity: 1; transform: translate3d(0, 0, 0); filter: blur(0); } 100% { opacity: 0; transform: translate3d(-42px, -12px, 0); filter: blur(3px); } }
 @keyframes overlaySlideRightIn { 0% { opacity: 0; transform: translate3d(42px, 0, 0); filter: blur(3px); } 100% { opacity: 1; transform: translate3d(0, 0, 0); filter: blur(0); } }

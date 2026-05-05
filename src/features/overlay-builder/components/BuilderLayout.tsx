@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, Code2, Eye, FilePlus2, Monitor, Redo2, Save, Trash2, Undo2 } from "lucide-react";
+import { ArrowLeft, Code2, Eye, FilePlus2, GiftIcon, Monitor, Redo2, Save, Trash2, Undo2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { io, type Socket } from "socket.io-client";
 import { Button } from "@/components/ui/button";
@@ -66,9 +66,100 @@ type SaveResponse = {
 };
 
 type BuilderView = "editor" | "json" | "preview";
-type PreviewDataMode = "sample" | "live";
+type PreviewDataMode = "sample" | "test" | "live";
 type OverlayBuilderType = "CUSTOM_OVERLAY" | "CHAT_STYLE";
 type OverlayKind = "CHAT" | "GIFT" | "LEADERBOARD" | "DOCK" | "CUSTOM";
+type PopularGiftSample = {
+  id: string;
+  name: string;
+  count: number;
+  sender: string;
+  avatar: string;
+  image: string;
+};
+
+const popularGiftSamples: PopularGiftSample[] = [
+  {
+    id: "rose",
+    name: "Rose",
+    count: 1,
+    sender: "Rose Viewer",
+    avatar: createGiftSampleImage("R", "#fb7185", "#fda4af"),
+    image: createGiftSampleImage("ROSE", "#ef4444", "#fda4af")
+  },
+  {
+    id: "tiktok",
+    name: "TikTok",
+    count: 1,
+    sender: "TikTok Viewer",
+    avatar: createGiftSampleImage("T", "#22d3ee", "#f472b6"),
+    image: createGiftSampleImage("TT", "#111827", "#22d3ee")
+  },
+  {
+    id: "finger-heart",
+    name: "Finger Heart",
+    count: 5,
+    sender: "Heart Viewer",
+    avatar: createGiftSampleImage("H", "#f43f5e", "#fb7185"),
+    image: createGiftSampleImage("LOVE", "#f43f5e", "#f9a8d4")
+  },
+  {
+    id: "gg",
+    name: "GG",
+    count: 10,
+    sender: "GG Viewer",
+    avatar: createGiftSampleImage("G", "#a855f7", "#60a5fa"),
+    image: createGiftSampleImage("GG", "#7c3aed", "#38bdf8")
+  },
+  {
+    id: "love-you",
+    name: "Love You",
+    count: 10,
+    sender: "Love Viewer",
+    avatar: createGiftSampleImage("L", "#ec4899", "#f97316"),
+    image: createGiftSampleImage("LOVE", "#db2777", "#fb923c")
+  },
+  {
+    id: "perfume",
+    name: "Perfume",
+    count: 20,
+    sender: "Perfume Viewer",
+    avatar: createGiftSampleImage("P", "#8b5cf6", "#f0abfc"),
+    image: createGiftSampleImage("P", "#8b5cf6", "#f0abfc")
+  },
+  {
+    id: "doughnut",
+    name: "Doughnut",
+    count: 25,
+    sender: "Doughnut Viewer",
+    avatar: createGiftSampleImage("D", "#f97316", "#facc15"),
+    image: createGiftSampleImage("O", "#f59e0b", "#f472b6")
+  },
+  {
+    id: "cap",
+    name: "Cap",
+    count: 50,
+    sender: "Cap Viewer",
+    avatar: createGiftSampleImage("C", "#2563eb", "#60a5fa"),
+    image: createGiftSampleImage("CAP", "#1d4ed8", "#93c5fd")
+  },
+  {
+    id: "hand-hearts",
+    name: "Hand Hearts",
+    count: 100,
+    sender: "Hearts Viewer",
+    avatar: createGiftSampleImage("HH", "#be123c", "#f43f5e"),
+    image: createGiftSampleImage("HH", "#be123c", "#fb7185")
+  },
+  {
+    id: "lion",
+    name: "Lion",
+    count: 1,
+    sender: "Lion Viewer",
+    avatar: createGiftSampleImage("L", "#f59e0b", "#fde047"),
+    image: createGiftSampleImage("LION", "#92400e", "#facc15")
+  }
+];
 
 export function BuilderLayout({
   workspaceId,
@@ -106,6 +197,8 @@ export function BuilderLayout({
     () => getSampleChatRenderData(designSchema.layout.maxItems, getEnabledEventTypes(designSchema)),
     [designSchema]
   );
+  const isGiftOverlay = overlayKind === "GIFT" || designSchema.kind === "GIFT" || designSchema.dataSource.type === "gift";
+  const isLeaderboardOverlay = overlayKind === "LEADERBOARD" || designSchema.kind === "LEADERBOARD" || designSchema.dataSource.type === "leaderboard";
   const listExitDurationMs = Math.max(designSchema.layout.animationDurationMs ?? 620, 720);
   const designOutputPath = designId ? `/overlay/${overlayKind.toLowerCase()}/${designId}` : "";
   const designOutputUrl = designOutputPath ? `${browserOrigin}${designOutputPath}` : "";
@@ -300,6 +393,49 @@ export function BuilderLayout({
     updateComponent(id, { zIndex: minZ - 1 });
   }
 
+  function sendTestGift(gift: PopularGiftSample) {
+    const event: OverlayEventPayload = {
+      id: `test-gift-${gift.id}-${Date.now()}`,
+      type: "GIFT",
+      username: "gift_tester",
+      displayName: gift.sender,
+      avatarUrl: gift.avatar,
+      userRole: "topgifter",
+      giftName: gift.name,
+      giftCount: gift.count,
+      giftImageUrl: gift.image,
+      comment: null,
+      receivedAt: new Date().toISOString()
+    };
+    const data = eventToRenderData(event);
+
+    setPreviewDataMode("test");
+    setView("preview");
+    setPreviewSingleData(data);
+    setPreviewItems((current) => appendPreviewItem(current, data, designSchema.layout.maxItems));
+    setStatus(`Test gift dikirim: ${gift.name} x${gift.count}`);
+  }
+
+  function switchOverlayKind(kind: OverlayKind) {
+    if (kind === "LEADERBOARD") {
+      const firstLeaderboardTemplate = overlayTemplates.find((template) => getTemplateKind(template.schema) === "LEADERBOARD");
+
+      if (firstLeaderboardTemplate) {
+        loadTemplate(firstLeaderboardTemplate.id);
+      }
+
+      return;
+    }
+
+    setOverlayKind(kind);
+    setOverlayType(kind === "CHAT" ? "CHAT_STYLE" : "CUSTOM_OVERLAY");
+    updateDesign({
+      kind,
+      dataSource: getDefaultDataSourceForKind(kind, designSchema.dataSource),
+      layout: getDefaultLayoutForKind(kind, designSchema.layout)
+    });
+  }
+
   function loadTemplate(templateId: string) {
     const template = overlayTemplates.find((item) => item.id === templateId);
 
@@ -317,7 +453,7 @@ export function BuilderLayout({
     setDesignId(null);
     setOverlayKind(normalizeKind(schema.kind ?? overlayKind));
     setOverlayType(schema.kind === "CHAT" ? "CHAT_STYLE" : "CUSTOM_OVERLAY");
-    setSelectedComponentId(schema.components[0]?.id ?? null);
+    setSelectedComponentId(schema.kind === "LEADERBOARD" ? null : schema.components[0]?.id ?? null);
     setBuilderStarted(true);
     setView("editor");
   }
@@ -532,30 +668,31 @@ export function BuilderLayout({
               </Button>
             </div>
             <div className="flex flex-wrap items-center gap-4">
+              {!isLeaderboardOverlay ? (
               <Button type="button" variant="outline" onClick={() => startBlankCanvas(true)}>
                 <FilePlus2 />
                 Blank Canvas
               </Button>
+              ) : null}
               <select
                 value={overlayKind}
                 onChange={(event) => {
                   const kind = normalizeKind(event.target.value);
-                  setOverlayKind(kind);
-                  setOverlayType(kind === "CHAT" ? "CHAT_STYLE" : "CUSTOM_OVERLAY");
-                  updateDesign({ kind });
+                  switchOverlayKind(kind);
                 }}
                 className="flex h-10 rounded-md border border-input bg-card px-4 py-2 text-sm font-semibold outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <option value="CHAT">Chat</option>
                 <option value="GIFT">Gift</option>
                 <option value="LEADERBOARD">Leaderboard</option>
-                <option value="DOCK">Dock</option>
                 <option value="CUSTOM">Custom</option>
               </select>
+              {!isLeaderboardOverlay ? (
               <Button type="button" variant="outline" onClick={clearCanvas}>
                 <Trash2 />
                 Clear Canvas
               </Button>
+              ) : null}
             </div>
             {designId ? (
               <div className="flex flex-wrap items-center gap-4">
@@ -589,7 +726,7 @@ export function BuilderLayout({
 
       <div className="grid min-w-0 items-start gap-6 xl:grid-cols-[18rem_minmax(0,1fr)_24rem]">
         <aside className="grid gap-4 xl:sticky xl:top-4">
-          <ComponentLibrary onAddComponent={addComponent} onLoadTemplate={loadTemplate} onBlankCanvas={() => startBlankCanvas(true)} />
+          <ComponentLibrary onAddComponent={addComponent} onLoadTemplate={loadTemplate} onBlankCanvas={() => startBlankCanvas(true)} overlayKind={overlayKind} />
           <section className="grid gap-3 rounded-lg border bg-card p-4">
             <p className="text-sm font-semibold">Saved Designs</p>
             {savedDesigns.length ? (
@@ -660,16 +797,61 @@ export function BuilderLayout({
               </select>
               <select
                 value={previewDataMode}
-                onChange={(event) => setPreviewDataMode(event.target.value === "live" ? "live" : "sample")}
+                onChange={(event) => setPreviewDataMode(normalizePreviewDataMode(event.target.value))}
                 className="flex h-10 rounded-md border border-input bg-card px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <option value="sample">Sample data</option>
+                <option value="test">Test data</option>
                 <option value="live">Live socket data</option>
               </select>
+              {isGiftOverlay ? (
+                <div className="grid gap-3 rounded-lg border bg-muted/20 p-3 md:col-span-3">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold">Test Kirim Gift</p>
+                      <p className="text-xs text-muted-foreground">Pilih sample gift untuk mengetes text, count, dan gambar gift di preview.</p>
+                    </div>
+                    <Button type="button" variant="outline" onClick={() => sendTestGift(popularGiftSamples[0])}>
+                      <GiftIcon />
+                      Test Rose
+                    </Button>
+                  </div>
+                  <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+                    {popularGiftSamples.map((gift) => (
+                      <button
+                        key={gift.id}
+                        type="button"
+                        onClick={() => sendTestGift(gift)}
+                        className="flex min-w-0 items-center gap-2 rounded-md border bg-card px-2.5 py-2 text-left text-xs font-semibold transition-colors hover:bg-muted"
+                        title={`${gift.name} x${gift.count}`}
+                      >
+                        <span
+                          aria-hidden="true"
+                          className="size-7 shrink-0 rounded-full bg-cover bg-center"
+                          style={{ backgroundImage: `url("${gift.image}")` }}
+                        />
+                        <span className="min-w-0">
+                          <span className="block truncate">{gift.name}</span>
+                          <span className="block text-[11px] font-normal text-muted-foreground">x{gift.count}</span>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
             </CardContent>
           </Card>
 
           {view === "editor" ? (
+            isLeaderboardOverlay ? (
+            <div className="min-h-[560px] overflow-auto rounded-lg border bg-zinc-950/5 p-8 shadow-inner">
+              <OverlaySceneRenderer
+                schema={designSchema}
+                items={previewSampleItems}
+                scale={zoom}
+              />
+            </div>
+            ) : (
             <CanvasEditor
               designSchema={designSchema}
               data={dummyOverlayData}
@@ -683,6 +865,7 @@ export function BuilderLayout({
               onAddComment={() => addComponent("comment")}
               onChooseTemplate={() => loadTemplate(overlayTemplates[0].id)}
             />
+            )
           ) : null}
 
           {view === "json" ? (
@@ -699,8 +882,8 @@ export function BuilderLayout({
             <div className="min-h-[560px] overflow-auto rounded-lg border bg-zinc-950/5 p-8 shadow-inner">
               <OverlaySceneRenderer
                 schema={designSchema}
-                data={previewDataMode === "live" ? previewSingleData : dummyOverlayData}
-                items={isListPreview ? (previewDataMode === "live" ? previewItems : previewSampleItems) : undefined}
+                data={previewDataMode === "sample" ? dummyOverlayData : previewSingleData}
+                items={isListPreview ? (previewDataMode === "sample" ? previewSampleItems : previewItems) : undefined}
                 scale={zoom}
               />
             </div>
@@ -714,7 +897,7 @@ export function BuilderLayout({
             <CardContent className="p-5">
               <PropertyInspector
                 designSchema={designSchema}
-                selectedComponent={selectedComponent}
+                selectedComponent={isLeaderboardOverlay ? null : selectedComponent}
                 onUpdateDesign={updateDesign}
                 onUpdateCanvas={updateCanvas}
                 onUpdateComponent={updateComponent}
@@ -749,6 +932,52 @@ function normalizeKind(value: string | undefined): OverlayKind {
   return "CUSTOM";
 }
 
+function normalizePreviewDataMode(value: string): PreviewDataMode {
+  if (value === "live" || value === "test") {
+    return value;
+  }
+
+  return "sample";
+}
+
+function getTemplateKind(schema: unknown) {
+  if (!schema || typeof schema !== "object" || Array.isArray(schema)) {
+    return "CUSTOM";
+  }
+
+  const kind = (schema as { kind?: unknown }).kind;
+
+  return typeof kind === "string" ? kind : "CUSTOM";
+}
+
+function getDefaultDataSourceForKind(kind: OverlayKind, current: OverlayDesignSchema["dataSource"]): OverlayDesignSchema["dataSource"] {
+  if (kind === "CHAT") {
+    return { type: "chat", filters: current.type === "chat" ? current.filters : {} };
+  }
+
+  if (kind === "GIFT") {
+    return { type: "gift", filters: current.type === "gift" ? current.filters : {} };
+  }
+
+  if (kind === "LEADERBOARD") {
+    return { type: "leaderboard", filters: { metric: "gift" } };
+  }
+
+  return { type: "manual", filters: current.type === "manual" ? current.filters : {} };
+}
+
+function getDefaultLayoutForKind(kind: OverlayKind, current: OverlayDesignSchema["layout"]): OverlayDesignSchema["layout"] {
+  if (kind === "CHAT") {
+    return { ...current, mode: "list", maxItems: Math.max(1, current.maxItems || 10) };
+  }
+
+  if (kind === "LEADERBOARD") {
+    return { ...current, mode: "list", maxItems: Math.min(50, Math.max(1, current.maxItems || 5)), reverse: false, align: "start" };
+  }
+
+  return { ...current, mode: "single", maxItems: 1 };
+}
+
 function getEnabledEventTypes(schema: OverlayDesignSchema) {
   const value = schema.dataSource.filters?.eventTypes;
 
@@ -756,11 +985,41 @@ function getEnabledEventTypes(schema: OverlayDesignSchema) {
     return value.filter((item): item is string => typeof item === "string");
   }
 
+  if (schema.dataSource.type === "leaderboard") {
+    const metric = schema.dataSource.filters?.metric;
+
+    if (metric === "like") {
+      return ["LEADERBOARD_LIKE"];
+    }
+
+    if (metric === "share") {
+      return ["LEADERBOARD_SHARE"];
+    }
+
+    if (metric === "chat") {
+      return ["LEADERBOARD_CHAT"];
+    }
+
+    return ["LEADERBOARD_GIFT"];
+  }
+
   return ["CHAT"];
 }
 
 function appendPreviewItem(current: OverlayRenderData[], next: OverlayRenderData, maxItems: number) {
   const active = current.filter((item) => !item.meta?.exiting);
+  const mergeIndex = active.findIndex((item) => Boolean(mergeGiftPreviewData(item, next)));
+
+  if (mergeIndex >= 0) {
+    return active.map((item, index) => {
+      if (index !== mergeIndex) {
+        return item;
+      }
+
+      return mergeGiftPreviewData(item, next) ?? item;
+    });
+  }
+
   const itemWithId = {
     ...next,
     meta: {
@@ -776,10 +1035,64 @@ function appendPreviewItem(current: OverlayRenderData[], next: OverlayRenderData
   }
 
   return combined.map((item, index) => {
-    return index >= maxItems ? { ...item, meta: { ...item.meta, exiting: true } } : item;
+    const shouldExit = index >= maxItems;
+
+    return shouldExit ? { ...item, meta: { ...item.meta, exiting: true } } : item;
   });
 }
 
 function acceptsFocusDock(schema: OverlayDesignSchema) {
   return schema.kind === "CUSTOM" && schema.layout.mode === "single" && schema.dataSource.type === "manual";
+}
+
+function mergeGiftPreviewData(current: OverlayRenderData, next: OverlayRenderData) {
+  const currentGiftName = current.gift?.name?.trim();
+  const nextGiftName = next.gift?.name?.trim();
+  const currentUser = current.viewer?.username || current.viewer?.name;
+  const nextUser = next.viewer?.username || next.viewer?.name;
+
+  if (!currentGiftName || !nextGiftName || currentGiftName !== nextGiftName || !currentUser || currentUser !== nextUser) {
+    return null;
+  }
+
+  const mergedCount = toGiftPreviewCount(current.gift?.count) + toGiftPreviewCount(next.gift?.count);
+  const giftName = next.gift?.name ?? current.gift?.name ?? "";
+
+  return {
+    ...current,
+    viewer: {
+      ...current.viewer,
+      ...next.viewer
+    },
+    comment: {
+      ...current.comment,
+      createdAt: next.comment?.createdAt ?? current.comment?.createdAt,
+      text: mergedCount > 0 ? `sent ${giftName} x${mergedCount}` : current.comment?.text
+    },
+    gift: {
+      ...current.gift,
+      ...next.gift,
+      name: giftName,
+      count: mergedCount || next.gift?.count || current.gift?.count,
+      image: next.gift?.image || current.gift?.image || ""
+    },
+    meta: {
+      ...current.meta,
+      id: next.meta?.id ?? current.meta?.id,
+      instanceId: current.meta?.instanceId ?? next.meta?.instanceId
+    }
+  } satisfies OverlayRenderData;
+}
+
+function toGiftPreviewCount(value: number | string | null | undefined) {
+  const numeric = Number(value);
+
+  return Number.isFinite(numeric) ? numeric : 0;
+}
+
+function createGiftSampleImage(label: string, from: string, to: string) {
+  const safeLabel = label.slice(0, 5);
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${from}"/><stop offset="1" stop-color="${to}"/></linearGradient></defs><rect width="160" height="160" rx="42" fill="url(#g)"/><circle cx="80" cy="80" r="58" fill="rgba(255,255,255,.18)" stroke="rgba(255,255,255,.72)" stroke-width="6"/><text x="80" y="91" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="${safeLabel.length > 2 ? 28 : 48}" font-weight="900" fill="#fff">${safeLabel}</text></svg>`;
+
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 }

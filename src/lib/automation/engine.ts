@@ -215,12 +215,14 @@ function evaluateCondition(data: AutomationNodeData, event: LiveEvent) {
   const operator = data.operator ?? "equals";
   const expected = String(data.value ?? "");
   const value = getEventFieldValue(event, field);
+  const normalizedValue = normalizeComparable(value);
+  const expectedValues = getExpectedComparables(field, expected);
 
   switch (operator) {
     case "equals":
-      return String(value ?? "").toLowerCase() === expected.toLowerCase();
+      return expectedValues.some((expectedValue) => normalizedValue === expectedValue);
     case "contains":
-      return String(value ?? "").toLowerCase().includes(expected.toLowerCase());
+      return expectedValues.some((expectedValue) => normalizedValue.includes(expectedValue));
     case "greaterThan":
       return Number(value ?? 0) > Number(expected);
     case "lessThan":
@@ -240,6 +242,8 @@ function getEventFieldValue(event: LiveEvent, field: string) {
       return event.displayName;
     case "giftName":
       return event.giftName;
+    case "giftId":
+      return event.giftId;
     case "giftCount":
       return event.giftCount;
     case "repeatCount":
@@ -257,6 +261,43 @@ function getEventFieldValue(event: LiveEvent, field: string) {
   }
 }
 
+function normalizeComparable(value: unknown) {
+  return String(value ?? "")
+    .normalize("NFKC")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+}
+
+function getExpectedComparables(field: string, expected: string) {
+  const values = expected
+    .split(/[|,\n]/)
+    .map((value) => normalizeComparable(value))
+    .filter(Boolean);
+
+  if (field !== "giftName") {
+    return values;
+  }
+
+  return Array.from(new Set(values.flatMap(expandGiftNameAliases)));
+}
+
+function expandGiftNameAliases(value: string) {
+  const aliases: Record<string, string[]> = {
+    mawar: ["mawar", "rose"],
+    rose: ["rose", "mawar"],
+    donat: ["donat", "donut", "doughnut"],
+    donut: ["donut", "donat", "doughnut"],
+    doughnut: ["doughnut", "donut", "donat"],
+    heart: ["heart", "finger heart", "hati", "love"],
+    hati: ["hati", "heart", "finger heart", "love"],
+    love: ["love", "heart", "finger heart"],
+    "finger heart": ["finger heart", "heart", "hati", "love"]
+  };
+
+  return aliases[value] ?? [value];
+}
+
 async function executeAutomationAction(
   node: AutomationFlowNode,
   flowId: string,
@@ -271,6 +312,11 @@ async function executeAutomationAction(
       animationUrl: stringValue(node.data.animationUrl),
       animationPosition: stringValue(node.data.position) || "center",
       animationSize: toNumber(node.data.size, 420),
+      animationFit: stringValue(node.data.mediaFit) || "auto",
+      mediaFrame: stringValue(node.data.mediaFrame) || "square",
+      mediaWidth: toNumber(node.data.mediaWidth, 420),
+      mediaHeight: toNumber(node.data.mediaHeight, 420),
+      actionLayer: stringValue(node.data.actionLayer) || "back",
       soundUrl: stringValue(node.data.soundUrl),
       volume: toNumber(node.data.volume, 1),
       durationMs,
@@ -279,6 +325,7 @@ async function executeAutomationAction(
 
     emitOverlayEvent(overlayKey, {
       ...overlayPayload,
+      id: createActionEventId(overlayPayload, node),
       flowId,
       ...payload
     });
@@ -287,6 +334,80 @@ async function executeAutomationAction(
       {
         nodeId: node.id,
         type: "SHOW_ANIMATION",
+        payload
+      }
+    ];
+  }
+
+  if (node.type === "show3dText") {
+    const durationMs = toNumber(node.data.durationMs, 4500);
+    const payload = {
+      action: "SHOW_3D_TEXT",
+      animationPosition: stringValue(node.data.position) || "center",
+      animationSize: toNumber(node.data.size, 560),
+      actionLayer: stringValue(node.data.actionLayer) || "front",
+      text3dTemplate: stringValue(node.data.text3dTemplate) || "Terima kasih {{displayName}}!",
+      text3dSubtitle: stringValue(node.data.text3dSubtitle) || "{{giftName}} x{{giftCount}}",
+      text3dEffect: stringValue(node.data.text3dEffect) || "neon",
+      text3dColor: stringValue(node.data.text3dColor) || "#f8fafc",
+      text3dAccentColor: stringValue(node.data.text3dAccentColor) || "#22d3ee",
+      text3dDepth: toNumber(node.data.text3dDepth, 0.22),
+      text3dBevel: toNumber(node.data.text3dBevel, 0.035),
+      text3dMetalness: toNumber(node.data.text3dMetalness, 0.45),
+      text3dRoughness: toNumber(node.data.text3dRoughness, 0.2),
+      text3dSpin: node.data.text3dSpin !== false,
+      text3dFloat: node.data.text3dFloat !== false,
+      text3dOffsetX: toNumber(node.data.text3dOffsetX, 0),
+      text3dOffsetY: toNumber(node.data.text3dOffsetY, 0),
+      soundUrl: stringValue(node.data.soundUrl),
+      volume: toNumber(node.data.volume, 1),
+      durationMs
+    };
+
+    emitOverlayEvent(overlayKey, {
+      ...overlayPayload,
+      id: createActionEventId(overlayPayload, node),
+      flowId,
+      ...payload
+    });
+
+    return [
+      {
+        nodeId: node.id,
+        type: "SHOW_3D_TEXT",
+        payload
+      }
+    ];
+  }
+
+  if (node.type === "showConfetti") {
+    const payload = {
+      action: "SHOW_CONFETTI",
+      confettiEnabled: true,
+      confettiMode: stringValue(node.data.confettiMode) || "once",
+      confettiPresets: readStringArray(node.data.confettiPresets, ["basicCannon"]),
+      confettiLayer: stringValue(node.data.confettiLayer) || "front",
+      confettiParticleCount: toNumber(node.data.confettiParticleCount, 140),
+      confettiSpread: toNumber(node.data.confettiSpread, 85),
+      confettiStartVelocity: toNumber(node.data.confettiStartVelocity, 45),
+      confettiScalar: toNumber(node.data.confettiScalar, 1),
+      confettiIntervalMs: toNumber(node.data.confettiIntervalMs, 900),
+      confettiOriginY: toNumber(node.data.confettiOriginY, 0.55),
+      confettiDurationMs: toNumber(node.data.confettiDurationMs, 4500),
+      confettiEmoji: stringValue(node.data.confettiEmoji) || "🎁"
+    };
+
+    emitOverlayEvent(overlayKey, {
+      ...overlayPayload,
+      id: createActionEventId(overlayPayload, node),
+      flowId,
+      ...payload
+    });
+
+    return [
+      {
+        nodeId: node.id,
+        type: "SHOW_CONFETTI",
         payload
       }
     ];
@@ -301,6 +422,7 @@ async function executeAutomationAction(
 
     emitOverlayEvent(overlayKey, {
       ...overlayPayload,
+      id: createActionEventId(overlayPayload, node),
       flowId,
       ...payload
     });
@@ -344,6 +466,20 @@ function getOutgoingNodes(
 
 function stringValue(value: unknown) {
   return typeof value === "string" ? value : "";
+}
+
+function createActionEventId(overlayPayload: OverlayEventPayload, node: AutomationFlowNode) {
+  return `${overlayPayload.id}-${node.id}`;
+}
+
+function readStringArray(value: unknown, fallback: string[]) {
+  if (!Array.isArray(value)) {
+    return fallback;
+  }
+
+  const strings = value.filter((item): item is string => typeof item === "string" && item.trim().length > 0);
+
+  return strings.length ? strings : fallback;
 }
 
 function toNumber(value: unknown, fallback: number) {

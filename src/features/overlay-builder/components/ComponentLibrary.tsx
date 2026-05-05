@@ -10,6 +10,7 @@ type ComponentLibraryProps = {
   onAddComponent: (type: OverlayComponentType) => void;
   onLoadTemplate: (templateId: string) => void;
   onBlankCanvas: () => void;
+  overlayKind?: string;
 };
 
 const iconMap: Partial<Record<OverlayComponentType, ReactNode>> = {
@@ -30,19 +31,37 @@ const iconMap: Partial<Record<OverlayComponentType, ReactNode>> = {
   running_text: <Type className="size-4" />
 };
 
-export function ComponentLibrary({ onAddComponent, onLoadTemplate, onBlankCanvas }: ComponentLibraryProps) {
+export function ComponentLibrary({ onAddComponent, onLoadTemplate, onBlankCanvas, overlayKind }: ComponentLibraryProps) {
+  const isLeaderboard = overlayKind === "LEADERBOARD";
+  const templates = overlayTemplates.filter((template) => {
+    const kind = getTemplateKind(template.schema);
+
+    if (isLeaderboard) {
+      return kind === "LEADERBOARD";
+    }
+
+    return kind !== "LEADERBOARD";
+  });
+
   return (
     <div className="grid gap-4">
       <div className="grid gap-3 rounded-lg border bg-card p-4">
-        <button
-          type="button"
-          onClick={onBlankCanvas}
-          className="flex h-10 items-center gap-2.5 rounded-md border bg-background px-4 text-left text-sm font-semibold transition-colors hover:bg-muted"
-        >
-          <FilePlus2 className="size-4" />
-          Blank Canvas
-        </button>
+        {isLeaderboard ? (
+          <div className="rounded-md border border-dashed bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+            Leaderboard memakai template. Atur metric dan max leader di panel kanan.
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={onBlankCanvas}
+            className="flex h-10 items-center gap-2.5 rounded-md border bg-background px-4 text-left text-sm font-semibold transition-colors hover:bg-muted"
+          >
+            <FilePlus2 className="size-4" />
+            Blank Canvas
+          </button>
+        )}
 
+        {!isLeaderboard ? (
         <section className="grid min-w-0 gap-3">
           <div className="flex items-center gap-2.5 whitespace-nowrap text-sm font-semibold text-muted-foreground">
             <Plus className="size-4" />
@@ -65,6 +84,7 @@ export function ComponentLibrary({ onAddComponent, onLoadTemplate, onBlankCanvas
             ))}
           </div>
         </section>
+        ) : null}
       </div>
 
       <section className="grid min-w-0 gap-3 rounded-lg border bg-card p-4">
@@ -73,7 +93,7 @@ export function ComponentLibrary({ onAddComponent, onLoadTemplate, onBlankCanvas
           Template
         </div>
         <div className="grid min-w-0 gap-3">
-          {overlayTemplates.map((template) => (
+          {templates.map((template) => (
             <button
               key={template.id}
               type="button"
@@ -88,4 +108,14 @@ export function ComponentLibrary({ onAddComponent, onLoadTemplate, onBlankCanvas
       </section>
     </div>
   );
+}
+
+function getTemplateKind(schema: unknown) {
+  if (!schema || typeof schema !== "object" || Array.isArray(schema)) {
+    return "CUSTOM";
+  }
+
+  const kind = (schema as { kind?: unknown }).kind;
+
+  return typeof kind === "string" ? kind : "CUSTOM";
 }

@@ -282,6 +282,7 @@ function EventSourceFields({
 }) {
   const dataSource = designSchema.dataSource;
   const enabledTypes = getEnabledEventTypes(designSchema);
+  const metric = typeof dataSource.filters?.metric === "string" ? dataSource.filters.metric : "gift";
   const updateDataSource = (patch: Partial<OverlayDesignSchema["dataSource"]>) => onUpdateDesign({
     dataSource: {
       ...dataSource,
@@ -295,6 +296,7 @@ function EventSourceFields({
 
   return (
     <Section title="Event Source">
+      {designSchema.kind !== "LEADERBOARD" ? (
       <SelectField
         label="Source"
         value={dataSource.type}
@@ -307,6 +309,16 @@ function EventSourceFields({
         ]}
         onChange={(type) => updateDataSource({ type: type as OverlayDesignSchema["dataSource"]["type"] })}
       />
+      ) : null}
+      {designSchema.kind === "LEADERBOARD" ? (
+        <SelectField
+          label="Leaderboard Metric"
+          value={metric}
+          options={leaderboardMetricOptions}
+          onChange={(nextMetric) => updateDataSource({ type: "leaderboard", filters: { metric: nextMetric } })}
+        />
+      ) : null}
+      {designSchema.kind !== "LEADERBOARD" ? (
       <div className="grid grid-cols-2 gap-3">
         {eventTypeOptions.map((option) => (
           <ToggleField
@@ -327,6 +339,7 @@ function EventSourceFields({
           />
         ))}
       </div>
+      ) : null}
     </Section>
   );
 }
@@ -339,11 +352,13 @@ function LayoutFields({
   onUpdateDesign: (patch: Partial<OverlayDesignSchema>) => void;
 }) {
   const layout = designSchema.layout;
+  const isLeaderboard = designSchema.kind === "LEADERBOARD";
 
   return (
     <>
-      <Section title="List Layout">
+      <Section title={isLeaderboard ? "Leaderboard Layout" : "List Layout"}>
         <div className="grid grid-cols-2 gap-3">
+          {!isLeaderboard ? (
           <SelectField
             label="Mode"
             value={layout.mode}
@@ -356,9 +371,16 @@ function LayoutFields({
             ]}
             onChange={(mode) => onUpdateDesign({ layout: { ...layout, mode: mode as OverlayDesignSchema["layout"]["mode"] } })}
           />
-          <NumberField label="Max Items" value={layout.maxItems} min={1} max={100} onChange={(maxItems) => onUpdateDesign({ layout: { ...layout, maxItems } })} />
+          ) : null}
+          <NumberField
+            label={isLeaderboard ? "Max Leaders" : "Max Items"}
+            value={layout.maxItems}
+            min={1}
+            max={isLeaderboard ? 50 : 100}
+            onChange={(maxItems) => onUpdateDesign({ layout: { ...layout, mode: isLeaderboard ? "list" : layout.mode, maxItems } })}
+          />
           <NumberField label="Gap" value={layout.gap} min={0} max={240} onChange={(gap) => onUpdateDesign({ layout: { ...layout, gap } })} />
-          {layout.mode === "list" ? (
+          {layout.mode === "list" && !isLeaderboard ? (
             <SelectField
               label="List Style"
               value={layout.listStyle ?? "stacked_card"}
@@ -549,7 +571,11 @@ function ComponentVisualFields({
               <NumberField label="Line Height" value={component.style.lineHeight ?? 1.2} min={0.6} max={4} step={0.05} onChange={(lineHeight) => updateStyle({ lineHeight })} />
               <NumberField label="Max Lines" value={component.style.maxLines ?? component.style.lineClamp ?? 0} min={0} max={20} onChange={(maxLines) => updateStyle({ maxLines: maxLines > 0 ? maxLines : undefined, lineClamp: undefined })} />
             </div>
-            <ToggleField label="Auto Height" checked={component.style.autoHeight === true} onChange={(autoHeight) => updateStyle({ autoHeight })} />
+            <ToggleField
+              label="Auto Height"
+              checked={component.type === "comment" ? component.style.autoHeight !== false : component.style.autoHeight === true}
+              onChange={(autoHeight) => updateStyle({ autoHeight })}
+            />
             <SelectField
               label="Text Overflow"
               value={component.style.textOverflow ?? "clip"}
@@ -561,7 +587,7 @@ function ComponentVisualFields({
             />
             <ToggleField
               label="Auto Fit Font Size"
-              checked={component.type === "comment" ? component.style.autoFitFontSize !== false : component.style.autoFitFontSize === true}
+              checked={component.style.autoFitFontSize === true}
               onChange={(autoFitFontSize) => updateStyle({ autoFitFontSize })}
             />
           </Section>
@@ -952,6 +978,7 @@ const enterAnimationOptions = [
   { label: "Slide Right In", value: "slide-right" },
   { label: "Slide Up In", value: "slide-up" },
   { label: "Slide Down In", value: "slide-down" },
+  { label: "Bounce In", value: "bounce-in" },
   { label: "Pop In", value: "pop-in" }
 ];
 
@@ -961,7 +988,8 @@ const exitAnimationOptions = [
   { label: "Slide Left Out", value: "slide-left" },
   { label: "Slide Right Out", value: "slide-right" },
   { label: "Slide Up Out", value: "slide-up" },
-  { label: "Slide Down Out", value: "slide-down" }
+  { label: "Slide Down Out", value: "slide-down" },
+  { label: "Bounce Out", value: "bounce-out" }
 ];
 
 const listStyleOptions = [
@@ -970,6 +998,13 @@ const listStyleOptions = [
   { label: "Card Stack", value: "card_stack" },
   { label: "Focus Stack List", value: "focus_stack" },
   { label: "Depth List UI", value: "depth_list" }
+];
+
+const leaderboardMetricOptions = [
+  { label: "Gift Total", value: "gift" },
+  { label: "Like Total", value: "like" },
+  { label: "Share Total", value: "share" },
+  { label: "Comment Count", value: "chat" }
 ];
 
 const effectAnimationOptions = [

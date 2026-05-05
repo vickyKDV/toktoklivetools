@@ -9,6 +9,7 @@ type MappedEvent = {
   avatarUrl?: string | null;
   userRole?: ChatUserRole | null;
   giftName?: string | null;
+  giftImageUrl?: string | null;
   giftId?: string | null;
   giftCount?: number | null;
   repeatCount?: number | null;
@@ -43,6 +44,7 @@ export function mapTikTokEvent(eventName: string, payload: unknown): MappedEvent
         avatarUrl: findAvatarUrl(data),
         userRole: getUserRole(data),
         giftName: pickString(data.giftName),
+        giftImageUrl: findGiftImageUrl(data),
         giftId: pickString(data.giftId),
         giftCount: pickNumber(data.diamondCount) ?? pickNumber(data.repeatCount) ?? 1,
         repeatCount: pickNumber(data.repeatCount),
@@ -236,6 +238,34 @@ function findAvatarUrl(data: Record<string, unknown>) {
   return findNestedAvatarUrl(data);
 }
 
+function findGiftImageUrl(data: Record<string, unknown>) {
+  const direct =
+    pickString(data.giftPictureUrl) ??
+    pickString(data.giftPicture) ??
+    pickString(data.giftImageUrl) ??
+    pickString(data.giftImage) ??
+    pickString(data.giftIconUrl) ??
+    pickString(data.giftIcon) ??
+    pickString(data.imageUrl) ??
+    pickString(data.iconUrl);
+
+  if (direct && isImageUrl(direct)) {
+    return direct;
+  }
+
+  const nestedGift =
+    findNestedGiftImageUrl(data.gift) ??
+    findNestedGiftImageUrl(data.giftDetails) ??
+    findNestedGiftImageUrl(data.giftInfo) ??
+    findNestedGiftImageUrl(data.giftData);
+
+  if (nestedGift) {
+    return nestedGift;
+  }
+
+  return findNestedGiftImageUrl(data);
+}
+
 function findNestedAvatarUrl(value: unknown, depth = 0): string | null {
   if (!value || depth > 4) {
     return null;
@@ -286,6 +316,72 @@ function findNestedAvatarUrl(value: unknown, depth = 0): string | null {
       continue;
     }
     const nested = findNestedAvatarUrl(candidate, depth + 1);
+    if (nested) {
+      return nested;
+    }
+  }
+
+  return null;
+}
+
+function findNestedGiftImageUrl(value: unknown, depth = 0): string | null {
+  if (!value || depth > 5) {
+    return null;
+  }
+
+  if (typeof value === "string") {
+    return isImageUrl(value) ? value : null;
+  }
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const found = findNestedGiftImageUrl(item, depth + 1);
+      if (found) {
+        return found;
+      }
+    }
+
+    return null;
+  }
+
+  if (typeof value !== "object") {
+    return null;
+  }
+
+  const record = value as Record<string, unknown>;
+  const preferredKeys = [
+    "giftPictureUrl",
+    "giftPicture",
+    "giftImageUrl",
+    "giftImage",
+    "giftIconUrl",
+    "giftIcon",
+    "imageUrl",
+    "image",
+    "iconUrl",
+    "icon",
+    "url"
+  ];
+
+  for (const key of preferredKeys) {
+    const candidate = record[key];
+
+    if (typeof candidate === "string" && isImageUrl(candidate)) {
+      return candidate;
+    }
+
+    const nested = findNestedGiftImageUrl(candidate, depth + 1);
+    if (nested) {
+      return nested;
+    }
+  }
+
+  for (const [key, candidate] of Object.entries(record)) {
+    if (/avatar|profile/i.test(key) || !/gift|diamond|icon|image|picture|thumb/i.test(key)) {
+      continue;
+    }
+
+    const nested = findNestedGiftImageUrl(candidate, depth + 1);
     if (nested) {
       return nested;
     }

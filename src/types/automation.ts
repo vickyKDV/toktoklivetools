@@ -7,6 +7,8 @@ export type AutomationNodeType =
   | "followTrigger"
   | "condition"
   | "showAnimation"
+  | "show3dText"
+  | "showConfetti"
   | "playSound"
   | "replyComment";
 
@@ -29,6 +31,36 @@ export type AutomationNodeData = Record<string, unknown> & {
   useMediaDuration?: boolean;
   position?: string;
   size?: number;
+  mediaFit?: "auto" | "cover" | "fill";
+  mediaFrame?: "square" | "portrait" | "landscape" | "obsDefault" | "fullscreen" | "custom";
+  mediaWidth?: number;
+  mediaHeight?: number;
+  actionLayer?: "front" | "back";
+  text3dTemplate?: string;
+  text3dSubtitle?: string;
+  text3dEffect?: "neon" | "gold" | "hologram" | "glitch" | "bubble" | "cyber" | "fire";
+  text3dColor?: string;
+  text3dAccentColor?: string;
+  text3dDepth?: number;
+  text3dBevel?: number;
+  text3dMetalness?: number;
+  text3dRoughness?: number;
+  text3dSpin?: boolean;
+  text3dFloat?: boolean;
+  text3dOffsetX?: number;
+  text3dOffsetY?: number;
+  confettiEnabled?: boolean;
+  confettiMode?: "once" | "repeat" | "repeatUntilOverlayEnd";
+  confettiPresets?: string[];
+  confettiLayer?: "front" | "back";
+  confettiParticleCount?: number;
+  confettiSpread?: number;
+  confettiStartVelocity?: number;
+  confettiScalar?: number;
+  confettiIntervalMs?: number;
+  confettiOriginY?: number;
+  confettiDurationMs?: number;
+  confettiEmoji?: string;
   soundUrl?: string;
   volume?: number;
   message?: string;

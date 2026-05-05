@@ -115,7 +115,7 @@ function shouldUseRuntimeAutoHeight(component: OverlayComponentSchema) {
   }
 
   if (component.type === "comment") {
-    return !shouldUseAutoFitFontSize(component);
+    return true;
   }
 
   return component.style.autoHeight === true;
@@ -127,14 +127,14 @@ function shouldUseAutoFitFontSize(component: OverlayComponentSchema) {
   }
 
   if (component.type === "comment") {
-    return component.style.autoFitFontSize !== false;
+    return false;
   }
 
   return component.type === "gift_text" || component.style.autoFitFontSize === true;
 }
 
 function getWrappedAutoFitFontSize(component: OverlayComponentSchema, text: string, initialFontSize: number) {
-  const minFontSize = 6;
+  const minFontSize = Math.min(initialFontSize, 12);
   const width = Math.max(1, component.width);
   const height = Math.max(1, component.height);
   const lineHeight = component.style.lineHeight ?? 1.2;

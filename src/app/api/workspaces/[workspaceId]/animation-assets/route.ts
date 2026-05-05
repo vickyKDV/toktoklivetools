@@ -30,6 +30,7 @@ const allowedExtensions = new Set([
 
 const maxUploadBytes = 25 * 1024 * 1024;
 const uploadRoot = path.join(process.cwd(), "public", "uploads", "animations");
+const legacyUploadRoot = path.join(process.cwd(), "public", "upload", "animations");
 
 export async function GET(_request: Request, context: RouteContext) {
   const auth = await authorizeWorkspace(context);
@@ -40,6 +41,7 @@ export async function GET(_request: Request, context: RouteContext) {
 
   const assets = [
     ...(await readAssets("default", "Default Template", path.join(uploadRoot, "default"), "/uploads/animations/default")),
+    ...(await readAssets("default", "Default Template", path.join(legacyUploadRoot, "default"), "/upload/animations/default")),
     ...(await readAssets(
       "workspace",
       "Workspace Upload",
@@ -189,7 +191,7 @@ async function toAsset({
   const extension = path.extname(filename).toLowerCase();
 
   return {
-    id: `${source}:${filename}`,
+    id: `${source}:${urlPrefix}:${filename}`,
     name: filename,
     label: humanizeFilename(filename),
     source,

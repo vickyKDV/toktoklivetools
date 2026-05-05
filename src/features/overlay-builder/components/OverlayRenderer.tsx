@@ -229,7 +229,8 @@ function getEffectLayerStyle(
     return {
       ...base,
       padding: borderWidth,
-      background: `conic-gradient(from 0deg, transparent 0deg, ${color} 70deg, ${color2} 150deg, transparent 260deg, ${color} 360deg)`,
+      backgroundColor: "transparent",
+      backgroundImage: `conic-gradient(from 0deg, transparent 0deg, ${color} 70deg, ${color2} 150deg, transparent 260deg, ${color} 360deg)`,
       WebkitMask: "linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)",
       WebkitMaskComposite: "xor",
       maskComposite: "exclude",
@@ -242,7 +243,8 @@ function getEffectLayerStyle(
     return {
       ...base,
       opacity: Math.max(0.18, intensity / 180),
-      background: `linear-gradient(115deg, transparent 0%, ${color}55 32%, ${color2}66 50%, transparent 68%)`,
+      backgroundColor: "transparent",
+      backgroundImage: `linear-gradient(115deg, transparent 0%, ${color}55 32%, ${color2}66 50%, transparent 68%)`,
       backgroundSize: "220% 220%",
       mixBlendMode: "screen",
       animation: `overlayEffectGradient ${duration} ease-in-out infinite`

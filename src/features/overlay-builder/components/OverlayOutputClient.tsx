@@ -46,7 +46,7 @@ export function OverlayOutputClient({
     socket.on("connect", () => socket.emit("overlay:join", overlayKey));
     socket.on("overlay:live-event", (event: OverlayEventPayload) => {
       const nextData = eventToRenderData(event);
-      setData(nextData);
+      setData((current) => mergeGiftOutputData(current, nextData) ?? nextData);
 
       if (event.type === "CHAT" || event.comment) {
         setChatItems((current) => appendOutputItem(current, nextData, designJson.layout.maxItems));
@@ -96,6 +96,18 @@ export function OverlayOutputClient({
 
 function appendOutputItem(current: OverlayRenderData[], next: OverlayRenderData, maxItems: number) {
   const active = current.filter((item) => !item.meta?.exiting);
+  const mergeIndex = active.findIndex((item) => Boolean(mergeGiftOutputData(item, next)));
+
+  if (mergeIndex >= 0) {
+    return active.map((item, index) => {
+      if (index !== mergeIndex) {
+        return item;
+      }
+
+      return mergeGiftOutputData(item, next) ?? item;
+    });
+  }
+
   const itemWithId = {
     ...next,
     meta: {
@@ -111,12 +123,59 @@ function appendOutputItem(current: OverlayRenderData[], next: OverlayRenderData,
   }
 
   return combined.map((item, index) => {
-    return index >= maxItems ? { ...item, meta: { ...item.meta, exiting: true } } : item;
+    const shouldExit = index >= maxItems;
+
+    return shouldExit ? { ...item, meta: { ...item.meta, exiting: true } } : item;
   });
 }
 
 function acceptsFocusDock(schema: OverlayDesignSchema) {
   return schema.kind === "CUSTOM" && schema.layout.mode === "single" && schema.dataSource.type === "manual";
+}
+
+function mergeGiftOutputData(current: OverlayRenderData, next: OverlayRenderData) {
+  const currentGiftName = current.gift?.name?.trim();
+  const nextGiftName = next.gift?.name?.trim();
+  const currentUser = current.viewer?.username || current.viewer?.name;
+  const nextUser = next.viewer?.username || next.viewer?.name;
+
+  if (!currentGiftName || !nextGiftName || currentGiftName !== nextGiftName || !currentUser || currentUser !== nextUser) {
+    return null;
+  }
+
+  const mergedCount = toGiftOutputCount(current.gift?.count) + toGiftOutputCount(next.gift?.count);
+  const giftName = next.gift?.name ?? current.gift?.name ?? "";
+
+  return {
+    ...current,
+    viewer: {
+      ...current.viewer,
+      ...next.viewer
+    },
+    comment: {
+      ...current.comment,
+      createdAt: next.comment?.createdAt ?? current.comment?.createdAt,
+      text: mergedCount > 0 ? `sent ${giftName} x${mergedCount}` : current.comment?.text
+    },
+    gift: {
+      ...current.gift,
+      ...next.gift,
+      name: giftName,
+      count: mergedCount || next.gift?.count || current.gift?.count,
+      image: next.gift?.image || current.gift?.image || ""
+    },
+    meta: {
+      ...current.meta,
+      id: next.meta?.id ?? current.meta?.id,
+      instanceId: current.meta?.instanceId ?? next.meta?.instanceId
+    }
+  } satisfies OverlayRenderData;
+}
+
+function toGiftOutputCount(value: number | string | null | undefined) {
+  const numeric = Number(value);
+
+  return Number.isFinite(numeric) ? numeric : 0;
 }
 
 function eventToRenderData(event: OverlayEventPayload): OverlayRenderData {
@@ -140,7 +199,7 @@ function eventToRenderData(event: OverlayEventPayload): OverlayRenderData {
     gift: {
       name: event.giftName ?? "",
       count: event.giftCount ?? "",
-      image: ""
+      image: event.giftImageUrl ?? ""
     }
   };
 }

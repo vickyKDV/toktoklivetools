@@ -168,6 +168,7 @@ async function persistAndBroadcastEvent(
     avatarUrl: liveEvent.avatarUrl,
     userRole: mapped.userRole,
     giftName: liveEvent.giftName,
+    giftImageUrl: mapped.giftImageUrl,
     giftCount: liveEvent.giftCount,
     likeCount: liveEvent.likeCount,
     shareCount: liveEvent.shareCount,

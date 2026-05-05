@@ -50,7 +50,7 @@ export const componentRegistry: Record<OverlayComponentType, ComponentRegistryIt
   },
   comment: {
     ...textItem("comment", "Komentar", "{{comment.text}}", 440, 82, 24, 700),
-    defaultStyle: { opacity: 100, fontSize: 24, fontWeight: 700, color: "#ffffff", align: "left", lineHeight: 1.2, autoHeight: false, autoFitFontSize: true }
+    defaultStyle: { opacity: 100, fontSize: 24, fontWeight: 700, color: "#ffffff", align: "left", lineHeight: 1.2, autoHeight: true, autoFitFontSize: false }
   },
   created_at: textItem("created_at", "Timestamp", "{{comment.createdAt}}", 90, 24, 13, 700),
   gift_text: {

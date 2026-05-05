@@ -39,7 +39,7 @@ export default async function ChatDockPage({ params }: ChatDockPageProps) {
     orderBy: {
       receivedAt: "desc"
     },
-    take: 50,
+    take: 100,
     select: {
       id: true,
       type: true,
