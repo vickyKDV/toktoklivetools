@@ -3,10 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 5000",
     "dev:ws": "tsx server.ts",
     "build": "prisma generate && next build",
-    "start": "next start",
+    "start": "next start -p 5000",
     "start:ws": "NODE_ENV=production tsx server.ts",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
