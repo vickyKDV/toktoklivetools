@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { Radio } from "lucide-react";
-import { io, type Socket } from "socket.io-client";
+import type { Socket } from "socket.io-client";
+import { createRealtimeSocket } from "@/lib/realtime/client";
 import { Badge } from "@/components/ui/badge";
 import type { OverlayEventPayload } from "@/types/live";
 
@@ -15,10 +16,7 @@ export function RealtimeEventFeed({ workspaceId }: RealtimeEventFeedProps) {
   const [connected, setConnected] = useState(false);
 
   useEffect(() => {
-    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || window.location.origin;
-    const socket: Socket = io(socketUrl, {
-      transports: ["websocket", "polling"]
-    });
+    const socket: Socket = createRealtimeSocket();
 
     socket.on("connect", () => {
       setConnected(true);

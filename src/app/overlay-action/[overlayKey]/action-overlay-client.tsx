@@ -1,7 +1,8 @@
 "use client";
 
 import { createElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { io, type Socket } from "socket.io-client";
+import type { Socket } from "socket.io-client";
+import { createRealtimeSocket } from "@/lib/realtime/client";
 import { ThreeTextOverlay } from "@/app/overlay-action/[overlayKey]/three-text-overlay";
 import type { OverlayEventPayload } from "@/types/live";
 
@@ -66,10 +67,7 @@ export function ActionOverlayClient({ overlayKey, flowId, position }: ActionOver
   }, []);
 
   useEffect(() => {
-    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || window.location.origin;
-    const socket: Socket = io(socketUrl, {
-      transports: ["websocket", "polling"]
-    });
+    const socket: Socket = createRealtimeSocket();
 
     socket.emit("overlay:join", overlayKey);
     socket.on("connect", () => socket.emit("overlay:join", overlayKey));

@@ -38,7 +38,7 @@ import {
   Zap
 } from "lucide-react";
 import Link from "next/link";
-import { io } from "socket.io-client";
+import { createRealtimeSocket } from "@/lib/realtime/client";
 import { ThreeTextOverlay } from "@/app/overlay-action/[overlayKey]/three-text-overlay";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -539,12 +539,7 @@ function AutomationBuilderCanvas({
       setStatusMessage("Gagal mengirim test trigger. Pastikan Next dev server aktif.");
       return;
     }
-
-    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || window.location.origin;
-    const socket = io(socketUrl, {
-      transports: ["websocket", "polling"],
-      timeout: 1000
-    });
+    const socket = createRealtimeSocket({ timeout: 1000, reconnectionAttempts: 2 });
 
     socket.on("connect", () => {
       for (const payload of payloads) {

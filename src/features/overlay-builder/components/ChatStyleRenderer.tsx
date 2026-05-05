@@ -31,16 +31,19 @@ export function ChatStyleRenderer({
   height
 }: ChatStyleRendererProps) {
   const runtimeCanvas = getRuntimeCanvasSize(designJson);
+  const isHorizontal = designJson.layout.direction === "horizontal";
   const itemBounds = items.map((item) => getRuntimeComponentBounds(designJson.components, item, runtimeCanvas.width, runtimeCanvas.height));
   const bounds = itemBounds[0] ?? getRuntimeComponentBounds(designJson.components, dummyOverlayData, runtimeCanvas.width, runtimeCanvas.height);
   const viewportWidth = runtimeCanvas.width;
   const viewportHeight = typeof height === "number" ? Math.max(height, runtimeCanvas.height) : runtimeCanvas.height;
   const renderedItemWidth = Math.max(bounds.width, ...itemBounds.map((item) => item.width));
+  const renderedItemHeight = Math.max(bounds.height, ...itemBounds.map((item) => item.height));
   const enterAnimation = getOverlayAnimationName(designJson.layout.enterAnimation, "in");
   const exitAnimation = getOverlayAnimationName(designJson.layout.exitAnimation, "out");
   const animationDurationMs = designJson.layout.animationDurationMs ?? 620;
   const listStyle = designJson.layout.listStyle ?? "stacked_card";
   const renderGap = getListRenderGap(listStyle, gap);
+  const listWidth = Math.max(renderedItemWidth, viewportWidth - bounds.left);
   const listHeight = Math.max(bounds.height, viewportHeight - bounds.top);
   const smoothDurationMs = Math.max(animationDurationMs, 720);
 
@@ -59,6 +62,7 @@ export function ChatStyleRenderer({
       elementHeight: bounds.height,
       maxItems: designJson.layout.maxItems,
       listStyle,
+      direction: designJson.layout.direction,
       renderedItems: items.length,
       reverseOrder: designJson.layout.reverse
     });
@@ -69,6 +73,7 @@ export function ChatStyleRenderer({
     bounds.width,
     debug,
     designJson.layout.maxItems,
+    designJson.layout.direction,
     listStyle,
     designJson.layout.reverse,
     items.length,
@@ -90,24 +95,39 @@ export function ChatStyleRenderer({
           position: "absolute",
           left: bounds.left,
           top: bounds.top,
-          width: renderedItemWidth,
-          height: listHeight,
+          width: isHorizontal ? listWidth : renderedItemWidth,
+          height: isHorizontal ? renderedItemHeight : listHeight,
           overflow: "visible"
         }}
       >
-        <div style={{ position: "relative", width: renderedItemWidth, height: listHeight, overflow: "visible" }}>
+        <div
+          style={{
+            position: "relative",
+            width: isHorizontal ? listWidth : renderedItemWidth,
+            height: isHorizontal ? renderedItemHeight : listHeight,
+            overflow: "visible"
+          }}
+        >
           {items.map((item, index) => {
             const currentBounds = itemBounds[index] ?? bounds;
-            const renderedItemHeight = currentBounds.height;
+            const currentRenderedItemHeight = currentBounds.height;
             const isExiting = Boolean(item.meta?.exiting);
-            const exitMaskDirection = designJson.layout.reverse ? "to bottom" : "to top";
+            const exitMaskDirection = getExitMaskDirection(designJson.layout.reverse, isHorizontal);
             const exitMask = `linear-gradient(${exitMaskDirection}, transparent 0%, rgba(0, 0, 0, 0.2) 28%, #000 68%)`;
             const animationDelayMs = isExiting ? overlayListExitDelayMs : 0;
-            const exitY = designJson.layout.reverse ? "-30px" : "30px";
-            const visualStyle = getListVisualStyle(listStyle, index, designJson.layout.maxItems, alignRight);
+            const exitY = isHorizontal ? "0px" : designJson.layout.reverse ? "-30px" : "30px";
+            const exitX = isHorizontal ? designJson.layout.reverse ? "-30px" : "30px" : "0px";
+            const visualStyle = getListVisualStyle(listStyle, index, designJson.layout.maxItems, alignRight, isHorizontal);
+            const targetX = isHorizontal
+              ? designJson.layout.reverse
+                ? getReverseItemX(itemBounds, index, listWidth, renderGap)
+                : getNormalItemX(itemBounds, index, renderGap)
+              : 0;
             const targetY = designJson.layout.reverse
               ? getReverseItemY(itemBounds, index, listHeight, renderGap)
               : getNormalItemY(itemBounds, index, renderGap);
+            const translateX = targetX + visualStyle.x;
+            const translateY = (isHorizontal ? 0 : targetY) + visualStyle.y;
 
             return (
               <div
@@ -119,13 +139,13 @@ export function ChatStyleRenderer({
                   right: alignRight ? 0 : "auto",
                   top: 0,
                   width: renderedItemWidth,
-                  height: renderedItemHeight,
+                  height: currentRenderedItemHeight,
                   minWidth: renderedItemWidth,
-                  minHeight: renderedItemHeight,
+                  minHeight: currentRenderedItemHeight,
                   maxWidth: renderedItemWidth,
-                  maxHeight: renderedItemHeight,
+                  maxHeight: currentRenderedItemHeight,
                   overflow: "visible",
-                  transform: `translate3d(${visualStyle.x}px, ${targetY}px, 0) scale(${visualStyle.scale})`,
+                  transform: `translate3d(${translateX}px, ${translateY}px, 0) scale(${visualStyle.scale})`,
                   transformOrigin: alignRight ? "top right" : "top left",
                   opacity: visualStyle.opacity,
                   filter: visualStyle.filter,
@@ -138,10 +158,11 @@ export function ChatStyleRenderer({
                 <div
                   style={{
                     width: renderedItemWidth,
-                    height: renderedItemHeight,
+                    height: currentRenderedItemHeight,
                     overflow: "visible",
                     WebkitMaskImage: isExiting ? exitMask : undefined,
                     maskImage: isExiting ? exitMask : undefined,
+                    "--overlay-list-exit-x": exitX,
                     "--overlay-list-exit-y": exitY,
                     animation: `${isExiting ? exitAnimation : enterAnimation} ${smoothDurationMs}ms cubic-bezier(.16, 1, .3, 1) ${animationDelayMs}ms both`,
                     willChange: "opacity, transform, filter"
@@ -283,12 +304,32 @@ function getNormalItemY(bounds: Array<{ height: number }>, index: number, gap: n
   return bounds.slice(0, index).reduce((top, item) => top + item.height + gap, 0);
 }
 
+function getNormalItemX(bounds: Array<{ width: number }>, index: number, gap: number) {
+  return bounds.slice(0, index).reduce((left, item) => left + item.width + gap, 0);
+}
+
 function getReverseItemY(bounds: Array<{ height: number }>, index: number, listHeight: number, gap: number) {
   const heightThroughCurrent = bounds.slice(0, index + 1).reduce((height, item, itemIndex) => {
     return height + item.height + (itemIndex === 0 ? 0 : gap);
   }, 0);
 
   return listHeight - heightThroughCurrent;
+}
+
+function getReverseItemX(bounds: Array<{ width: number }>, index: number, listWidth: number, gap: number) {
+  const widthThroughCurrent = bounds.slice(0, index + 1).reduce((width, item, itemIndex) => {
+    return width + item.width + (itemIndex === 0 ? 0 : gap);
+  }, 0);
+
+  return listWidth - widthThroughCurrent;
+}
+
+function getExitMaskDirection(reverseOrder: boolean, isHorizontal: boolean) {
+  if (isHorizontal) {
+    return reverseOrder ? "to right" : "to left";
+  }
+
+  return reverseOrder ? "to bottom" : "to top";
 }
 
 function getListRenderGap(style: OverlayListStyle, gap: number) {
@@ -299,13 +340,19 @@ function getListRenderGap(style: OverlayListStyle, gap: number) {
   return gap;
 }
 
-function getListVisualStyle(style: OverlayListStyle, index: number, maxItems: number, alignRight: boolean) {
+function getListVisualStyle(style: OverlayListStyle, index: number, maxItems: number, alignRight: boolean, isHorizontal: boolean) {
   const depth = Math.max(0, Math.min(index, Math.max(0, maxItems - 1)));
   const direction = alignRight ? -1 : 1;
+  const axis = (amount: number) => ({
+    x: isHorizontal ? 0 : direction * amount,
+    y: isHorizontal ? amount : 0
+  });
 
   if (style === "layered_list") {
+    const offset = axis(depth * 14);
+
     return {
-      x: direction * depth * 14,
+      ...offset,
       scale: Math.max(0.92, 1 - depth * 0.012),
       opacity: Math.max(0.72, 1 - depth * 0.035),
       filter: undefined,
@@ -314,8 +361,10 @@ function getListVisualStyle(style: OverlayListStyle, index: number, maxItems: nu
   }
 
   if (style === "card_stack") {
+    const offset = axis(depth * 8);
+
     return {
-      x: direction * depth * 8,
+      ...offset,
       scale: Math.max(0.88, 1 - depth * 0.026),
       opacity: Math.max(0.66, 1 - depth * 0.05),
       filter: depth > 3 ? "saturate(.92)" : undefined,
@@ -324,8 +373,10 @@ function getListVisualStyle(style: OverlayListStyle, index: number, maxItems: nu
   }
 
   if (style === "focus_stack") {
+    const offset = axis(depth * 5);
+
     return {
-      x: direction * depth * 5,
+      ...offset,
       scale: depth === 0 ? 1.02 : Math.max(0.9, 1 - depth * 0.03),
       opacity: depth === 0 ? 1 : Math.max(0.54, 0.86 - depth * 0.07),
       filter: depth > 0 ? `saturate(${Math.max(0.72, 1 - depth * 0.06)})` : undefined,
@@ -334,8 +385,10 @@ function getListVisualStyle(style: OverlayListStyle, index: number, maxItems: nu
   }
 
   if (style === "depth_list") {
+    const offset = axis(depth * 18);
+
     return {
-      x: direction * depth * 18,
+      ...offset,
       scale: Math.max(0.58, 1 - depth * 0.085),
       opacity: Math.max(0.34, 1 - depth * 0.12),
       filter: depth > 0 ? `blur(${Math.min(2.6, depth * 0.38)}px) saturate(${Math.max(0.55, 1 - depth * 0.07)})` : undefined,
@@ -343,8 +396,10 @@ function getListVisualStyle(style: OverlayListStyle, index: number, maxItems: nu
     };
   }
 
+  const offset = axis(depth * 6);
+
   return {
-    x: direction * depth * 6,
+    ...offset,
     scale: Math.max(0.94, 1 - depth * 0.014),
     opacity: Math.max(0.78, 1 - depth * 0.03),
     filter: undefined,
@@ -388,12 +443,12 @@ export function getOverlayAnimationName(value: string, direction: "in" | "out") 
 
 export const overlayAnimationCss = `
 @keyframes overlayFadeIn { 0% { opacity: 0; transform: translate3d(0, 18px, 0) scale(.985); filter: blur(3px); } 60% { opacity: 1; filter: blur(.6px); } 100% { opacity: 1; transform: translate3d(0, 0, 0) scale(1); filter: blur(0); } }
-@keyframes overlayFadeOut { 0% { opacity: 1; transform: translate3d(0, 0, 0) scale(1); filter: blur(0); } 55% { opacity: .42; filter: blur(1.4px); } 100% { opacity: 0; transform: translate3d(0, var(--overlay-list-exit-y, -30px), 0) scale(.985); filter: blur(3px); } }
+@keyframes overlayFadeOut { 0% { opacity: 1; transform: translate3d(0, 0, 0) scale(1); filter: blur(0); } 55% { opacity: .42; filter: blur(1.4px); } 100% { opacity: 0; transform: translate3d(var(--overlay-list-exit-x, 0), var(--overlay-list-exit-y, -30px), 0) scale(.985); filter: blur(3px); } }
 @keyframes overlayZoomIn { 0% { opacity: 0; transform: scale(.92); filter: blur(3px); } 64% { opacity: 1; transform: scale(1.012); filter: blur(.6px); } 100% { opacity: 1; transform: scale(1); filter: blur(0); } }
-@keyframes overlayZoomOut { 0% { opacity: 1; transform: scale(1); filter: blur(0); } 100% { opacity: 0; transform: scale(.94) translate3d(0, var(--overlay-list-exit-y, -18px), 0); filter: blur(3px); } }
+@keyframes overlayZoomOut { 0% { opacity: 1; transform: scale(1); filter: blur(0); } 100% { opacity: 0; transform: scale(.94) translate3d(var(--overlay-list-exit-x, 0), var(--overlay-list-exit-y, -18px), 0); filter: blur(3px); } }
 @keyframes overlayPopIn { 0% { opacity: 0; transform: scale(.86); filter: blur(3px); } 68% { opacity: 1; transform: scale(1.025); filter: blur(.5px); } 100% { opacity: 1; transform: scale(1); filter: blur(0); } }
 @keyframes overlayBounceIn { 0% { opacity: 0; transform: translate3d(0, 38px, 0) scale(.86); filter: blur(3px); } 48% { opacity: 1; transform: translate3d(0, -10px, 0) scale(1.045); filter: blur(.5px); } 68% { transform: translate3d(0, 5px, 0) scale(.985); filter: blur(0); } 84% { transform: translate3d(0, -2px, 0) scale(1.008); } 100% { opacity: 1; transform: translate3d(0, 0, 0) scale(1); filter: blur(0); } }
-@keyframes overlayBounceOut { 0% { opacity: 1; transform: translate3d(0, 0, 0) scale(1); filter: blur(0); } 22% { opacity: 1; transform: translate3d(0, -8px, 0) scale(1.035); filter: blur(.2px); } 42% { transform: translate3d(0, 4px, 0) scale(.985); } 100% { opacity: 0; transform: translate3d(0, var(--overlay-list-exit-y, -34px), 0) scale(.84); filter: blur(3px); } }
+@keyframes overlayBounceOut { 0% { opacity: 1; transform: translate3d(0, 0, 0) scale(1); filter: blur(0); } 22% { opacity: 1; transform: translate3d(0, -8px, 0) scale(1.035); filter: blur(.2px); } 42% { transform: translate3d(0, 4px, 0) scale(.985); } 100% { opacity: 0; transform: translate3d(var(--overlay-list-exit-x, 0), var(--overlay-list-exit-y, -34px), 0) scale(.84); filter: blur(3px); } }
 @keyframes overlaySlideLeftIn { 0% { opacity: 0; transform: translate3d(-42px, 0, 0); filter: blur(3px); } 100% { opacity: 1; transform: translate3d(0, 0, 0); filter: blur(0); } }
 @keyframes overlaySlideLeftOut { 0% { opacity: 1; transform: translate3d(0, 0, 0); filter: blur(0); } 100% { opacity: 0; transform: translate3d(-42px, -12px, 0); filter: blur(3px); } }
 @keyframes overlaySlideRightIn { 0% { opacity: 0; transform: translate3d(42px, 0, 0); filter: blur(3px); } 100% { opacity: 1; transform: translate3d(0, 0, 0); filter: blur(0); } }

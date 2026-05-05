@@ -12,7 +12,8 @@ import {
   Volume2,
   VolumeX
 } from "lucide-react";
-import { io, type Socket } from "socket.io-client";
+import type { Socket } from "socket.io-client";
+import { createRealtimeSocket } from "@/lib/realtime/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { OverlayEventPayload } from "@/types/live";
@@ -79,10 +80,7 @@ export function ChatDockClient({
   }, [overlayKey]);
 
   useEffect(() => {
-    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || window.location.origin;
-    const socket: Socket = io(socketUrl, {
-      transports: ["websocket", "polling"]
-    });
+    const socket: Socket = createRealtimeSocket();
 
     socketRef.current = socket;
 

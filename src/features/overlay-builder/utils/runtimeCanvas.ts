@@ -7,6 +7,13 @@ export const defaultObsCanvas = {
 
 export function getRuntimeCanvasSize(schema: OverlayDesignSchema) {
   if (schema.kind === "CHAT" && schema.layout.mode === "list") {
+    if (schema.layout.direction === "horizontal") {
+      return {
+        width: Math.max(defaultObsCanvas.width, schema.canvas.width),
+        height: Math.max(350, schema.canvas.height)
+      };
+    }
+
     return {
       width: Math.max(defaultObsCanvas.width, schema.canvas.width),
       height: Math.max(defaultObsCanvas.height, schema.canvas.height)

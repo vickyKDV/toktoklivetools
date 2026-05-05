@@ -12,6 +12,9 @@ const handle = app.getRequestHandler();
 app.prepare().then(() => {
   const httpServer = createServer(handle);
   const io = new Server(httpServer, {
+    pingInterval: 25_000,
+    pingTimeout: 20_000,
+    connectTimeout: 20_000,
     cors: {
       origin: "*"
     }

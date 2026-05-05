@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { io, type Socket } from "socket.io-client";
+import type { Socket } from "socket.io-client";
+import { createRealtimeSocket } from "@/lib/realtime/client";
 import {
   getOverlayAnimationName,
   getSampleChatRenderData,
@@ -66,11 +67,7 @@ export function OverlayRuntimeClient({ schema, overlayKey, preview = false, debu
     if (preview) {
       return;
     }
-
-    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || window.location.origin;
-    const socket: Socket = io(socketUrl, {
-      transports: ["websocket", "polling"]
-    });
+    const socket: Socket = createRealtimeSocket();
 
     socket.emit("overlay:join", overlayKey);
     socket.on("connect", () => socket.emit("overlay:join", overlayKey));

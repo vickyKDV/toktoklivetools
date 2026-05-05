@@ -14,16 +14,40 @@ type TikTokConnection = {
   on: (eventName: string, handler: (payload: unknown) => void) => void;
 };
 
+type ManagedTikTokConnection = {
+  workspaceId: string;
+  overlayKey: string;
+  tiktokUsername: string;
+  connection: TikTokConnection | null;
+  retryAttempt: number;
+  retryTimer: ReturnType<typeof setTimeout> | null;
+  stopped: boolean;
+  connecting: boolean;
+};
+
 type ConnectionGlobal = typeof globalThis & {
-  __tlaTikTokConnections?: Map<string, TikTokConnection>;
+  __tlaTikTokConnections?: Map<string, ManagedTikTokConnection>;
 };
 
 const connectionGlobal = globalThis as ConnectionGlobal;
-const activeConnections =
-  connectionGlobal.__tlaTikTokConnections ?? new Map<string, TikTokConnection>();
+const activeConnections: Map<string, ManagedTikTokConnection> =
+  connectionGlobal.__tlaTikTokConnections ?? new Map<string, ManagedTikTokConnection>();
 connectionGlobal.__tlaTikTokConnections = activeConnections;
 
 const eventNames = ["chat", "gift", "like", "social", "member", "subscribe", "roomUser", "streamEnd"];
+const reconnectEventNames = ["disconnected", "disconnect", "error"];
+const maxReconnectAttempts = readNonNegativeInteger(process.env.TIKTOK_RECONNECT_MAX_ATTEMPTS, 0);
+const maxReconnectDelayMs = readNonNegativeInteger(process.env.TIKTOK_RECONNECT_MAX_DELAY_MS, 30_000);
+
+function readNonNegativeInteger(value: string | undefined, fallback: number) {
+  const parsed = Number(value);
+
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return fallback;
+  }
+
+  return Math.floor(parsed);
+}
 
 export async function startTikTokConnection(workspaceId: string) {
   if (activeConnections.has(workspaceId)) {
@@ -63,33 +87,21 @@ export async function startTikTokConnection(workspaceId: string) {
     }
   });
 
+  const state: ManagedTikTokConnection = {
+    workspaceId: workspace.id,
+    overlayKey: workspace.overlayKey,
+    tiktokUsername: workspace.tiktokUsername,
+    connection: null,
+    retryAttempt: 0,
+    retryTimer: null,
+    stopped: false,
+    connecting: false
+  };
+
+  activeConnections.set(workspaceId, state);
+
   try {
-    const connector = (await import("tiktok-live-connector")) as {
-      WebcastPushConnection: new (username: string) => TikTokConnection;
-    };
-    const connection = new connector.WebcastPushConnection(workspace.tiktokUsername);
-
-    eventNames.forEach((eventName) => {
-      connection.on(eventName, (payload) => {
-        const mappedEventName = eventName === "social" ? socialEventName(payload) : eventName;
-        void persistAndBroadcastEvent(workspace.id, workspace.overlayKey, mappedEventName, payload);
-      });
-    });
-
-    await connection.connect();
-    activeConnections.set(workspaceId, connection);
-
-    await prisma.tikTokConnection.update({
-      where: {
-        workspaceId
-      },
-      data: {
-        status: "LIVE",
-        startedAt: new Date(),
-        stoppedAt: null,
-        lastError: null
-      }
-    });
+    await connectManagedTikTokConnection(state, true);
 
     return {
       status: "started" as const
@@ -110,10 +122,18 @@ export async function startTikTokConnection(workspaceId: string) {
 }
 
 export async function stopTikTokConnection(workspaceId: string) {
-  const connection = activeConnections.get(workspaceId);
+  const state = activeConnections.get(workspaceId);
 
-  if (connection) {
-    connection.disconnect();
+  if (state) {
+    state.stopped = true;
+
+    if (state.retryTimer) {
+      clearTimeout(state.retryTimer);
+      state.retryTimer = null;
+    }
+
+    state.connection?.disconnect();
+    state.connection = null;
     activeConnections.delete(workspaceId);
   }
 
@@ -130,6 +150,152 @@ export async function stopTikTokConnection(workspaceId: string) {
   return {
     status: "stopped" as const
   };
+}
+
+async function connectManagedTikTokConnection(state: ManagedTikTokConnection, throwOnFailure: boolean) {
+  if (state.stopped || state.connecting) {
+    return;
+  }
+
+  state.connecting = true;
+
+  try {
+    const connector = (await import("tiktok-live-connector")) as {
+      WebcastPushConnection: new (username: string) => TikTokConnection;
+    };
+    const connection = new connector.WebcastPushConnection(state.tiktokUsername);
+
+    bindTikTokConnectionEvents(state, connection);
+    await connection.connect();
+
+    if (state.stopped) {
+      connection.disconnect();
+      return;
+    }
+
+    state.connection = connection;
+    state.retryAttempt = 0;
+
+    await prisma.tikTokConnection.update({
+      where: {
+        workspaceId: state.workspaceId
+      },
+      data: {
+        status: "LIVE",
+        startedAt: new Date(),
+        stoppedAt: null,
+        lastError: null
+      }
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unable to connect to TikTok LIVE";
+
+    if (throwOnFailure) {
+      throw error;
+    }
+
+    await markTikTokConnectionError(state, message);
+    scheduleTikTokReconnect(state, message);
+  } finally {
+    state.connecting = false;
+  }
+}
+
+function bindTikTokConnectionEvents(state: ManagedTikTokConnection, connection: TikTokConnection) {
+  eventNames.forEach((eventName) => {
+    connection.on(eventName, (payload) => {
+      const mappedEventName = eventName === "social" ? socialEventName(payload) : eventName;
+      void persistAndBroadcastEvent(state.workspaceId, state.overlayKey, mappedEventName, payload);
+
+      if (eventName === "streamEnd") {
+        void closeTikTokConnectionAfterStreamEnd(state);
+      }
+    });
+  });
+
+  reconnectEventNames.forEach((eventName) => {
+    connection.on(eventName, (payload) => {
+      const message = payload instanceof Error
+        ? payload.message
+        : typeof payload === "string"
+          ? payload
+          : `TikTok connection ${eventName}`;
+
+      handleTikTokConnectionLost(state, message);
+    });
+  });
+}
+
+function handleTikTokConnectionLost(state: ManagedTikTokConnection, message: string) {
+  if (state.stopped) {
+    return;
+  }
+
+  state.connection?.disconnect();
+  state.connection = null;
+  void markTikTokConnectionError(state, message);
+  scheduleTikTokReconnect(state, message);
+}
+
+function scheduleTikTokReconnect(state: ManagedTikTokConnection, message: string) {
+  if (state.stopped || state.retryTimer) {
+    return;
+  }
+
+  state.retryAttempt += 1;
+
+  if (maxReconnectAttempts > 0 && state.retryAttempt > maxReconnectAttempts) {
+    activeConnections.delete(state.workspaceId);
+    void markTikTokConnectionError(state, `Reconnect stopped after ${maxReconnectAttempts} attempts. Last error: ${message}`);
+    return;
+  }
+
+  const delayMs = Math.min(maxReconnectDelayMs, 1000 * 2 ** Math.min(state.retryAttempt - 1, 5));
+
+  state.retryTimer = setTimeout(() => {
+    state.retryTimer = null;
+    void connectManagedTikTokConnection(state, false);
+  }, delayMs);
+}
+
+async function markTikTokConnectionError(state: ManagedTikTokConnection, message: string) {
+  await prisma.tikTokConnection.updateMany({
+    where: {
+      workspaceId: state.workspaceId
+    },
+    data: {
+      status: "CONNECTING",
+      lastError: message
+    }
+  });
+}
+
+async function closeTikTokConnectionAfterStreamEnd(state: ManagedTikTokConnection) {
+  if (state.stopped) {
+    return;
+  }
+
+  state.stopped = true;
+
+  if (state.retryTimer) {
+    clearTimeout(state.retryTimer);
+    state.retryTimer = null;
+  }
+
+  state.connection?.disconnect();
+  state.connection = null;
+  activeConnections.delete(state.workspaceId);
+
+  await prisma.tikTokConnection.updateMany({
+    where: {
+      workspaceId: state.workspaceId
+    },
+    data: {
+      status: "STOPPED",
+      stoppedAt: new Date(),
+      lastError: null
+    }
+  });
 }
 
 async function persistAndBroadcastEvent(

@@ -23,6 +23,17 @@ Edit `DATABASE_URL` in `.env` before running migrations.
 
 Use `pnpm dev:ws` instead of `pnpm dev` when testing realtime overlay events locally. It starts Next.js and Socket.IO in the same Node process.
 
+## Production Realtime
+
+For production/cloud deployment, keep the HTTP app and realtime runtime as independently restartable processes when possible:
+
+- Run the Socket.IO/TikTok process with `pnpm dev:ws` locally or the equivalent `server.ts` entrypoint in production.
+- Point browsers/widgets to that realtime endpoint with `NEXT_PUBLIC_SOCKET_URL`.
+- Use `TIKTOK_RECONNECT_MAX_ATTEMPTS=0` for unlimited reconnect attempts, or set a positive number to stop after that many retries.
+- Use `TIKTOK_RECONNECT_MAX_DELAY_MS` to cap the reconnect backoff delay.
+
+The client socket uses automatic reconnect with websocket plus polling fallback. The TikTok connection manager also closes cleanly on manual stop or stream end, and retries transient disconnects with backoff.
+
 ## Overlay Runtime
 
 Overlays are now standalone JSON resources. There is no active/inactive global selector. Every overlay has its own OBS URL:

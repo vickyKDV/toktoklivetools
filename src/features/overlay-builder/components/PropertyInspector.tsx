@@ -382,6 +382,17 @@ function LayoutFields({
           <NumberField label="Gap" value={layout.gap} min={0} max={240} onChange={(gap) => onUpdateDesign({ layout: { ...layout, gap } })} />
           {layout.mode === "list" && !isLeaderboard ? (
             <SelectField
+              label="Direction"
+              value={layout.direction}
+              options={[
+                { label: "Vertical", value: "vertical" },
+                { label: "Horizontal", value: "horizontal" }
+              ]}
+              onChange={(direction) => onUpdateDesign({ layout: { ...layout, direction: direction as OverlayDesignSchema["layout"]["direction"] } })}
+            />
+          ) : null}
+          {layout.mode === "list" && !isLeaderboard ? (
+            <SelectField
               label="List Style"
               value={layout.listStyle ?? "stacked_card"}
               options={listStyleOptions}

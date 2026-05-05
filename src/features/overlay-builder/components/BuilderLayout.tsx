@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { ArrowLeft, Code2, Eye, FilePlus2, GiftIcon, Monitor, Redo2, Save, Trash2, Undo2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { io, type Socket } from "socket.io-client";
+import type { Socket } from "socket.io-client";
+import { createRealtimeSocket } from "@/lib/realtime/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { CopyButton } from "@/components/ui/copy-button";
@@ -211,11 +212,7 @@ export function BuilderLayout({
     if (view !== "preview" || previewDataMode !== "live") {
       return;
     }
-
-    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || window.location.origin;
-    const socket: Socket = io(socketUrl, {
-      transports: ["websocket", "polling"]
-    });
+    const socket: Socket = createRealtimeSocket();
 
     socket.emit("overlay:join", workspaceOverlayKey);
     socket.on("connect", () => socket.emit("overlay:join", workspaceOverlayKey));
