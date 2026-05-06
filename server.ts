@@ -5,7 +5,7 @@ import { bindSocketServer } from "./src/lib/realtime/server";
 
 const dev = process.env.NODE_ENV !== "production";
 const hostname = process.env.HOSTNAME || "0.0.0.0";
-const port = Number(process.env.PORT || 5000);
+const port = Number(process.env.PORT || 7050);
 const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();
 

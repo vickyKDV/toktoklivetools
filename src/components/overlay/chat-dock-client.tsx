@@ -143,6 +143,7 @@ export function ChatDockClient({
       playNotification(audioRef.current);
     }
 
+    socketRef.current?.emit("dock:test-chat", overlayKey, event);
     sendFocusChat(event);
   }
 

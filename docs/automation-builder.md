@@ -117,7 +117,7 @@ Pakai halaman:
 Setiap card overlay menampilkan URL OBS. Contoh:
 
 ```txt
-http://localhost:5000/overlay/chat/cuid_overlay
+http://localhost:7050/overlay/chat/cuid_overlay
 ```
 
 Browser Source OBS harus memakai width/height sesuai canvas JSON overlay. Untuk `CHAT` list, tinggi Browser Source boleh lebih besar agar beberapa item terlihat.

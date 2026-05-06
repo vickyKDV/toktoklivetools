@@ -30,7 +30,7 @@ export function getBaseUrl() {
     return `https://${process.env.VERCEL_URL}`;
   }
 
-  return "http://localhost:5000";
+  return "http://localhost:7050";
 }
 
 export function getWidgetBaseUrl() {

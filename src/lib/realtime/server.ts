@@ -33,6 +33,19 @@ export function bindSocketServer(io: Server) {
       io.to(overlayRoom(overlayKey)).emit("overlay:focus-chat", event);
     });
 
+    socket.on("dock:test-chat", (overlayKey: string, payload: unknown) => {
+      const event = normalizeFocusChatPayload(payload);
+
+      if (!overlayKey || !event) {
+        return;
+      }
+
+      io.to(overlayRoom(overlayKey)).emit("overlay:live-event", {
+        ...event,
+        action: undefined
+      });
+    });
+
     socket.on("dock:clear-focus-chat", (overlayKey: string) => {
       if (!overlayKey) {
         return;
