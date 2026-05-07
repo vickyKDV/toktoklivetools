@@ -1,7 +1,7 @@
 import type { OverlayComponentSchema, OverlayComponentType } from "@/features/overlay-builder/schema/overlaySchema";
 
 export function isContainerType(type: OverlayComponentType) {
-  return type === "container" || type === "bubble_card" || type === "glass_card" || type === "gradient_card";
+  return type === "raw_card" || type === "speech_bubble_card" || type === "container" || type === "bubble_card" || type === "glass_card" || type === "gradient_card";
 }
 
 export function findComponent(components: OverlayComponentSchema[], id: string | null): OverlayComponentSchema | null {

@@ -16,6 +16,7 @@ type ChatStyleRendererProps = {
   items?: OverlayRenderData[];
   gap?: number;
   debug?: boolean;
+  align?: OverlayDesignSchema["layout"]["align"];
   alignRight?: boolean;
   height?: CSSProperties["height"];
 };
@@ -27,11 +28,13 @@ export function ChatStyleRenderer({
   items = sampleChatRenderData,
   gap = 12,
   debug = false,
+  align,
   alignRight = false,
   height
 }: ChatStyleRendererProps) {
   const runtimeCanvas = getRuntimeCanvasSize(designJson);
   const isHorizontal = designJson.layout.direction === "horizontal";
+  const listAlign = align ?? (alignRight ? "end" : designJson.layout.align ?? "start");
   const itemBounds = items.map((item) => getRuntimeComponentBounds(designJson.components, item, runtimeCanvas.width, runtimeCanvas.height));
   const bounds = itemBounds[0] ?? getRuntimeComponentBounds(designJson.components, dummyOverlayData, runtimeCanvas.width, runtimeCanvas.height);
   const viewportWidth = runtimeCanvas.width;
@@ -41,10 +44,10 @@ export function ChatStyleRenderer({
   const enterAnimation = getOverlayAnimationName(designJson.layout.enterAnimation, "in");
   const exitAnimation = getOverlayAnimationName(designJson.layout.exitAnimation, "out");
   const animationDurationMs = designJson.layout.animationDurationMs ?? 620;
-  const listStyle = designJson.layout.listStyle ?? "stacked_card";
+  const listStyle = designJson.layout.listStyle ?? "default";
   const renderGap = getListRenderGap(listStyle, gap);
   const listWidth = Math.max(renderedItemWidth, viewportWidth - bounds.left);
-  const listHeight = Math.max(bounds.height, viewportHeight - bounds.top);
+  const listHeight = Math.max(renderedItemHeight, viewportHeight - bounds.top);
   const smoothDurationMs = Math.max(animationDurationMs, 720);
 
   useEffect(() => {
@@ -63,6 +66,7 @@ export function ChatStyleRenderer({
       maxItems: designJson.layout.maxItems,
       listStyle,
       direction: designJson.layout.direction,
+      align: listAlign,
       renderedItems: items.length,
       reverseOrder: designJson.layout.reverse
     });
@@ -74,6 +78,7 @@ export function ChatStyleRenderer({
     debug,
     designJson.layout.maxItems,
     designJson.layout.direction,
+    listAlign,
     listStyle,
     designJson.layout.reverse,
     items.length,
@@ -95,16 +100,16 @@ export function ChatStyleRenderer({
           position: "absolute",
           left: bounds.left,
           top: bounds.top,
-          width: isHorizontal ? listWidth : renderedItemWidth,
-          height: isHorizontal ? renderedItemHeight : listHeight,
+          width: listWidth,
+          height: listHeight,
           overflow: "visible"
         }}
       >
         <div
           style={{
             position: "relative",
-            width: isHorizontal ? listWidth : renderedItemWidth,
-            height: isHorizontal ? renderedItemHeight : listHeight,
+            width: listWidth,
+            height: listHeight,
             overflow: "visible"
           }}
         >
@@ -117,17 +122,20 @@ export function ChatStyleRenderer({
             const animationDelayMs = isExiting ? overlayListExitDelayMs : 0;
             const exitY = isHorizontal ? "0px" : designJson.layout.reverse ? "-30px" : "30px";
             const exitX = isHorizontal ? designJson.layout.reverse ? "-30px" : "30px" : "0px";
-            const visualStyle = getListVisualStyle(listStyle, index, designJson.layout.maxItems, alignRight, isHorizontal);
+            const visualStyle = getListVisualStyle(listStyle, index, designJson.layout.maxItems, listAlign === "end", isHorizontal);
+            const itemWidth = !isHorizontal && listAlign === "stretch" ? listWidth : renderedItemWidth;
+            const itemHeight = isHorizontal && listAlign === "stretch" ? listHeight : currentRenderedItemHeight;
+            const crossAxisOffset = getCrossAxisOffset(listAlign, isHorizontal ? listHeight : listWidth, isHorizontal ? itemHeight : itemWidth);
             const targetX = isHorizontal
               ? designJson.layout.reverse
                 ? getReverseItemX(itemBounds, index, listWidth, renderGap)
                 : getNormalItemX(itemBounds, index, renderGap)
-              : 0;
+              : crossAxisOffset;
             const targetY = designJson.layout.reverse
               ? getReverseItemY(itemBounds, index, listHeight, renderGap)
               : getNormalItemY(itemBounds, index, renderGap);
             const translateX = targetX + visualStyle.x;
-            const translateY = (isHorizontal ? 0 : targetY) + visualStyle.y;
+            const translateY = (isHorizontal ? crossAxisOffset : targetY) + visualStyle.y;
 
             return (
               <div
@@ -135,18 +143,18 @@ export function ChatStyleRenderer({
                 data-exiting={isExiting ? "true" : "false"}
                 style={{
                   position: "absolute",
-                  left: alignRight ? "auto" : 0,
-                  right: alignRight ? 0 : "auto",
+                  left: 0,
+                  right: "auto",
                   top: 0,
-                  width: renderedItemWidth,
-                  height: currentRenderedItemHeight,
-                  minWidth: renderedItemWidth,
-                  minHeight: currentRenderedItemHeight,
-                  maxWidth: renderedItemWidth,
-                  maxHeight: currentRenderedItemHeight,
+                  width: itemWidth,
+                  height: itemHeight,
+                  minWidth: itemWidth,
+                  minHeight: itemHeight,
+                  maxWidth: itemWidth,
+                  maxHeight: itemHeight,
                   overflow: "visible",
                   transform: `translate3d(${translateX}px, ${translateY}px, 0) scale(${visualStyle.scale})`,
-                  transformOrigin: alignRight ? "top right" : "top left",
+                  transformOrigin: getTransformOrigin(listAlign, isHorizontal),
                   opacity: visualStyle.opacity,
                   filter: visualStyle.filter,
                   zIndex: visualStyle.zIndex,
@@ -157,8 +165,8 @@ export function ChatStyleRenderer({
               >
                 <div
                   style={{
-                    width: renderedItemWidth,
-                    height: currentRenderedItemHeight,
+                    width: itemWidth,
+                    height: itemHeight,
                     overflow: "visible",
                     WebkitMaskImage: isExiting ? exitMask : undefined,
                     maskImage: isExiting ? exitMask : undefined,
@@ -334,10 +342,34 @@ function getExitMaskDirection(reverseOrder: boolean, isHorizontal: boolean) {
 
 function getListRenderGap(style: OverlayListStyle, gap: number) {
   if (style === "depth_list") {
-    return Math.max(0, Math.round(gap * 0.25));
+    return Math.round(gap * 0.25);
   }
 
   return gap;
+}
+
+function getCrossAxisOffset(align: OverlayDesignSchema["layout"]["align"], containerSize: number, itemSize: number) {
+  if (align === "center") {
+    return Math.max(0, (containerSize - itemSize) / 2);
+  }
+
+  if (align === "end") {
+    return Math.max(0, containerSize - itemSize);
+  }
+
+  return 0;
+}
+
+function getTransformOrigin(align: OverlayDesignSchema["layout"]["align"], isHorizontal: boolean) {
+  if (align === "center") {
+    return isHorizontal ? "left center" : "center top";
+  }
+
+  if (align === "end") {
+    return isHorizontal ? "left bottom" : "right top";
+  }
+
+  return "top left";
 }
 
 function getListVisualStyle(style: OverlayListStyle, index: number, maxItems: number, alignRight: boolean, isHorizontal: boolean) {
@@ -347,6 +379,17 @@ function getListVisualStyle(style: OverlayListStyle, index: number, maxItems: nu
     x: isHorizontal ? 0 : direction * amount,
     y: isHorizontal ? amount : 0
   });
+
+  if (style === "default") {
+    return {
+      x: 0,
+      y: 0,
+      scale: 1,
+      opacity: 1,
+      filter: undefined,
+      zIndex: maxItems - depth
+    };
+  }
 
   if (style === "layered_list") {
     const offset = axis(depth * 14);

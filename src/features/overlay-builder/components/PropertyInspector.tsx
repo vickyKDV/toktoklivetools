@@ -379,7 +379,7 @@ function LayoutFields({
             max={isLeaderboard ? 50 : 100}
             onChange={(maxItems) => onUpdateDesign({ layout: { ...layout, mode: isLeaderboard ? "list" : layout.mode, maxItems } })}
           />
-          <NumberField label="Gap" value={layout.gap} min={0} max={240} onChange={(gap) => onUpdateDesign({ layout: { ...layout, gap } })} />
+          <NumberField label="Gap" value={layout.gap} min={-240} max={240} onChange={(gap) => onUpdateDesign({ layout: { ...layout, gap } })} />
           {layout.mode === "list" && !isLeaderboard ? (
             <SelectField
               label="Direction"
@@ -469,8 +469,14 @@ function CanvasFields({
         <div className="grid grid-cols-2 gap-3">
           <NumberField label="Width" value={canvas.width} min={120} onChange={(width) => onUpdateCanvas({ width })} />
           <NumberField label="Height" value={canvas.height} min={80} onChange={(height) => onUpdateCanvas({ height })} />
-          <NumberField label="Radius" value={canvas.radius} min={0} onChange={(radius) => onUpdateCanvas({ radius })} />
           <NumberField label="Opacity" value={canvas.background.opacity} min={0} max={100} onChange={(opacity) => onUpdateCanvas({ background: { ...canvas.background, opacity } })} />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <NumberField label="Radius" value={canvas.radius} min={0} max={999} onChange={(radius) => onUpdateCanvas({ radius })} />
+          <NumberField label="Top Left" value={canvas.radiusTopLeft ?? canvas.radius} min={0} max={999} onChange={(radiusTopLeft) => onUpdateCanvas({ radiusTopLeft })} />
+          <NumberField label="Top Right" value={canvas.radiusTopRight ?? canvas.radius} min={0} max={999} onChange={(radiusTopRight) => onUpdateCanvas({ radiusTopRight })} />
+          <NumberField label="Bottom Right" value={canvas.radiusBottomRight ?? canvas.radius} min={0} max={999} onChange={(radiusBottomRight) => onUpdateCanvas({ radiusBottomRight })} />
+          <NumberField label="Bottom Left" value={canvas.radiusBottomLeft ?? canvas.radius} min={0} max={999} onChange={(radiusBottomLeft) => onUpdateCanvas({ radiusBottomLeft })} />
         </div>
         <ColorField label="Background" value={canvas.background.color} onChange={(color) => onUpdateCanvas({ background: { ...canvas.background, type: "solid", color } })} />
       </Section>
@@ -527,6 +533,12 @@ function ComponentVisualFields({
   const border = component.style.border ?? { enabled: false, color: "#ffffff", width: 0 };
   const shadow = component.style.shadow ?? { enabled: false, color: "#00000055", blur: 0, x: 0, y: 0 };
   const animation = normalizeAnimation(component.style.animation);
+  const bubbleTail = {
+    enabled: component.style.bubbleTail?.enabled ?? false,
+    side: component.style.bubbleTail?.side ?? "left",
+    position: component.style.bubbleTail?.position ?? "bottom",
+    size: component.style.bubbleTail?.size ?? 22
+  };
   const updateStyle = (style: Partial<OverlayComponentSchema["style"]>) => onUpdateComponent(component.id, { style: { ...component.style, ...style } });
 
   return (
@@ -610,6 +622,10 @@ function ComponentVisualFields({
           <Section title="Shape">
             <div className="grid grid-cols-2 gap-3">
               <NumberField label="Radius" value={component.style.radius ?? 0} min={0} max={999} onChange={(radius) => updateStyle({ radius })} />
+              <NumberField label="Top Left" value={component.style.radiusTopLeft ?? component.style.radius ?? 0} min={0} max={999} onChange={(radiusTopLeft) => updateStyle({ radiusTopLeft })} />
+              <NumberField label="Top Right" value={component.style.radiusTopRight ?? component.style.radius ?? 0} min={0} max={999} onChange={(radiusTopRight) => updateStyle({ radiusTopRight })} />
+              <NumberField label="Bottom Right" value={component.style.radiusBottomRight ?? component.style.radius ?? 0} min={0} max={999} onChange={(radiusBottomRight) => updateStyle({ radiusBottomRight })} />
+              <NumberField label="Bottom Left" value={component.style.radiusBottomLeft ?? component.style.radius ?? 0} min={0} max={999} onChange={(radiusBottomLeft) => updateStyle({ radiusBottomLeft })} />
               <NumberField label="Opacity" value={component.style.opacity ?? 100} min={0} max={100} onChange={(opacity) => updateStyle({ opacity })} />
               <NumberField label="Blur" value={component.style.blur ?? 0} min={0} max={80} onChange={(blur) => updateStyle({ blur })} />
               <NumberField label="Backdrop Blur" value={component.style.backdropBlur ?? 0} min={0} max={80} onChange={(backdropBlur) => updateStyle({ backdropBlur })} />
@@ -632,6 +648,41 @@ function ComponentVisualFields({
               ]}
               onChange={(objectFit) => updateStyle({ objectFit: objectFit as NonNullable<OverlayComponentSchema["style"]["objectFit"]> })}
             />
+          </Section>
+          <Section title="Bubble Tail">
+            <ToggleField
+              label="Enabled"
+              checked={bubbleTail.enabled}
+              onChange={(enabled) => updateStyle({ bubbleTail: { ...bubbleTail, enabled } })}
+            />
+            <div className="grid grid-cols-2 gap-3">
+              <SelectField
+                label="Side"
+                value={bubbleTail.side}
+                options={[
+                  { label: "Left", value: "left" },
+                  { label: "Right", value: "right" }
+                ]}
+                onChange={(side) => updateStyle({ bubbleTail: { ...bubbleTail, side: side as "left" | "right" } })}
+              />
+              <SelectField
+                label="Position"
+                value={bubbleTail.position}
+                options={[
+                  { label: "Top", value: "top" },
+                  { label: "Center", value: "center" },
+                  { label: "Bottom", value: "bottom" }
+                ]}
+                onChange={(position) => updateStyle({ bubbleTail: { ...bubbleTail, position: position as "top" | "center" | "bottom" } })}
+              />
+              <NumberField
+                label="Size"
+                value={bubbleTail.size}
+                min={4}
+                max={120}
+                onChange={(size) => updateStyle({ bubbleTail: { ...bubbleTail, size } })}
+              />
+            </div>
           </Section>
         </>
       ) : null}
@@ -1004,6 +1055,7 @@ const exitAnimationOptions = [
 ];
 
 const listStyleOptions = [
+  { label: "Default", value: "default" },
   { label: "Stacked Card UI", value: "stacked_card" },
   { label: "Layered List", value: "layered_list" },
   { label: "Card Stack", value: "card_stack" },

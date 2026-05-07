@@ -31,6 +31,8 @@ For production/cloud deployment, keep the HTTP app and realtime runtime as indep
 - Point browsers/widgets to that realtime endpoint with `NEXT_PUBLIC_SOCKET_URL`.
 - Use `TIKTOK_RECONNECT_MAX_ATTEMPTS=0` for unlimited reconnect attempts, or set a positive number to stop after that many retries.
 - Use `TIKTOK_RECONNECT_MAX_DELAY_MS` to cap the reconnect backoff delay.
+- Use `TIKTOK_CONNECTION_MODE=auto` for the default server connector. This project intentionally does not depend on a static TikTok `sessionid` cookie because workspaces can target different live accounts.
+- If TikTok does not offer websocket upgrade for a room, use a browser bridge connector path instead of server-side session-cookie polling.
 
 The client socket uses automatic reconnect with websocket plus polling fallback. The TikTok connection manager also closes cleanly on manual stop or stream end, and retries transient disconnects with backoff.
 

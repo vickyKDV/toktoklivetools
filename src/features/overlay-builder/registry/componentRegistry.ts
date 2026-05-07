@@ -29,6 +29,8 @@ export type ComponentRegistryItem = {
 };
 
 export const componentRegistry: Record<OverlayComponentType, ComponentRegistryItem> = {
+  raw_card: cardItem("raw_card", "Basic White Card", { type: "solid", color: "#ffffff", opacity: 100 }, 500, 120, 18),
+  speech_bubble_card: cardItem("speech_bubble_card", "Speech Bubble Card", { type: "solid", color: "#dcfce7", opacity: 100 }, 500, 120, 28),
   container: cardItem("container", "Card / Container", { type: "solid", color: "#ffffff", opacity: 90 }, 500, 120),
   bubble_card: cardItem("bubble_card", "Bubble Card", { type: "solid", color: "#ffffff", opacity: 92 }, 500, 120, 24),
   glass_card: cardItem("glass_card", "Glass Card", { type: "glass", color: "#ffffff", opacity: 22 }, 500, 120, 24, 16),
@@ -153,6 +155,7 @@ function cardItem(
     defaultProps: { clipContent: true, padding: 16, layout: "free" },
     defaultStyle: {
       background,
+      bubbleTail: type === "speech_bubble_card" ? { enabled: true, side: "left", position: "bottom", size: 22 } : undefined,
       radius,
       opacity: 100,
       overflow: "hidden",

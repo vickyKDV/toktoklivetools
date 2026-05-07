@@ -144,300 +144,409 @@ const leaderboardTemplates: OverlayTemplate[] = [
   })
 ];
 
+const chatBubbleTemplates: OverlayTemplate[] = [
+  createChatBubbleTemplate({
+    id: "chat-cyberpunk-neon",
+    name: "Cyberpunk Neon",
+    description: "Bubble neon futuristik dengan garis cyan-magenta.",
+    cardType: "gradient_card",
+    from: "#061826",
+    to: "#120013",
+    text: "#fdf4ff",
+    nameColor: "#f472d0",
+    badgeColor: "#0891b2",
+    badgeText: "#ecfeff",
+    border: "#22d3ee",
+    glow: "#f0abfc",
+    radius: 12,
+    radiusTopLeft: 24,
+    radiusTopRight: 8,
+    radiusBottomRight: 24,
+    radiusBottomLeft: 8,
+    effect: "rotate_neon"
+  }),
+  createChatBubbleTemplate({
+    id: "chat-modern-glass-card",
+    name: "Modern Glass Card",
+    description: "Glass card premium dengan blur lembut dan border ungu.",
+    cardType: "glass_card",
+    from: "#4c1d95",
+    to: "#111827",
+    text: "#f8fafc",
+    nameColor: "#ffffff",
+    badgeColor: "#7c3aed",
+    badgeText: "#ffffff",
+    border: "#c4b5fd",
+    glow: "#a78bfa",
+    radius: 32,
+    backdropBlur: 18
+  }),
+  createChatBubbleTemplate({
+    id: "chat-whatsapp-style-bubble",
+    name: "Whatsapp Style Bubble",
+    description: "Bubble hijau muda, bersih, dan mudah dibaca.",
+    cardType: "speech_bubble_card",
+    from: "#dcfce7",
+    to: "#bbf7d0",
+    text: "#14532d",
+    nameColor: "#14532d",
+    badgeColor: "#16a34a",
+    badgeText: "#ffffff",
+    border: "#dcfce7",
+    glow: "#86efac",
+    radius: 30,
+    profileSide: "left",
+    darkText: true,
+    bubbleTail: { enabled: true, side: "left", position: "bottom", size: 24 }
+  }),
+  createChatBubbleTemplate({
+    id: "chat-dark-minimal-card",
+    name: "Dark Minimal Card",
+    description: "Card gelap minimal tanpa efek berlebihan.",
+    cardType: "container",
+    from: "#18181b",
+    to: "#27272a",
+    text: "#f4f4f5",
+    nameColor: "#ffffff",
+    badgeColor: "#52525b",
+    badgeText: "#ffffff",
+    border: "#3f3f46",
+    glow: "#000000",
+    radius: 24,
+    shadowOpacity: 20
+  }),
+  createChatBubbleTemplate({
+    id: "chat-gradient-bubble",
+    name: "Gradient Bubble",
+    description: "Bubble gradient pink-biru dengan bentuk rounded besar.",
+    cardType: "gradient_card",
+    from: "#ec4899",
+    to: "#3b82f6",
+    text: "#ffffff",
+    nameColor: "#ffffff",
+    badgeColor: "#ffffff",
+    badgeText: "#7c3aed",
+    border: "#ffffff",
+    glow: "#ec4899",
+    radius: 34,
+    profileSide: "left"
+  }),
+  createChatBubbleTemplate({
+    id: "chat-neumorphism-card",
+    name: "Neumorphism Card",
+    description: "Card putih halus dengan text hitam dan bayangan soft.",
+    cardType: "container",
+    from: "#f8fafc",
+    to: "#e2e8f0",
+    text: "#111827",
+    nameColor: "#111827",
+    badgeColor: "#e5e7eb",
+    badgeText: "#374151",
+    border: "#ffffff",
+    glow: "#cbd5e1",
+    radius: 30,
+    darkText: true
+  }),
+  createChatBubbleTemplate({
+    id: "chat-gaming-hud-style",
+    name: "Gaming HUD Style",
+    description: "HUD gaming dengan aksen orange dan sudut panel tegas.",
+    cardType: "container",
+    from: "#020617",
+    to: "#111827",
+    text: "#f8fafc",
+    nameColor: "#fb923c",
+    badgeColor: "#fb923c",
+    badgeText: "#111827",
+    border: "#fb923c",
+    glow: "#fb923c",
+    radius: 8,
+    radiusTopLeft: 28,
+    radiusBottomRight: 28,
+    effect: "glow"
+  }),
+  createChatBubbleTemplate({
+    id: "chat-paper-card-style",
+    name: "Paper Card Style",
+    description: "Paper card terang, simple, dan nyaman dibaca.",
+    cardType: "container",
+    from: "#fffaf0",
+    to: "#f5efe4",
+    text: "#18181b",
+    nameColor: "#111827",
+    badgeColor: "#e7decf",
+    badgeText: "#57534e",
+    border: "#f5efe4",
+    glow: "#d6d3d1",
+    radius: 10,
+    darkText: true
+  }),
+  createChatBubbleTemplate({
+    id: "chat-glow-bubble",
+    name: "Glow Bubble",
+    description: "Bubble gelap dengan glow cyan di tepi card.",
+    cardType: "glass_card",
+    from: "#082f49",
+    to: "#0f172a",
+    text: "#ecfeff",
+    nameColor: "#f8fafc",
+    badgeColor: "#14b8a6",
+    badgeText: "#ecfeff",
+    border: "#22d3ee",
+    glow: "#22d3ee",
+    radius: 30,
+    effect: "neon",
+    backdropBlur: 8
+  }),
+  createChatBubbleTemplate({
+    id: "chat-liquid-bubble",
+    name: "Liquid Bubble",
+    description: "Bubble organik biru-ungu dengan radius per sisi.",
+    cardType: "gradient_card",
+    from: "#6366f1",
+    to: "#0284c7",
+    text: "#ffffff",
+    nameColor: "#ffffff",
+    badgeColor: "#8b5cf6",
+    badgeText: "#ffffff",
+    border: "#93c5fd",
+    glow: "#60a5fa",
+    radius: 44,
+    radiusTopLeft: 70,
+    radiusTopRight: 42,
+    radiusBottomRight: 72,
+    radiusBottomLeft: 38,
+    effect: "float"
+  }),
+  createChatBubbleTemplate({
+    id: "chat-basic-rounded-white",
+    name: "Basic Rounded White",
+    description: "Theme dasar: card putih rounded, text hitam.",
+    cardType: "container",
+    from: "#ffffff",
+    to: "#ffffff",
+    text: "#111111",
+    nameColor: "#111111",
+    badgeColor: "#e5e7eb",
+    badgeText: "#374151",
+    border: "#e5e7eb",
+    glow: "#000000",
+    radius: 18,
+    darkText: true,
+    shadowOpacity: 16
+  })
+];
+
 export const overlayTemplates: OverlayTemplate[] = [
   ...leaderboardTemplates,
-  {
-    id: "profile-outside-card",
-    name: "Profile Outside Card",
-    description: "Foto profil di luar card, nama dan komentar di dalam card.",
+  ...chatBubbleTemplates
+];
+
+function createChatBubbleTemplate({
+  id,
+  name,
+  description,
+  cardType,
+  from,
+  to,
+  text,
+  nameColor,
+  badgeColor,
+  badgeText,
+  border,
+  glow,
+  radius,
+  radiusTopLeft,
+  radiusTopRight,
+  radiusBottomRight,
+  radiusBottomLeft,
+  effect = "none",
+  backdropBlur = 0,
+  darkText = false,
+  profileSide = "left",
+  shadowOpacity = 30,
+  bubbleTail
+}: {
+  id: string;
+  name: string;
+  description: string;
+  cardType: "container" | "speech_bubble_card" | "bubble_card" | "glass_card" | "gradient_card";
+  from: string;
+  to: string;
+  text: string;
+  nameColor: string;
+  badgeColor: string;
+  badgeText: string;
+  border: string;
+  glow: string;
+  radius: number;
+  radiusTopLeft?: number;
+  radiusTopRight?: number;
+  radiusBottomRight?: number;
+  radiusBottomLeft?: number;
+  effect?: "none" | "pulse" | "glow" | "neon" | "rotate_neon" | "gradient_shift" | "float";
+  backdropBlur?: number;
+  darkText?: boolean;
+  profileSide?: "left" | "right";
+  shadowOpacity?: number;
+  bubbleTail?: { enabled: boolean; side: "left" | "right"; position: "top" | "center" | "bottom"; size: number };
+}): OverlayTemplate {
+  const cardX = 120;
+  const cardY = 242;
+  const cardWidth = 600;
+  const cardHeight = 96;
+  const avatarSize = 64;
+  const avatarX = profileSide === "right" ? cardX + cardWidth - 56 : cardX - 54;
+  const avatarY = cardY + 16;
+  const contentX = profileSide === "right" ? 28 : 72;
+  const usernameX = profileSide === "right" ? 400 : 440;
+  const backgroundType = cardType === "glass_card" ? "glass" : cardType === "gradient_card" ? "gradient" : "solid";
+
+  return {
+    id,
+    name,
+    description,
     schema: {
-      version: 1,
-      name: "Profile Outside Card",
+      version: 2,
+      kind: "CHAT",
+      name,
       canvas: {
         width: 800,
-        height: 600,
+        height: 400,
         background: { type: "transparent", color: "transparent", opacity: 0 },
         radius: 0,
         stroke: { enabled: false, color: "#ffffff", width: 0 },
-        shadow: { enabled: false, color: "#000000", blur: 0, x: 0, y: 0 }
+        shadow: { enabled: false, color: "#000000", blur: 0, x: 0, y: 0 },
+        animation: { type: "none", enabled: false, color: border, color2: to, durationMs: 2400, intensity: 70 }
+      },
+      dataSource: {
+        type: "chat",
+        filters: { chat: true, join: true, like: false, share: false, follow: false, gift: false }
+      },
+      layout: {
+        mode: "list",
+        maxItems: 5,
+        gap: -10,
+        direction: "vertical",
+        reverse: true,
+        align: "start",
+        listStyle: "focus_stack",
+        enterAnimation: "slide-right",
+        exitAnimation: "slide-left",
+        autoCloseMs: 0,
+        animationDurationMs: 620
       },
       components: [
         {
-          id: "profile_1",
-          type: "profile_photo",
-          name: "Foto Profil",
-          x: 24,
-          y: 58,
-          width: 84,
-          height: 84,
-          zIndex: 3,
-          visible: true,
-          locked: false,
-          props: { src: "{{viewer.avatar}}", fallback: "/default-avatar.png" },
-          style: { radius: 999, opacity: 100, border: { enabled: true, color: "#ffffff", width: 4 }, objectFit: "cover" }
-        },
-        {
-          id: "card_1",
-          type: "bubble_card",
-          name: "Comment Card",
-          x: 90,
-          y: 40,
-          width: 600,
-          height: 130,
+          id: `${id}_card`,
+          type: cardType,
+          name: "Chat Bubble Card",
+          x: cardX,
+          y: cardY,
+          width: cardWidth,
+          height: cardHeight,
           zIndex: 1,
           visible: true,
           locked: false,
-          props: { clipContent: true, padding: 16, layout: "free" },
+          props: { clipContent: true, padding: 18, layout: "free" },
           style: {
-            background: { type: "solid", color: "#ffffff", opacity: 92 },
-            radius: 24,
+            background: { type: backgroundType, color: from, from, to, angle: 135, opacity: backgroundType === "glass" ? 42 : 94 },
+            bubbleTail,
+            radius,
+            radiusTopLeft,
+            radiusTopRight,
+            radiusBottomRight,
+            radiusBottomLeft,
             overflow: "hidden",
-            border: { enabled: true, color: "#ff9bb0", width: 2 },
-            shadow: { enabled: true, color: "#000000", opacity: 20, blur: 20, x: 0, y: 8 }
+            border: { enabled: true, color: border, width: darkText ? 1 : 2 },
+            shadow: { enabled: true, color: glow, opacity: shadowOpacity, blur: darkText ? 18 : 24, x: 0, y: 9 },
+            backdropBlur,
+            animation: { type: effect, enabled: effect !== "none", color: border, color2: to, durationMs: 2300, intensity: 56 }
           },
           children: [
             {
-              id: "name_1",
+              id: `${id}_name`,
               type: "viewer_name",
               name: "Nama",
-              x: 42,
-              y: 18,
-              width: 260,
-              height: 28,
-              zIndex: 1,
-              visible: true,
-              locked: false,
-              props: { text: "{{viewer.name}}" },
-              style: { fontSize: 20, fontWeight: 800, color: "#111111", lineHeight: 1.1 }
-            },
-            {
-              id: "comment_1",
-              type: "comment",
-              name: "Komentar",
-              x: 42,
-              y: 52,
-              width: 520,
-              height: 58,
+              x: contentX,
+              y: 16,
+              width: 250,
+              height: 24,
               zIndex: 2,
               visible: true,
               locked: false,
+              props: { text: "{{viewer.name}}" },
+              style: { fontSize: 18, fontWeight: 900, color: nameColor, align: "left", lineHeight: 1.05, textOverflow: "ellipsis" }
+            },
+            {
+              id: `${id}_username`,
+              type: "viewer_username",
+              name: "Username",
+              x: usernameX,
+              y: 17,
+              width: 128,
+              height: 18,
+              zIndex: 3,
+              visible: true,
+              locked: false,
+              props: { text: "{{viewer.username}}" },
+              style: { fontSize: 12, fontWeight: 800, color: text, align: "right", lineHeight: 1, opacity: 78, textOverflow: "ellipsis" }
+            },
+            {
+              id: `${id}_comment`,
+              type: "comment",
+              name: "Komentar",
+              x: contentX,
+              y: 48,
+              width: 470,
+              height: 32,
+              zIndex: 4,
+              visible: true,
+              locked: false,
               props: { text: "{{comment.text}}" },
-              style: { fontSize: 24, fontWeight: 700, color: "#111111", lineHeight: 1.25, overflow: "hidden", textOverflow: "clip", autoFitFontSize: true }
+              style: { fontSize: 18, fontWeight: 800, color: text, align: "left", lineHeight: 1.2, overflow: "hidden", textOverflow: "clip", autoFitFontSize: true }
+            },
+            {
+              id: `${id}_badge`,
+              type: "viewer_badge",
+              name: "Badge",
+              x: 300,
+              y: 14,
+              width: 78,
+              height: 20,
+              zIndex: 5,
+              visible: true,
+              locked: false,
+              props: { text: "{{viewer.badge}}" },
+              style: { backgroundColor: badgeColor, radius: 999, fontSize: 9, fontWeight: 900, color: badgeText, align: "center", lineHeight: 1 }
             }
           ]
-        }
-      ]
-    }
-  },
-  {
-    id: "comment-inside-bubble",
-    name: "Comment Inside Bubble",
-    description: "Profile dan nama di atas, komentar di dalam bubble card.",
-    schema: {
-      version: 1,
-      name: "Comment Inside Bubble",
-      canvas: {
-        width: 800,
-        height: 600,
-        background: { type: "transparent", color: "transparent", opacity: 0 },
-        radius: 0,
-        stroke: { enabled: false, color: "#ffffff", width: 0 },
-        shadow: { enabled: false, color: "#000000", blur: 0, x: 0, y: 0 }
-      },
-      components: [
-        { id: "profile_1", type: "profile_photo", name: "Foto Profil", x: 36, y: 26, width: 56, height: 56, zIndex: 2, visible: true, locked: false, props: { src: "{{viewer.avatar}}", fallback: "/default-avatar.png" }, style: { radius: 999, opacity: 100, objectFit: "cover" } },
-        { id: "name_1", type: "viewer_name", name: "Nama", x: 108, y: 36, width: 280, height: 28, zIndex: 2, visible: true, locked: false, props: { text: "{{viewer.name}}" }, style: { fontSize: 21, fontWeight: 900, color: "#ffffff", lineHeight: 1.1 } },
+        },
         {
-          id: "bubble_1",
-          type: "bubble_card",
-          name: "Bubble Card",
-          x: 84,
-          y: 92,
-          width: 580,
-          height: 104,
-          zIndex: 1,
-          visible: true,
-          locked: false,
-          props: { clipContent: true, padding: 18, layout: "free" },
-          style: { background: { type: "solid", color: "#111827", opacity: 86 }, radius: 28, overflow: "hidden", shadow: { enabled: true, color: "#000000", opacity: 34, blur: 28, x: 0, y: 12 } },
-          children: [
-            { id: "comment_1", type: "comment", name: "Komentar", x: 26, y: 22, width: 528, height: 58, zIndex: 1, visible: true, locked: false, props: { text: "{{comment.text}}" }, style: { fontSize: 25, fontWeight: 700, color: "#ffffff", lineHeight: 1.25, overflow: "hidden", textOverflow: "clip", autoFitFontSize: true } }
-          ]
-        }
-      ]
-    }
-  },
-  {
-    id: "moderator-card",
-    name: "Moderator Card",
-    description: "Badge moderator kecil, nama dan komentar di dalam card.",
-    schema: {
-      version: 1,
-      name: "Moderator Card",
-      canvas: { width: 800, height: 600, background: { type: "transparent", color: "transparent", opacity: 0 }, radius: 0, stroke: { enabled: false, color: "#ffffff", width: 0 }, shadow: { enabled: false, color: "#000000", blur: 0, x: 0, y: 0 } },
-      components: [
-        {
-          id: "card_1",
-          type: "gradient_card",
-          name: "Moderator Card",
-          x: 70,
-          y: 46,
-          width: 630,
-          height: 138,
-          zIndex: 1,
-          visible: true,
-          locked: false,
-          props: { clipContent: true, padding: 18, layout: "free" },
-          style: { background: { type: "gradient", color: "#4d85ff", from: "#1d4ed8", to: "#f43f5e", angle: 135, opacity: 94 }, radius: 22, overflow: "hidden", shadow: { enabled: true, color: "#000000", opacity: 30, blur: 26, x: 0, y: 10 } },
-          children: [
-            { id: "badge_1", type: "viewer_badge", name: "Badge", x: 24, y: 18, width: 122, height: 26, zIndex: 1, visible: true, locked: false, props: { text: "{{viewer.badge}}" }, style: { backgroundColor: "#dc2626", radius: 999, fontSize: 12, fontWeight: 900, color: "#ffffff", align: "center" } },
-            { id: "name_1", type: "viewer_name", name: "Nama", x: 162, y: 18, width: 250, height: 28, zIndex: 2, visible: true, locked: false, props: { text: "{{viewer.name}}" }, style: { fontSize: 21, fontWeight: 900, color: "#ffffff", lineHeight: 1.1 } },
-            { id: "comment_1", type: "comment", name: "Komentar", x: 24, y: 58, width: 580, height: 58, zIndex: 3, visible: true, locked: false, props: { text: "{{comment.text}}" }, style: { fontSize: 25, fontWeight: 800, color: "#ffffff", lineHeight: 1.25, overflow: "hidden", textOverflow: "clip", autoFitFontSize: true } }
-          ]
-        }
-      ]
-    }
-  },
-  {
-    id: "minimal-floating",
-    name: "Minimal Floating",
-    description: "Profile tanpa card, komentar dengan background tipis.",
-    schema: {
-      version: 1,
-      name: "Minimal Floating",
-      canvas: { width: 800, height: 600, background: { type: "transparent", color: "transparent", opacity: 0 }, radius: 0, stroke: { enabled: false, color: "#ffffff", width: 0 }, shadow: { enabled: false, color: "#000000", blur: 0, x: 0, y: 0 } },
-      components: [
-        { id: "profile_1", type: "profile_photo", name: "Foto Profil", x: 28, y: 42, width: 58, height: 58, zIndex: 2, visible: true, locked: false, props: { src: "{{viewer.avatar}}", fallback: "/default-avatar.png" }, style: { radius: 999, opacity: 100, objectFit: "cover" } },
-        {
-          id: "comment_card_1",
-          type: "glass_card",
-          name: "Comment Background",
-          x: 98,
-          y: 36,
-          width: 560,
-          height: 76,
-          zIndex: 1,
-          visible: true,
-          locked: false,
-          props: { clipContent: true, padding: 14, layout: "free" },
-          style: { background: { type: "glass", color: "#000000", opacity: 38 }, radius: 14, backdropBlur: 10, overflow: "hidden" },
-          children: [
-            { id: "comment_1", type: "comment", name: "Komentar", x: 18, y: 17, width: 520, height: 38, zIndex: 1, visible: true, locked: false, props: { text: "{{viewer.name}}: {{comment.text}}" }, style: { fontSize: 22, fontWeight: 700, color: "#ffffff", lineHeight: 1.2, overflow: "hidden", textOverflow: "clip", autoFitFontSize: true } }
-          ]
-        }
-      ]
-    }
-  },
-  moderatorStackTemplate,
-  {
-    id: "soft-bubble",
-    name: "Soft Bubble",
-    description: "Bubble putih lembut untuk chat kasual.",
-    schema: {
-      version: 1,
-      name: "Soft Bubble",
-      canvas: {
-        width: 800,
-        height: 600,
-        background: { type: "solid", color: "#ffffff", opacity: 92 },
-        radius: 30,
-        stroke: { enabled: true, color: "#fecdd3", width: 2 },
-        shadow: { enabled: true, color: "#00000030", blur: 22, x: 0, y: 10 }
-      },
-      components: [
-        {
-          id: "profile_1",
+          id: `${id}_profile`,
           type: "profile_photo",
           name: "Foto Profil",
-          x: 24,
-          y: 38,
-          width: 68,
-          height: 68,
-          zIndex: 1,
+          x: avatarX,
+          y: avatarY,
+          width: avatarSize,
+          height: avatarSize,
+          zIndex: 6,
           visible: true,
           locked: false,
           props: { src: "{{viewer.avatar}}", fallback: "/default-avatar.png" },
-          style: { radius: 999, opacity: 100, border: { enabled: true, color: "#fecdd3", width: 3 }, objectFit: "cover" }
-        },
-        {
-          id: "name_1",
-          type: "viewer_name",
-          name: "Nama",
-          x: 112,
-          y: 30,
-          width: 260,
-          height: 30,
-          zIndex: 2,
-          visible: true,
-          locked: false,
-          props: { text: "{{viewer.name}}" },
-          style: { fontSize: 22, fontWeight: 900, color: "#65a30d", align: "left", lineHeight: 1.1 }
-        },
-        {
-          id: "comment_1",
-          type: "comment",
-          name: "Komentar",
-          x: 112,
-          y: 70,
-          width: 560,
-          height: 68,
-          zIndex: 3,
-          visible: true,
-          locked: false,
-          props: { text: "{{comment.text}}" },
-          style: { fontSize: 26, fontWeight: 800, color: "#18181b", align: "left", lineHeight: 1.2 }
+          style: {
+            radius: 999,
+            opacity: 100,
+            border: { enabled: true, color: border, width: darkText ? 2 : 3 },
+            shadow: { enabled: true, color: glow, opacity: darkText ? 18 : 40, blur: 14, x: 0, y: 0 },
+            objectFit: "cover",
+            animation: { type: "pulse", enabled: false, color: border, color2: to, durationMs: 1800, intensity: 35 }
+          }
         }
       ]
     }
-  },
-  {
-    id: "minimal-line",
-    name: "Minimal Line",
-    description: "Bar chat tipis tanpa avatar untuk canvas kecil.",
-    schema: {
-      version: 1,
-      name: "Minimal Line",
-      canvas: {
-        width: 800,
-        height: 600,
-        background: { type: "solid", color: "#000000", opacity: 64 },
-        radius: 12,
-        stroke: { enabled: false, color: "#ffffff", width: 0 },
-        shadow: { enabled: true, color: "#00000055", blur: 18, x: 0, y: 8 }
-      },
-      components: [
-        {
-          id: "name_1",
-          type: "viewer_name",
-          name: "Nama",
-          x: 22,
-          y: 16,
-          width: 230,
-          height: 24,
-          zIndex: 1,
-          visible: true,
-          locked: false,
-          props: { text: "{{viewer.name}}" },
-          style: { fontSize: 18, fontWeight: 900, color: "#22d3ee", align: "left", lineHeight: 1 }
-        },
-        {
-          id: "comment_1",
-          type: "comment",
-          name: "Komentar",
-          x: 22,
-          y: 46,
-          width: 640,
-          height: 42,
-          zIndex: 2,
-          visible: true,
-          locked: false,
-          props: { text: "{{comment.text}}" },
-          style: { fontSize: 22, fontWeight: 700, color: "#ffffff", align: "left", lineHeight: 1.1 }
-        }
-      ]
-    }
-  }
-];
+  };
+}
 
 function createLeaderboardTemplate({
   id,

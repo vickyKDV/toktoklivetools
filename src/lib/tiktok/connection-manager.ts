@@ -14,6 +14,13 @@ type TikTokConnection = {
   on: (eventName: string, handler: (payload: unknown) => void) => void;
 };
 
+type TikTokConnectionOptions = {
+  processInitialData: boolean;
+  enableExtendedGiftInfo: boolean;
+  enableWebsocketUpgrade: boolean;
+  requestPollingIntervalMs: number;
+};
+
 type ManagedTikTokConnection = {
   workspaceId: string;
   overlayKey: string;
@@ -27,17 +34,24 @@ type ManagedTikTokConnection = {
 
 type ConnectionGlobal = typeof globalThis & {
   __tlaTikTokConnections?: Map<string, ManagedTikTokConnection>;
+  __tlaTikTokEventFingerprints?: Map<string, number>;
 };
 
 const connectionGlobal = globalThis as ConnectionGlobal;
 const activeConnections: Map<string, ManagedTikTokConnection> =
   connectionGlobal.__tlaTikTokConnections ?? new Map<string, ManagedTikTokConnection>();
 connectionGlobal.__tlaTikTokConnections = activeConnections;
+const recentEventFingerprints: Map<string, number> =
+  connectionGlobal.__tlaTikTokEventFingerprints ?? new Map<string, number>();
+connectionGlobal.__tlaTikTokEventFingerprints = recentEventFingerprints;
 
 const eventNames = ["chat", "gift", "like", "social", "member", "subscribe", "roomUser", "streamEnd"];
 const reconnectEventNames = ["disconnected", "disconnect", "error"];
 const maxReconnectAttempts = readNonNegativeInteger(process.env.TIKTOK_RECONNECT_MAX_ATTEMPTS, 0);
 const maxReconnectDelayMs = readNonNegativeInteger(process.env.TIKTOK_RECONNECT_MAX_DELAY_MS, 30_000);
+const tiktokConnectionMode = (process.env.TIKTOK_CONNECTION_MODE ?? "auto").toLowerCase();
+const requestPollingIntervalMs = readNonNegativeInteger(process.env.TIKTOK_REQUEST_POLLING_INTERVAL_MS, 1_000);
+const duplicateEventWindowMs = 30_000;
 
 function readNonNegativeInteger(value: string | undefined, fallback: number) {
   const parsed = Number(value);
@@ -50,9 +64,17 @@ function readNonNegativeInteger(value: string | undefined, fallback: number) {
 }
 
 export async function startTikTokConnection(workspaceId: string) {
-  if (activeConnections.has(workspaceId)) {
+  const existingState = activeConnections.get(workspaceId);
+
+  if (existingState?.connection) {
     return {
       status: "already-running" as const
+    };
+  }
+
+  if (existingState?.connecting) {
+    return {
+      status: "connecting" as const
     };
   }
 
@@ -161,9 +183,9 @@ async function connectManagedTikTokConnection(state: ManagedTikTokConnection, th
 
   try {
     const connector = (await import("tiktok-live-connector")) as {
-      WebcastPushConnection: new (username: string) => TikTokConnection;
+      WebcastPushConnection: new (username: string, options?: TikTokConnectionOptions) => TikTokConnection;
     };
-    const connection = new connector.WebcastPushConnection(state.tiktokUsername);
+    const connection = new connector.WebcastPushConnection(state.tiktokUsername, getTikTokConnectionOptions());
 
     bindTikTokConnectionEvents(state, connection);
     await connection.connect();
@@ -188,10 +210,10 @@ async function connectManagedTikTokConnection(state: ManagedTikTokConnection, th
       }
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unable to connect to TikTok LIVE";
+    const message = formatTikTokConnectionError(error);
 
     if (throwOnFailure) {
-      throw error;
+      throw new Error(message);
     }
 
     await markTikTokConnectionError(state, message);
@@ -199,6 +221,25 @@ async function connectManagedTikTokConnection(state: ManagedTikTokConnection, th
   } finally {
     state.connecting = false;
   }
+}
+
+function getTikTokConnectionOptions(): TikTokConnectionOptions {
+  return {
+    processInitialData: false,
+    enableExtendedGiftInfo: true,
+    enableWebsocketUpgrade: tiktokConnectionMode !== "polling",
+    requestPollingIntervalMs
+  };
+}
+
+function formatTikTokConnectionError(error: unknown) {
+  const message = error instanceof Error ? error.message : "Unable to connect to TikTok LIVE";
+
+  if (/websocket upgrade/i.test(message)) {
+    return `${message}. This server connector cannot use session-cookie polling by design. Use websocket mode when available, or add a browser bridge connector for Social Stream Ninja-style capture.`;
+  }
+
+  return message;
 }
 
 function bindTikTokConnectionEvents(state: ManagedTikTokConnection, connection: TikTokConnection) {
@@ -305,6 +346,11 @@ async function persistAndBroadcastEvent(
   payload: unknown
 ) {
   const mapped = mapTikTokEvent(eventName, payload);
+  const fingerprint = createSourceEventFingerprint(workspaceId, eventName, payload);
+
+  if (fingerprint && isRecentDuplicate(fingerprint)) {
+    return;
+  }
 
   const liveEvent = await prisma.liveEvent.create({
     data: {
@@ -390,4 +436,59 @@ async function persistAndBroadcastEvent(
       });
     }
   }
+}
+
+function isRecentDuplicate(fingerprint: string) {
+  const now = Date.now();
+  const previous = recentEventFingerprints.get(fingerprint);
+
+  for (const [key, timestamp] of recentEventFingerprints) {
+    if (now - timestamp > duplicateEventWindowMs) {
+      recentEventFingerprints.delete(key);
+    }
+  }
+
+  if (previous && now - previous < duplicateEventWindowMs) {
+    return true;
+  }
+
+  recentEventFingerprints.set(fingerprint, now);
+  return false;
+}
+
+function createSourceEventFingerprint(workspaceId: string, eventName: string, payload: unknown) {
+  const sourceEventId = findSourceEventId(payload);
+
+  if (!sourceEventId) {
+    return null;
+  }
+
+  return [workspaceId, eventName, sourceEventId].join("|").toLowerCase();
+}
+
+function findSourceEventId(value: unknown, depth = 0): string | null {
+  if (!value || typeof value !== "object" || depth > 4) {
+    return null;
+  }
+
+  const record = value as Record<string, unknown>;
+  const preferredKeys = ["msgId", "msg_id", "messageId", "message_id", "eventId", "event_id"];
+
+  for (const key of preferredKeys) {
+    const candidate = record[key];
+
+    if ((typeof candidate === "string" || typeof candidate === "number") && String(candidate).trim()) {
+      return String(candidate);
+    }
+  }
+
+  for (const candidate of Object.values(record)) {
+    const found = findSourceEventId(candidate, depth + 1);
+
+    if (found) {
+      return found;
+    }
+  }
+
+  return null;
 }

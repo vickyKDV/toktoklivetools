@@ -45,7 +45,7 @@ export function OverlayRenderer({
         ...style
       }}
     >
-      {renderEffectLayer(designJson.canvas.animation, designJson.canvas.radius, "canvas", "canvas-effect")}
+      {renderEffectLayer(designJson.canvas.animation, getCanvasRadiusStyle(designJson), "canvas", "canvas-effect")}
       {renderComponents(designJson.components, data, getComponentProps, renderEditorOverlay, renderDropIndicator, enableRuntimeLayout, "root")}
       <style dangerouslySetInnerHTML={{ __html: overlayEffectCss }} />
 
@@ -68,14 +68,18 @@ function renderComponents(
   enableRuntimeLayout = true,
   keyPath = "root"
 ) {
+  const occurrenceById = new Map<string, number>();
+
   return [...(components ?? [])]
-    .filter((component) => component.visible)
+    .filter((component) => component.visible && !component.hidden)
     .sort((a, b) => a.zIndex - b.zIndex)
     .map((component, index) => {
       const registryItem = componentRegistry[component.type];
       const props = getComponentProps?.(component) ?? {};
       const runtimeHeight = enableRuntimeLayout ? getRuntimeComponentHeight(component, data) : component.height;
-      const renderKey = `${keyPath}-${index}-${component.id}`;
+      const occurrence = occurrenceById.get(component.id) ?? 0;
+      occurrenceById.set(component.id, occurrence + 1);
+      const renderKey = `${keyPath}-${index}-${occurrence}-${component.id}`;
 
       return (
         <div
@@ -100,7 +104,8 @@ function renderComponents(
             isolation: component.style.animation?.enabled ? "isolate" : undefined
           }}
         >
-          {renderEffectLayer(component.style.animation, component.style.radius, "component", `${renderKey}-effect`)}
+          {renderEffectLayer(component.style.animation, getComponentRadiusStyle(component), "component", `${renderKey}-effect`)}
+          {renderBubbleTail(component, `${renderKey}-tail`)}
           <div
             style={{
               ...getComponentStyle(component),
@@ -108,7 +113,8 @@ function renderComponents(
               width: "100%",
               height: "100%",
               minHeight: component.height,
-              boxSizing: "border-box"
+              boxSizing: "border-box",
+              zIndex: 1
             }}
           >
             {registryItem.render(component, data)}
@@ -145,12 +151,94 @@ function DebugViewport({ width, height }: { width: number; height: number }) {
   );
 }
 
+function renderBubbleTail(component: OverlayComponentSchema, key: string) {
+  const tail = getBubbleTail(component);
+
+  if (!tail?.enabled) {
+    return null;
+  }
+
+  return (
+    <span
+      key={key}
+      aria-hidden="true"
+      data-overlay-bubble-tail="true"
+      style={getBubbleTailStyle(component, tail)}
+    />
+  );
+}
+
+function getBubbleTail(component: OverlayComponentSchema) {
+  const tail = component.style.bubbleTail ?? component.props.bubbleTail;
+
+  if (!tail || typeof tail !== "object") {
+    return null;
+  }
+
+  const tailRecord = tail as {
+    enabled?: unknown;
+    side?: unknown;
+    position?: unknown;
+    size?: unknown;
+  };
+  const side = tailRecord.side === "right" ? "right" : "left";
+  const position =
+    tailRecord.position === "top" || tailRecord.position === "center" || tailRecord.position === "bottom"
+      ? tailRecord.position
+      : "bottom";
+  const parsedSize = Number(tailRecord.size);
+
+  return {
+    enabled: tailRecord.enabled === true,
+    side,
+    position,
+    size: Number.isFinite(parsedSize) ? Math.min(Math.max(parsedSize, 4), 120) : 22
+  };
+}
+
+function getBubbleTailStyle(
+  component: OverlayComponentSchema,
+  tail: NonNullable<ReturnType<typeof getBubbleTail>>
+): CSSProperties {
+  const size = tail.size;
+  const offset = Math.round(size * 0.54);
+  const style: CSSProperties = {
+    position: "absolute",
+    width: size,
+    height: size,
+    ...getBackgroundStyle(component.style.background, component.style.backgroundColor),
+    opacity: component.style.opacity == null ? undefined : component.style.opacity / 100,
+    pointerEvents: "none",
+    zIndex: 0,
+    boxSizing: "border-box"
+  };
+
+  if (tail.side === "left") {
+    style.left = -offset;
+    style.clipPath = "polygon(100% 0, 0 100%, 100% 100%)";
+  } else {
+    style.right = -offset;
+    style.clipPath = "polygon(0 0, 0 100%, 100% 100%)";
+  }
+
+  if (tail.position === "top") {
+    style.top = Math.max(0, Math.round(size * 0.35));
+  } else if (tail.position === "center") {
+    style.top = "50%";
+    style.transform = "translateY(-50%)";
+  } else {
+    style.bottom = Math.max(0, Math.round(size * 0.2));
+  }
+
+  return style;
+}
+
 function getCanvasStyle(design: OverlayDesignSchema): CSSProperties {
   const canvas = design.canvas;
 
   return {
     ...getBackgroundStyle(canvas.background),
-    borderRadius: canvas.radius,
+    ...getCanvasRadiusStyle(design),
     border: canvas.stroke.enabled ? `${canvas.stroke.width}px solid ${canvas.stroke.color}` : undefined,
     boxShadow: canvas.shadow.enabled
       ? `${canvas.shadow.x}px ${canvas.shadow.y}px ${canvas.shadow.blur}px ${canvas.shadow.color}`
@@ -160,7 +248,7 @@ function getCanvasStyle(design: OverlayDesignSchema): CSSProperties {
 
 function renderEffectLayer(
   animation: OverlayComponentSchema["style"]["animation"] | OverlayDesignSchema["canvas"]["animation"] | undefined,
-  radius: number | undefined,
+  radiusStyle: CSSProperties,
   scope: "canvas" | "component",
   key: string
 ) {
@@ -173,7 +261,7 @@ function renderEffectLayer(
       key={key}
       aria-hidden="true"
       data-overlay-effect={animation.type}
-      style={getEffectLayerStyle(animation, radius, scope)}
+      style={getEffectLayerStyle(animation, radiusStyle, scope)}
     />
   );
 }
@@ -188,7 +276,7 @@ function getComponentStyle(component: OverlayComponentSchema): CSSProperties {
 
   return {
     ...getBackgroundStyle(style.background, style.backgroundColor),
-    borderRadius: style.radius,
+    ...getComponentRadiusStyle(component),
     opacity: style.opacity == null ? undefined : style.opacity / 100,
     border,
     boxShadow: shadow,
@@ -205,7 +293,7 @@ function getComponentStyle(component: OverlayComponentSchema): CSSProperties {
 
 function getEffectLayerStyle(
   animation: NonNullable<OverlayComponentSchema["style"]["animation"]>,
-  radius: number | undefined,
+  radiusStyle: CSSProperties,
   scope: "canvas" | "component"
 ): CSSProperties {
   const color = animation.color ?? "#22d3ee";
@@ -217,7 +305,7 @@ function getEffectLayerStyle(
   const base: CSSProperties = {
     position: "absolute",
     inset: scope === "canvas" ? 0 : -borderWidth,
-    borderRadius: radius ?? "inherit",
+    ...radiusStyle,
     pointerEvents: "none",
     zIndex: 2,
     boxSizing: "border-box",
@@ -228,15 +316,17 @@ function getEffectLayerStyle(
   if (animation.type === "rotate_neon") {
     return {
       ...base,
+      "--overlay-effect-angle": "0deg",
       padding: borderWidth,
       backgroundColor: "transparent",
-      backgroundImage: `conic-gradient(from 0deg, transparent 0deg, ${color} 70deg, ${color2} 150deg, transparent 260deg, ${color} 360deg)`,
+      backgroundImage: `conic-gradient(from var(--overlay-effect-angle), transparent 0deg, ${color} 70deg, ${color2} 150deg, transparent 260deg, ${color} 360deg)`,
       WebkitMask: "linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)",
       WebkitMaskComposite: "xor",
       maskComposite: "exclude",
       filter: `drop-shadow(0 0 ${Math.round(glow * 0.75)}px ${color})`,
-      animation: `overlayEffectSpin ${duration} linear infinite`
-    };
+      willChange: "opacity, background-image, filter",
+      animation: `overlayEffectConicSpin ${duration} linear infinite`
+    } as CSSProperties;
   }
 
   if (animation.type === "gradient_shift") {
@@ -289,10 +379,49 @@ function getEffectLayerStyle(
   };
 }
 
+function getCanvasRadiusStyle(design: OverlayDesignSchema): CSSProperties {
+  const canvas = design.canvas;
+
+  return getRadiusStyle({
+    radius: canvas.radius,
+    radiusTopLeft: canvas.radiusTopLeft,
+    radiusTopRight: canvas.radiusTopRight,
+    radiusBottomRight: canvas.radiusBottomRight,
+    radiusBottomLeft: canvas.radiusBottomLeft
+  });
+}
+
+function getComponentRadiusStyle(component: OverlayComponentSchema): CSSProperties {
+  return getRadiusStyle(component.style);
+}
+
+function getRadiusStyle(source: {
+  radius?: number;
+  radiusTopLeft?: number;
+  radiusTopRight?: number;
+  radiusBottomRight?: number;
+  radiusBottomLeft?: number;
+}): CSSProperties {
+  const radius = source.radius;
+
+  return {
+    borderRadius: radius,
+    borderTopLeftRadius: source.radiusTopLeft ?? radius,
+    borderTopRightRadius: source.radiusTopRight ?? radius,
+    borderBottomRightRadius: source.radiusBottomRight ?? radius,
+    borderBottomLeftRadius: source.radiusBottomLeft ?? radius
+  };
+}
+
 const overlayEffectCss = `
-@keyframes overlayEffectSpin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+@property --overlay-effect-angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+@keyframes overlayEffectConicSpin {
+  from { --overlay-effect-angle: 0deg; }
+  to { --overlay-effect-angle: 360deg; }
 }
 @keyframes overlayEffectPulse {
   0%, 100% { opacity: .45; transform: scale(1); filter: saturate(1); }

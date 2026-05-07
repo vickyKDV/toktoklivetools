@@ -21,6 +21,8 @@ type ConnectionPageProps = {
   searchParams?: Promise<{
     error?: string;
     started?: string;
+    connecting?: string;
+    alreadyRunning?: string;
     stopped?: string;
     usernameUpdated?: string;
   }>;
@@ -32,6 +34,7 @@ export default async function ConnectionPage({ params, searchParams }: Connectio
   const query = searchParams ? await searchParams : {};
   const workspace = await getWorkspaceForUser(user.id, workspaceId);
   const status = workspace.connection?.status ?? "IDLE";
+  const isBusy = status === "LIVE" || status === "CONNECTING";
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-6">
@@ -74,7 +77,17 @@ export default async function ConnectionPage({ params, searchParams }: Connectio
           ) : null}
           {query.started ? (
             <div className="rounded-md border border-primary/30 bg-primary/10 px-3 py-2 text-sm text-primary">
-              Connection started.
+              Connection live.
+            </div>
+          ) : null}
+          {query.connecting ? (
+            <div className="rounded-md border border-amber-300/50 bg-amber-100 px-3 py-2 text-sm text-amber-900">
+              Connection request sent. Waiting for TikTok LIVE handshake.
+            </div>
+          ) : null}
+          {query.alreadyRunning ? (
+            <div className="rounded-md border bg-muted px-3 py-2 text-sm text-muted-foreground">
+              Connection process is already running.
             </div>
           ) : null}
           {query.stopped ? (
@@ -109,7 +122,7 @@ export default async function ConnectionPage({ params, searchParams }: Connectio
                   name="intent"
                   value="save"
                   variant="outline"
-                  disabled={status === "LIVE"}
+                  disabled={isBusy}
                   pendingLabel="Saving..."
                 >
                   <Save />
@@ -118,7 +131,7 @@ export default async function ConnectionPage({ params, searchParams }: Connectio
                 <SubmitButton
                   name="intent"
                   value="start"
-                  disabled={status === "LIVE"}
+                  disabled={isBusy}
                   pendingLabel="Connecting..."
                 >
                   <Play />
@@ -152,7 +165,7 @@ export default async function ConnectionPage({ params, searchParams }: Connectio
           <div className="flex flex-wrap gap-2">
             <form action={stopConnectionAction}>
               <input type="hidden" name="workspaceId" value={workspace.id} />
-              <SubmitButton variant="outline" disabled={status !== "LIVE"} pendingLabel="Stopping...">
+              <SubmitButton variant="outline" disabled={status !== "LIVE" && status !== "CONNECTING"} pendingLabel="Stopping...">
                 <CircleStop />
                 Stop Connection
               </SubmitButton>

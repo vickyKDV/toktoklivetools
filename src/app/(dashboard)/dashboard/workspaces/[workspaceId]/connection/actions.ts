@@ -110,14 +110,10 @@ export async function connectionFormAction(formData: FormData) {
     redirect(path(result.workspaceId, "TikTok username is required before connecting"));
   }
 
-  try {
-    await startTikTokConnection(result.workspaceId);
-  } catch (error) {
-    redirect(path(result.workspaceId, error instanceof Error ? error.message : "Unable to start connection"));
-  }
+  const startResult = await startConnectionOrRedirect(result.workspaceId);
 
   revalidatePath(path(result.workspaceId));
-  redirect(path(result.workspaceId, undefined, "started"));
+  redirectToStartResult(result.workspaceId, startResult.status);
 }
 
 export async function startConnectionAction(formData: FormData) {
@@ -130,14 +126,30 @@ export async function startConnectionAction(formData: FormData) {
 
   const workspace = await getWorkspaceForUser(user.id, workspaceId);
 
-  try {
-    await startTikTokConnection(workspace.id);
-  } catch (error) {
-    redirect(path(workspace.id, error instanceof Error ? error.message : "Unable to start connection"));
-  }
+  const startResult = await startConnectionOrRedirect(workspace.id);
 
   revalidatePath(path(workspace.id));
-  redirect(path(workspace.id, undefined, "started"));
+  redirectToStartResult(workspace.id, startResult.status);
+}
+
+async function startConnectionOrRedirect(workspaceId: string) {
+  try {
+    return await startTikTokConnection(workspaceId);
+  } catch (error) {
+    redirect(path(workspaceId, error instanceof Error ? error.message : "Unable to start connection"));
+  }
+}
+
+function redirectToStartResult(workspaceId: string, status: Awaited<ReturnType<typeof startTikTokConnection>>["status"]) {
+  if (status === "started") {
+    redirect(path(workspaceId, undefined, "started"));
+  }
+
+  if (status === "already-running") {
+    redirect(path(workspaceId, undefined, "alreadyRunning"));
+  }
+
+  redirect(path(workspaceId, undefined, "connecting"));
 }
 
 export async function stopConnectionAction(formData: FormData) {

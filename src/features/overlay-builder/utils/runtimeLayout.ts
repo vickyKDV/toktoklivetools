@@ -2,7 +2,7 @@ import type { OverlayComponentSchema, OverlayRenderData } from "@/features/overl
 import { resolveBindings } from "@/features/overlay-builder/utils/resolveBindings";
 
 const wrappingTextTypes = new Set(["comment", "viewer_name", "viewer_username", "viewer_badge", "created_at"]);
-const containerTypes = new Set(["container", "bubble_card", "glass_card", "gradient_card"]);
+const containerTypes = new Set(["raw_card", "speech_bubble_card", "container", "bubble_card", "glass_card", "gradient_card"]);
 
 export function getResolvedComponentText(component: OverlayComponentSchema, data: OverlayRenderData) {
   if (component.type === "gift_text") {

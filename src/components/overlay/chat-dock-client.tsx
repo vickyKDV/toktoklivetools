@@ -37,7 +37,7 @@ export function ChatDockClient({
   workspaceName,
   initialEvents
 }: ChatDockClientProps) {
-  const [events, setEvents] = useState(initialEvents);
+  const [events, setEvents] = useState(() => dedupeDockEvents(initialEvents));
   const [connected, setConnected] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [sentIds, setSentIds] = useState<Set<string>>(() => new Set());
@@ -264,7 +264,39 @@ export function ChatDockClient({
 }
 
 function mergeDockEvent(current: OverlayEventPayload[], event: OverlayEventPayload) {
-  return [event, ...current.filter((item) => item.id !== event.id)].slice(0, 160);
+  const fingerprint = dockEventFingerprint(event);
+
+  return [
+    event,
+    ...current.filter((item) => item.id !== event.id && dockEventFingerprint(item) !== fingerprint)
+  ].slice(0, 160);
+}
+
+function dedupeDockEvents(events: OverlayEventPayload[]) {
+  const seen = new Set<string>();
+  const uniqueEvents: OverlayEventPayload[] = [];
+
+  for (const event of events) {
+    const fingerprint = dockEventFingerprint(event);
+
+    if (seen.has(fingerprint)) {
+      continue;
+    }
+
+    seen.add(fingerprint);
+    uniqueEvents.push(event);
+  }
+
+  return uniqueEvents;
+}
+
+function dockEventFingerprint(event: OverlayEventPayload) {
+  return [
+    event.type,
+    event.username ?? event.displayName ?? "",
+    event.comment ?? "",
+    event.receivedAt.slice(0, 19)
+  ].join("|").toLowerCase();
 }
 
 function isFocusableChat(event: OverlayEventPayload) {

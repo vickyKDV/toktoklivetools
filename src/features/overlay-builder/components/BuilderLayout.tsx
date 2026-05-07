@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { CopyButton } from "@/components/ui/copy-button";
 import { Input } from "@/components/ui/input";
+import { LayerPanel } from "@/components/overlay/editor/LayerPanel";
 import { ComponentLibrary } from "@/features/overlay-builder/components/ComponentLibrary";
 import { CanvasEditor } from "@/features/overlay-builder/components/CanvasEditor";
 import { PropertyInspector } from "@/features/overlay-builder/components/PropertyInspector";
@@ -285,6 +286,25 @@ export function BuilderLayout({
     });
   }
 
+  function updateComponentTransient(id: string, patch: Partial<OverlayComponentSchema>) {
+    setDesignSchema((current) => ({
+      ...current,
+      components: updateComponentInTree(current.components, id, (component) => ({
+        ...component,
+        ...patch,
+        props: patch.props ? { ...component.props, ...patch.props } : component.props,
+        style: patch.style ? { ...component.style, ...patch.style } : component.style
+      }))
+    }));
+    setIsDirty(true);
+  }
+
+  function beginEditorTransform() {
+    setHistory((current) => [...current.slice(-30), designSchema]);
+    setFuture([]);
+    setIsDirty(true);
+  }
+
   function addComponent(type: OverlayComponentType, x?: number, y?: number, parentId: string | null = null) {
     const registryItem = componentRegistry[type];
     const parent = parentId ? findComponent(designSchema.components, parentId) : null;
@@ -304,6 +324,12 @@ export function BuilderLayout({
   }
 
   function deleteComponent(id: string) {
+    const component = findComponent(designSchema.components, id);
+
+    if (component?.locked) {
+      return;
+    }
+
     const result = removeComponentFromTree(designSchema.components, id);
 
     commit({
@@ -316,7 +342,7 @@ export function BuilderLayout({
   function duplicateComponent(id: string) {
     const component = findComponent(designSchema.components, id);
 
-    if (!component) {
+    if (!component || component.locked) {
       return;
     }
 
@@ -388,6 +414,27 @@ export function BuilderLayout({
   function sendToBack(id: string) {
     const minZ = Math.min(0, ...flatComponents.map((component) => component.zIndex));
     updateComponent(id, { zIndex: minZ - 1 });
+  }
+
+  function reorderLayer(sourceId: string, targetId: string) {
+    const ordered = [...flatComponents].sort((a, b) => b.zIndex - a.zIndex);
+    const source = ordered.find((component) => component.id === sourceId);
+    const targetIndex = ordered.findIndex((component) => component.id === targetId);
+
+    if (!source || targetIndex < 0) {
+      return;
+    }
+
+    const withoutSource = ordered.filter((component) => component.id !== sourceId);
+    const nextTargetIndex = withoutSource.findIndex((component) => component.id === targetId);
+    withoutSource.splice(Math.max(0, nextTargetIndex), 0, source);
+
+    const zIndexById = new Map(withoutSource.map((component, index) => [component.id, withoutSource.length - index]));
+
+    commit({
+      ...designSchema,
+      components: applyZIndexMap(designSchema.components, zIndexById)
+    });
   }
 
   function sendTestGift(gift: PopularGiftSample) {
@@ -724,6 +771,25 @@ export function BuilderLayout({
       <div className="grid min-w-0 items-start gap-6 xl:grid-cols-[18rem_minmax(0,1fr)_24rem]">
         <aside className="grid gap-4 xl:sticky xl:top-4">
           <ComponentLibrary onAddComponent={addComponent} onLoadTemplate={loadTemplate} onBlankCanvas={() => startBlankCanvas(true)} overlayKind={overlayKind} />
+          {!isLeaderboardOverlay ? (
+            <LayerPanel
+              components={flatComponents}
+              selectedIds={selectedComponentId ? [selectedComponentId] : []}
+              onSelect={setSelectedComponentId}
+              onToggleVisible={(id) => {
+                const component = findComponent(designSchema.components, id);
+                const visible = Boolean(component?.visible && !component.hidden);
+
+                updateComponent(id, { visible: !visible, hidden: visible });
+              }}
+              onToggleLock={(id) => {
+                const component = findComponent(designSchema.components, id);
+                updateComponent(id, { locked: !component?.locked });
+              }}
+              onDelete={deleteComponent}
+              onReorder={reorderLayer}
+            />
+          ) : null}
           <section className="grid gap-3 rounded-lg border bg-card p-4">
             <p className="text-sm font-semibold">Saved Designs</p>
             {savedDesigns.length ? (
@@ -857,6 +923,15 @@ export function BuilderLayout({
               previewMode={false}
               onSelectComponent={setSelectedComponentId}
               onUpdateComponent={updateComponent}
+              onUpdateComponentTransient={updateComponentTransient}
+              onBeginTransform={beginEditorTransform}
+              onZoomChange={setZoom}
+              onDeleteComponent={deleteComponent}
+              onDuplicateComponent={duplicateComponent}
+              onBringToFront={bringToFront}
+              onSendToBack={sendToBack}
+              onUndo={undo}
+              onRedo={redo}
               onDropComponent={addComponent}
               onReparentComponent={handleReparentFromCanvas}
               onAddComment={() => addComponent("comment")}
@@ -1001,6 +1076,14 @@ function getEnabledEventTypes(schema: OverlayDesignSchema) {
   }
 
   return ["CHAT"];
+}
+
+function applyZIndexMap(components: OverlayComponentSchema[], zIndexById: Map<string, number>): OverlayComponentSchema[] {
+  return components.map((component) => ({
+    ...component,
+    zIndex: zIndexById.get(component.id) ?? component.zIndex,
+    children: applyZIndexMap(component.children ?? [], zIndexById)
+  }));
 }
 
 function appendPreviewItem(current: OverlayRenderData[], next: OverlayRenderData, maxItems: number) {

@@ -1,6 +1,8 @@
 import { z } from "zod";
 
 export const overlayComponentTypes = [
+  "raw_card",
+  "speech_bubble_card",
   "container",
   "bubble_card",
   "glass_card",
@@ -22,7 +24,7 @@ export const overlayKinds = ["CHAT", "GIFT", "LEADERBOARD", "DOCK", "CUSTOM"] as
 export type OverlayKind = (typeof overlayKinds)[number];
 export const overlayLayoutModes = ["single", "list", "ticker", "dock", "grid"] as const;
 export type OverlayLayoutMode = (typeof overlayLayoutModes)[number];
-export const overlayListStyles = ["stacked_card", "layered_list", "card_stack", "focus_stack", "depth_list"] as const;
+export const overlayListStyles = ["default", "stacked_card", "layered_list", "card_stack", "focus_stack", "depth_list"] as const;
 export type OverlayListStyle = (typeof overlayListStyles)[number];
 export type OverlayComponentType = (typeof overlayComponentTypes)[number];
 
@@ -65,9 +67,21 @@ export const overlayAnimationEffectSchema = z.object({
   intensity: z.number().min(0).max(100).default(70)
 });
 
+export const overlayBubbleTailSchema = z.object({
+  enabled: z.boolean().default(false),
+  side: z.enum(["left", "right"]).default("left"),
+  position: z.enum(["top", "center", "bottom"]).default("bottom"),
+  size: z.number().min(4).max(120).default(22)
+});
+
 export const overlayComponentStyleSchema = z.object({
   background: overlayBackgroundSchema.optional(),
+  bubbleTail: overlayBubbleTailSchema.optional(),
   radius: z.number().min(0).max(999).optional(),
+  radiusTopLeft: z.number().min(0).max(999).optional(),
+  radiusTopRight: z.number().min(0).max(999).optional(),
+  radiusBottomRight: z.number().min(0).max(999).optional(),
+  radiusBottomLeft: z.number().min(0).max(999).optional(),
   opacity: z.number().min(0).max(100).optional(),
   border: overlayBorderSchema.optional(),
   shadow: overlayShadowSchema.optional(),
@@ -100,6 +114,7 @@ const overlayComponentBaseSchema = z.object({
   rotation: z.number().min(-360).max(360).default(0).optional(),
   zIndex: z.number().min(-10000).max(10000).default(1),
   visible: z.boolean().default(true),
+  hidden: z.boolean().default(false).optional(),
   locked: z.boolean().default(false),
   props: z.record(z.unknown()).default({}),
   style: overlayComponentStyleSchema.default({})
@@ -118,10 +133,14 @@ export const overlayDesignSchema = z.object({
   kind: z.enum(overlayKinds).default("CUSTOM"),
   name: z.string().min(1).default("Chat Overlay"),
   canvas: z.object({
-    width: z.number().min(120).max(3840).default(1080),
-    height: z.number().min(80).max(2160).default(1920),
+    width: z.number().min(120).max(3840).default(800),
+    height: z.number().min(80).max(2160).default(400),
     background: overlayBackgroundSchema.default({ type: "solid", color: "#4d85ff", opacity: 100 }),
     radius: z.number().min(0).max(999).default(0),
+    radiusTopLeft: z.number().min(0).max(999).optional(),
+    radiusTopRight: z.number().min(0).max(999).optional(),
+    radiusBottomRight: z.number().min(0).max(999).optional(),
+    radiusBottomLeft: z.number().min(0).max(999).optional(),
     stroke: overlayStrokeSchema.default({ enabled: false, color: "#ffffff", width: 0 }),
     shadow: overlayShadowSchema.default({ enabled: false, color: "#00000055", blur: 0, x: 0, y: 0 }),
     animation: overlayAnimationEffectSchema.default({ type: "none", enabled: false, color: "#22d3ee", color2: "#f43f5e", durationMs: 2400, intensity: 70 })
@@ -133,11 +152,11 @@ export const overlayDesignSchema = z.object({
   layout: z.object({
     mode: z.enum(overlayLayoutModes).default("single"),
     maxItems: z.number().min(1).max(100).default(1),
-    gap: z.number().min(0).max(240).default(12),
+    gap: z.number().min(-240).max(240).default(12),
     direction: z.enum(["vertical", "horizontal"]).default("vertical"),
     reverse: z.boolean().default(false),
     align: z.enum(["start", "center", "end", "stretch"]).default("start"),
-    listStyle: z.enum(overlayListStyles).default("stacked_card"),
+    listStyle: z.enum(overlayListStyles).default("default"),
     enterAnimation: z.string().default("fade"),
     exitAnimation: z.string().default("fade"),
     autoCloseMs: z.number().min(0).max(600000).default(0),
@@ -149,7 +168,7 @@ export const overlayDesignSchema = z.object({
     direction: "vertical",
     reverse: false,
     align: "start",
-    listStyle: "stacked_card",
+    listStyle: "default",
     enterAnimation: "fade",
     exitAnimation: "fade",
     autoCloseMs: 0,
@@ -205,8 +224,8 @@ export const blankOverlayDesignSchema: OverlayDesignSchema = {
   kind: "CUSTOM",
   name: "Untitled Overlay",
   canvas: {
-    width: 1080,
-    height: 1920,
+    width: 800,
+    height: 400,
     background: {
       type: "transparent",
       color: "transparent",
@@ -245,7 +264,7 @@ export const blankOverlayDesignSchema: OverlayDesignSchema = {
     direction: "vertical",
     reverse: false,
     align: "start",
-    listStyle: "stacked_card",
+    listStyle: "default",
     enterAnimation: "fade",
     exitAnimation: "fade",
     autoCloseMs: 0,

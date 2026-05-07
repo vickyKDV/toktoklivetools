@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState, type DragEvent, type PointerEvent as ReactPointerEvent } from "react";
-import { OverlayRenderer } from "@/features/overlay-builder/components/OverlayRenderer";
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type DragEvent, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from "react";
+import { OverlaySceneRenderer } from "@/components/overlay/OverlaySceneRenderer";
 import type {
   OverlayComponentSchema,
   OverlayComponentType,
@@ -9,6 +9,7 @@ import type {
   OverlayRenderData
 } from "@/features/overlay-builder/schema/overlaySchema";
 import { isContainerType } from "@/features/overlay-builder/utils/componentTree";
+import { flattenComponents } from "@/features/overlay-builder/utils/componentTree";
 
 type CanvasEditorProps = {
   designSchema: OverlayDesignSchema;
@@ -18,25 +19,61 @@ type CanvasEditorProps = {
   previewMode: boolean;
   onSelectComponent: (id: string | null) => void;
   onUpdateComponent: (id: string, patch: Partial<OverlayComponentSchema>) => void;
+  onUpdateComponentTransient?: (id: string, patch: Partial<OverlayComponentSchema>) => void;
+  onBeginTransform?: () => void;
+  onZoomChange?: (zoom: number) => void;
+  onDeleteComponent?: (id: string) => void;
+  onDuplicateComponent?: (id: string) => void;
+  onBringToFront?: (id: string) => void;
+  onSendToBack?: (id: string) => void;
+  onUndo?: () => void;
+  onRedo?: () => void;
   onDropComponent: (type: OverlayComponentType, x: number, y: number, parentId?: string | null) => void;
   onReparentComponent: (id: string, parentId: string, x: number, y: number) => void;
   onAddComment: () => void;
   onChooseTemplate: () => void;
 };
 
-type Interaction = {
-  kind: "move" | "resize";
-  id: string;
-  startClientX: number;
-  startClientY: number;
-  currentClientX: number;
-  currentClientY: number;
-  startX: number;
-  startY: number;
-  startWidth: number;
-  startHeight: number;
-  scale: number;
+const SNAP_SIZE = 8;
+const MIN_COMPONENT_SIZE = 12;
+const DEBUG_RESIZE = true;
+
+type ResizeHandle = "n" | "s" | "e" | "w" | "nw" | "ne" | "sw" | "se";
+
+type LayoutSnapshot = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
 };
+
+type EditorPointerInteraction = {
+  kind: "move" | "resize";
+  pointerId: number;
+  componentId: string;
+  viewportScale: number;
+  startPointer: {
+    x: number;
+    y: number;
+  };
+  currentPointer: {
+    x: number;
+    y: number;
+  };
+  startLayout: LayoutSnapshot;
+  resizeHandle?: ResizeHandle;
+  latestLayout: LayoutSnapshot;
+};
+
+const resizeHandles: ResizeHandle[] = ["nw", "n", "ne", "w", "e", "sw", "s", "se"];
+
+function getSnapSize(event?: { altKey?: boolean }) {
+  return event?.altKey ? 1 : SNAP_SIZE;
+}
+
+function snapValue(value: number, snapSize = SNAP_SIZE) {
+  return Math.round(value / snapSize) * snapSize;
+}
 
 export function CanvasEditor({
   designSchema,
@@ -46,16 +83,30 @@ export function CanvasEditor({
   previewMode,
   onSelectComponent,
   onUpdateComponent,
+  onUpdateComponentTransient,
+  onBeginTransform,
+  onZoomChange,
+  onDeleteComponent,
+  onDuplicateComponent,
+  onUndo,
+  onRedo,
   onDropComponent,
-  onReparentComponent,
   onAddComment,
   onChooseTemplate
 }: CanvasEditorProps) {
   const areaRef = useRef<HTMLDivElement | null>(null);
-  const interactionRef = useRef<Interaction | null>(null);
+  const canvasRef = useRef<HTMLDivElement | null>(null);
+  const panRef = useRef<{ pointerId: number; x: number; y: number; scrollLeft: number; scrollTop: number } | null>(null);
+  const interactionRef = useRef<EditorPointerInteraction | null>(null);
+  const spacePressedRef = useRef(false);
   const [fitScale, setFitScale] = useState(1);
+  const [interactionScale, setInteractionScale] = useState<number | null>(null);
   const [hoverContainerId, setHoverContainerId] = useState<string | null>(null);
-  const scale = fitScale * zoom;
+  const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>(selectedComponentId ? [selectedComponentId] : []);
+  const [spacePressed, setSpacePressed] = useState(false);
+  const scale = interactionScale ?? fitScale * zoom;
+  const flatComponents = flattenComponents(designSchema.components);
+  const selectedNodes = flatComponents.filter((component) => selectedNodeIds.includes(component.id));
 
   useEffect(() => {
     const area = areaRef.current;
@@ -65,6 +116,10 @@ export function CanvasEditor({
     }
 
     function updateScale() {
+      if (interactionRef.current) {
+        return;
+      }
+
       const width = area?.clientWidth ?? designSchema.canvas.width;
       setFitScale(Math.min(1, Math.max(0.2, (width - 24) / Math.max(1, designSchema.canvas.width))));
     }
@@ -76,102 +131,293 @@ export function CanvasEditor({
     return () => observer.disconnect();
   }, [designSchema.canvas.width]);
 
-  function startMove(event: ReactPointerEvent<HTMLDivElement>, component: OverlayComponentSchema) {
+  useEffect(() => {
+    if (!selectedComponentId) {
+      setSelectedNodeIds([]);
+      return;
+    }
+
+    setSelectedNodeIds((current) => current.includes(selectedComponentId) ? current : [selectedComponentId]);
+  }, [selectedComponentId]);
+
+  const selectNodes = useCallback((ids: string[]) => {
+    const nextIds = [...new Set(ids)].filter((id) => flatComponents.some((component) => component.id === id));
+    setSelectedNodeIds(nextIds);
+    onSelectComponent(nextIds[0] ?? null);
+  }, [flatComponents, onSelectComponent]);
+
+  const clearSelection = useCallback(() => {
+    selectNodes([]);
+  }, [selectNodes]);
+
+  const patchNode = useCallback((id: string, patch: Partial<OverlayComponentSchema>) => {
+    (onUpdateComponentTransient ?? onUpdateComponent)(id, patch);
+  }, [onUpdateComponent, onUpdateComponentTransient]);
+
+  const deleteSelected = useCallback(() => {
+    selectedNodes
+      .filter((node) => !node.locked)
+      .forEach((node) => onDeleteComponent?.(node.id));
+    clearSelection();
+  }, [clearSelection, onDeleteComponent, selectedNodes]);
+
+  const duplicateSelected = useCallback(() => {
+    selectedNodes
+      .filter((node) => !node.locked)
+      .forEach((node) => onDuplicateComponent?.(node.id));
+  }, [onDuplicateComponent, selectedNodes]);
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (previewMode || isEditableTarget(event.target)) {
+        return;
+      }
+
+      if (event.code === "Space") {
+        event.preventDefault();
+        spacePressedRef.current = true;
+        setSpacePressed(true);
+        return;
+      }
+
+      const isMeta = event.metaKey || event.ctrlKey;
+
+      if (isMeta && event.key.toLowerCase() === "z") {
+        event.preventDefault();
+
+        if (event.shiftKey) {
+          onRedo?.();
+        } else {
+          onUndo?.();
+        }
+
+        return;
+      }
+
+      if (event.key === "Escape") {
+        clearSelection();
+        return;
+      }
+
+      if (isMeta && event.key.toLowerCase() === "d") {
+        event.preventDefault();
+        duplicateSelected();
+        return;
+      }
+
+      if (event.key === "Delete" || event.key === "Backspace") {
+        event.preventDefault();
+        deleteSelected();
+        return;
+      }
+
+      const delta = getKeyboardDelta(event);
+
+      if (!delta) {
+        return;
+      }
+
+      event.preventDefault();
+      onBeginTransform?.();
+      selectedNodes.filter((node) => !node.locked).forEach((node) => patchNode(node.id, {
+        x: node.x + delta.x,
+        y: node.y + delta.y
+      }));
+    }
+
+    function handleKeyUp(event: KeyboardEvent) {
+      if (event.code !== "Space") {
+        return;
+      }
+
+      spacePressedRef.current = false;
+      setSpacePressed(false);
+      panRef.current = null;
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keyup", handleKeyUp);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keyup", handleKeyUp);
+    };
+  }, [clearSelection, deleteSelected, duplicateSelected, onBeginTransform, onRedo, onUndo, patchNode, previewMode, selectedNodes]);
+
+  function startMove(event: ReactPointerEvent<HTMLElement>, component: OverlayComponentSchema) {
+    if (previewMode || component.locked || isEditorControlTarget(event.target)) {
+      return;
+    }
+
+    startInteraction(event, component, "move");
+  }
+
+  function startResize(event: ReactPointerEvent<HTMLElement>, component: OverlayComponentSchema, resizeHandle: ResizeHandle) {
     if (previewMode || component.locked) {
       return;
     }
 
+    startInteraction(event, component, "resize", resizeHandle);
+  }
+
+  function startInteraction(
+    event: ReactPointerEvent<HTMLElement>,
+    component: OverlayComponentSchema,
+    kind: EditorPointerInteraction["kind"],
+    resizeHandle?: ResizeHandle
+  ) {
+    const viewportScale = Math.max(scale, 0.001);
+    const startLayout = sanitizeLayoutSnapshot({
+      x: component.x,
+      y: component.y,
+      width: component.width,
+      height: component.height
+    });
+
     event.preventDefault();
     event.stopPropagation();
     event.currentTarget.setPointerCapture(event.pointerId);
-    onSelectComponent(component.id);
+    onBeginTransform?.();
+    setInteractionScale(viewportScale);
     interactionRef.current = {
-      kind: "move",
-      id: component.id,
-      startClientX: event.clientX,
-      startClientY: event.clientY,
-      currentClientX: event.clientX,
-      currentClientY: event.clientY,
-      startX: component.x,
-      startY: component.y,
-      startWidth: component.width,
-      startHeight: component.height,
-      scale
+      kind,
+      pointerId: event.pointerId,
+      componentId: component.id,
+      viewportScale,
+      startPointer: { x: event.clientX, y: event.clientY },
+      currentPointer: { x: event.clientX, y: event.clientY },
+      startLayout,
+      resizeHandle,
+      latestLayout: startLayout
     };
+    logInteraction("start", {
+      viewportScale,
+      startPointer: { x: event.clientX, y: event.clientY },
+      currentPointer: { x: event.clientX, y: event.clientY },
+      rawDelta: { x: 0, y: 0 },
+      sceneDelta: { x: 0, y: 0 },
+      nextLayout: startLayout
+    });
   }
 
   function moveInteraction(event: ReactPointerEvent<HTMLElement>) {
     const interaction = interactionRef.current;
 
-    if (!interaction) {
-      return;
-    }
-
-    const nextHoverContainerId = findContainerAtPoint(event.clientX, event.clientY, interaction.id);
-    setHoverContainerId(nextHoverContainerId);
-    interaction.currentClientX = event.clientX;
-    interaction.currentClientY = event.clientY;
-
-    const deltaX = (event.clientX - interaction.startClientX) / interaction.scale;
-    const deltaY = (event.clientY - interaction.startClientY) / interaction.scale;
-
-    if (interaction.kind === "resize") {
-      onUpdateComponent(interaction.id, {
-        width: Math.max(12, Math.round(interaction.startWidth + deltaX)),
-        height: Math.max(12, Math.round(interaction.startHeight + deltaY))
-      });
-      return;
-    }
-
-    onUpdateComponent(interaction.id, {
-      x: Math.round(interaction.startX + deltaX),
-      y: Math.round(interaction.startY + deltaY)
-    });
-  }
-
-  function stopInteraction() {
-    const interaction = interactionRef.current;
-
-    if (interaction && hoverContainerId) {
-      const rect = getComponentRect(hoverContainerId);
-      const childRect = getComponentRect(interaction.id);
-
-      if (rect && childRect) {
-        onReparentComponent(
-          interaction.id,
-          hoverContainerId,
-          Math.round((childRect.left - rect.left) / scale),
-          Math.round((childRect.top - rect.top) / scale)
-        );
-      }
-    }
-
-    interactionRef.current = null;
-    setHoverContainerId(null);
-  }
-
-  function startResize(event: ReactPointerEvent<HTMLButtonElement>, component: OverlayComponentSchema) {
-    if (component.locked) {
+    if (!interaction || interaction.pointerId !== event.pointerId) {
       return;
     }
 
     event.preventDefault();
     event.stopPropagation();
-    event.currentTarget.setPointerCapture(event.pointerId);
-    onSelectComponent(component.id);
-    interactionRef.current = {
-      kind: "resize",
-      id: component.id,
-      startClientX: event.clientX,
-      startClientY: event.clientY,
-      currentClientX: event.clientX,
-      currentClientY: event.clientY,
-      startX: component.x,
-      startY: component.y,
-      startWidth: component.width,
-      startHeight: component.height,
-      scale
+
+    const rawDelta = {
+      x: event.clientX - interaction.startPointer.x,
+      y: event.clientY - interaction.startPointer.y
     };
+    const sceneDelta = {
+      x: rawDelta.x / interaction.viewportScale,
+      y: rawDelta.y / interaction.viewportScale
+    };
+    const nextLayout = interaction.kind === "resize"
+      ? getResizedLayout(interaction.startLayout, sceneDelta, interaction.resizeHandle ?? "se", event.shiftKey)
+      : sanitizeLayoutSnapshot({
+        ...interaction.startLayout,
+        x: interaction.startLayout.x + sceneDelta.x,
+        y: interaction.startLayout.y + sceneDelta.y
+      });
+
+    interaction.currentPointer = { x: event.clientX, y: event.clientY };
+    interaction.latestLayout = nextLayout;
+    patchNode(interaction.componentId, nextLayout);
+    logInteraction("move", {
+      viewportScale: interaction.viewportScale,
+      startPointer: interaction.startPointer,
+      currentPointer: interaction.currentPointer,
+      rawDelta,
+      sceneDelta,
+      nextLayout
+    });
+  }
+
+  function stopInteraction(event: ReactPointerEvent<HTMLElement>) {
+    const interaction = interactionRef.current;
+
+    if (!interaction || interaction.pointerId !== event.pointerId) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    patchNode(interaction.componentId, interaction.latestLayout);
+
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+
+    logInteraction("end", {
+      viewportScale: interaction.viewportScale,
+      startPointer: interaction.startPointer,
+      currentPointer: interaction.currentPointer,
+      rawDelta: {
+        x: interaction.currentPointer.x - interaction.startPointer.x,
+        y: interaction.currentPointer.y - interaction.startPointer.y
+      },
+      sceneDelta: {
+        x: (interaction.currentPointer.x - interaction.startPointer.x) / interaction.viewportScale,
+        y: (interaction.currentPointer.y - interaction.startPointer.y) / interaction.viewportScale
+      },
+      nextLayout: interaction.latestLayout
+    });
+
+    interactionRef.current = null;
+    setInteractionScale(null);
+  }
+
+  function startPan(event: ReactPointerEvent<HTMLDivElement>) {
+    const area = areaRef.current;
+
+    if (!area || !spacePressedRef.current || previewMode) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    area.setPointerCapture(event.pointerId);
+    panRef.current = {
+      pointerId: event.pointerId,
+      x: event.clientX,
+      y: event.clientY,
+      scrollLeft: area.scrollLeft,
+      scrollTop: area.scrollTop
+    };
+  }
+
+  function movePan(event: ReactPointerEvent<HTMLDivElement>) {
+    const area = areaRef.current;
+    const pan = panRef.current;
+
+    if (!area || !pan || pan.pointerId !== event.pointerId) {
+      return;
+    }
+
+    area.scrollLeft = pan.scrollLeft - (event.clientX - pan.x);
+    area.scrollTop = pan.scrollTop - (event.clientY - pan.y);
+  }
+
+  function stopPan(event: ReactPointerEvent<HTMLDivElement>) {
+    if (panRef.current?.pointerId === event.pointerId) {
+      panRef.current = null;
+    }
+  }
+
+  function handleWheel(event: ReactWheelEvent<HTMLDivElement>) {
+    if (!event.ctrlKey && !event.metaKey) {
+      return;
+    }
+
+    event.preventDefault();
+    const nextZoom = clampZoom(zoom + (event.deltaY > 0 ? -0.05 : 0.05));
+    onZoomChange?.(nextZoom);
   }
 
   function handleDrop(event: DragEvent<HTMLDivElement>) {
@@ -180,18 +426,29 @@ export function CanvasEditor({
     const rect = areaRef.current?.querySelector("[data-canvas-shell]")?.getBoundingClientRect();
     const parentId = findContainerAtPoint(event.clientX, event.clientY, null);
     const parentRect = parentId ? getComponentRect(parentId) : null;
+    const snapSize = getSnapSize(event);
 
     if (!type || !rect) {
       return;
     }
 
     if (parentId && parentRect) {
-      onDropComponent(type, Math.round((event.clientX - parentRect.left) / scale), Math.round((event.clientY - parentRect.top) / scale), parentId);
+      onDropComponent(
+        type,
+        snapValue((event.clientX - parentRect.left) / scale, snapSize),
+        snapValue((event.clientY - parentRect.top) / scale, snapSize),
+        parentId
+      );
       setHoverContainerId(null);
       return;
     }
 
-    onDropComponent(type, Math.round((event.clientX - rect.left) / scale), Math.round((event.clientY - rect.top) / scale), null);
+    onDropComponent(
+      type,
+      snapValue((event.clientX - rect.left) / scale, snapSize),
+      snapValue((event.clientY - rect.top) / scale, snapSize),
+      null
+    );
     setHoverContainerId(null);
   }
 
@@ -230,7 +487,14 @@ export function CanvasEditor({
         setHoverContainerId(findContainerAtPoint(event.clientX, event.clientY, null));
       }}
       onDragLeave={() => setHoverContainerId(null)}
-      className="h-full min-h-[420px] min-w-0 overflow-auto rounded-lg border bg-zinc-950/5 p-8 shadow-inner"
+      onPointerDown={startPan}
+      onPointerMove={movePan}
+      onPointerUp={stopPan}
+      onPointerCancel={stopPan}
+      onWheel={handleWheel}
+      className={`h-full min-h-[420px] min-w-0 overflow-auto rounded-lg border bg-zinc-950/5 p-8 shadow-inner ${
+        spacePressed ? "cursor-grab active:cursor-grabbing" : ""
+      }`}
     >
       <div className="flex min-h-full min-w-0 items-start justify-center">
         <div
@@ -241,7 +505,12 @@ export function CanvasEditor({
           }}
         >
           <div
-            onPointerDown={() => onSelectComponent(null)}
+            ref={canvasRef}
+            onPointerDown={(event) => {
+              if (!spacePressedRef.current && shouldClearSelectionFromPointer(event.target, event.currentTarget)) {
+                clearSelection();
+              }
+            }}
             style={{
               position: "relative",
               width: designSchema.canvas.width,
@@ -250,19 +519,38 @@ export function CanvasEditor({
               transformOrigin: "top left"
             }}
           >
-            <OverlayRenderer
-              designJson={designSchema}
+            <OverlaySceneRenderer
+              schema={designSchema}
               data={data}
               enableRuntimeLayout={previewMode}
+              renderRuntime={false}
               className={previewMode ? undefined : "outline outline-1 outline-primary/50"}
               getComponentProps={(component) => ({
                 role: "button",
                 tabIndex: 0,
-                onPointerDown: (event) => startMove(event, component),
+                "data-node-id": component.id,
+                "data-node-locked": component.locked ? "true" : "false",
+                onPointerDown: (event) => {
+                  if (previewMode) {
+                    return;
+                  }
+
+                  if (event.shiftKey) {
+                    selectNodes(
+                      selectedNodeIds.includes(component.id)
+                        ? selectedNodeIds.filter((id) => id !== component.id)
+                        : [...selectedNodeIds, component.id]
+                    );
+                  } else {
+                    selectNodes([component.id]);
+                  }
+
+                  startMove(event, component);
+                },
                 onPointerMove: moveInteraction,
                 onPointerUp: stopInteraction,
                 onPointerCancel: stopInteraction,
-                className: previewMode ? "" : "select-none"
+                className: previewMode ? "" : `overlay-editor-node select-none ${component.locked ? "cursor-not-allowed" : "cursor-move"}`
               })}
               renderDropIndicator={(component) => (
                 hoverContainerId === component.id ? (
@@ -274,22 +562,27 @@ export function CanvasEditor({
                 ) : null
               )}
               renderEditorOverlay={(component) => {
-                if (previewMode || selectedComponentId !== component.id) {
+                if (previewMode || !selectedNodeIds.includes(component.id)) {
                   return null;
                 }
 
                 return (
                   <>
                     <div className="pointer-events-none absolute inset-0 ring-2 ring-primary ring-offset-2" />
-                    <button
-                      type="button"
-                      aria-label="Resize component"
-                      onPointerDown={(event) => startResize(event, component)}
-                      onPointerMove={moveInteraction}
-                      onPointerUp={stopInteraction}
-                      onPointerCancel={stopInteraction}
-                      className="absolute bottom-[-8px] right-[-8px] z-20 size-4 cursor-nwse-resize rounded-full border border-primary bg-card shadow"
-                    />
+                    {!component.locked ? resizeHandles.map((handle) => (
+                      <button
+                        key={`${component.id}-${handle}`}
+                        type="button"
+                        aria-label={`Resize ${handle}`}
+                        data-editor-resize-handle={handle}
+                        onPointerDown={(event) => startResize(event, component, handle)}
+                        onPointerMove={moveInteraction}
+                        onPointerUp={stopInteraction}
+                        onPointerCancel={stopInteraction}
+                        className="absolute z-[2147483000] size-3 rounded-full border border-primary bg-card shadow"
+                        style={getResizeHandleStyle(handle)}
+                      />
+                    )) : null}
                   </>
                 );
               }}
@@ -328,4 +621,203 @@ export function CanvasEditor({
       </div>
     </div>
   );
+}
+
+function isEditableTarget(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+
+  return Boolean(target.closest("input, textarea, select, [contenteditable='true']"));
+}
+
+function isEditorControlTarget(target: EventTarget | null) {
+  if (!(target instanceof Element)) {
+    return false;
+  }
+
+  const className = String(target.getAttribute("class") ?? "");
+
+  if (className.includes("moveable") || className.includes("selecto")) {
+    return true;
+  }
+
+  return Boolean(
+    target.closest(
+      [
+        "[class*='moveable']",
+        "[class*='selecto']",
+        ".moveable-control-box",
+        ".moveable-control",
+        ".moveable-line",
+        ".moveable-rotation",
+        ".moveable-origin",
+        ".moveable-area",
+        ".selecto-selection",
+        "[data-editor-toolbar='true']"
+      ].join(", ")
+    )
+  );
+}
+
+function shouldClearSelectionFromPointer(target: EventTarget | null, canvasElement: HTMLElement) {
+  if (!(target instanceof Element)) {
+    return false;
+  }
+
+  if (target === canvasElement) {
+    return true;
+  }
+
+  if (isEditorControlTarget(target)) {
+    return false;
+  }
+
+  return !target.closest(".overlay-editor-node, [data-overlay-component-id], [data-editor-toolbar='true']");
+}
+
+function getResizedLayout(
+  startLayout: LayoutSnapshot,
+  sceneDelta: { x: number; y: number },
+  handle: ResizeHandle,
+  lockAspectRatio: boolean
+): LayoutSnapshot {
+  let nextX = startLayout.x;
+  let nextY = startLayout.y;
+  let nextWidth = startLayout.width;
+  let nextHeight = startLayout.height;
+
+  if (handle.includes("e")) {
+    nextWidth = startLayout.width + sceneDelta.x;
+  }
+
+  if (handle.includes("s")) {
+    nextHeight = startLayout.height + sceneDelta.y;
+  }
+
+  if (handle.includes("w")) {
+    nextWidth = startLayout.width - sceneDelta.x;
+    nextX = startLayout.x + sceneDelta.x;
+  }
+
+  if (handle.includes("n")) {
+    nextHeight = startLayout.height - sceneDelta.y;
+    nextY = startLayout.y + sceneDelta.y;
+  }
+
+  if (lockAspectRatio && handle.length === 2) {
+    const aspectRatio = Math.max(0.001, startLayout.width / Math.max(1, startLayout.height));
+    const widthDelta = Math.abs(nextWidth - startLayout.width);
+    const heightDelta = Math.abs(nextHeight - startLayout.height);
+
+    if (widthDelta >= heightDelta) {
+      nextHeight = nextWidth / aspectRatio;
+    } else {
+      nextWidth = nextHeight * aspectRatio;
+    }
+
+    if (handle.includes("w")) {
+      nextX = startLayout.x + startLayout.width - nextWidth;
+    }
+
+    if (handle.includes("n")) {
+      nextY = startLayout.y + startLayout.height - nextHeight;
+    }
+  }
+
+  if (nextWidth < MIN_COMPONENT_SIZE) {
+    if (handle.includes("w")) {
+      nextX = startLayout.x + startLayout.width - MIN_COMPONENT_SIZE;
+    }
+
+    nextWidth = MIN_COMPONENT_SIZE;
+  }
+
+  if (nextHeight < MIN_COMPONENT_SIZE) {
+    if (handle.includes("n")) {
+      nextY = startLayout.y + startLayout.height - MIN_COMPONENT_SIZE;
+    }
+
+    nextHeight = MIN_COMPONENT_SIZE;
+  }
+
+  return sanitizeLayoutSnapshot({
+    x: nextX,
+    y: nextY,
+    width: nextWidth,
+    height: nextHeight
+  });
+}
+
+function sanitizeLayoutSnapshot(layout: LayoutSnapshot): LayoutSnapshot {
+  return {
+    x: safeFinite(layout.x, 0),
+    y: safeFinite(layout.y, 0),
+    width: Math.max(MIN_COMPONENT_SIZE, safeFinite(layout.width, MIN_COMPONENT_SIZE)),
+    height: Math.max(MIN_COMPONENT_SIZE, safeFinite(layout.height, MIN_COMPONENT_SIZE))
+  };
+}
+
+function safeFinite(value: unknown, fallback: number) {
+  const number = Number(value);
+  return Number.isFinite(number) ? Math.round(number) : fallback;
+}
+
+function getResizeHandleStyle(handle: ResizeHandle): CSSProperties {
+  const positions: Record<ResizeHandle, CSSProperties> = {
+    nw: { left: -6, top: -6, cursor: "nwse-resize" },
+    n: { left: "50%", top: -6, transform: "translateX(-50%)", cursor: "ns-resize" },
+    ne: { right: -6, top: -6, cursor: "nesw-resize" },
+    w: { left: -6, top: "50%", transform: "translateY(-50%)", cursor: "ew-resize" },
+    e: { right: -6, top: "50%", transform: "translateY(-50%)", cursor: "ew-resize" },
+    sw: { left: -6, bottom: -6, cursor: "nesw-resize" },
+    s: { left: "50%", bottom: -6, transform: "translateX(-50%)", cursor: "ns-resize" },
+    se: { right: -6, bottom: -6, cursor: "nwse-resize" }
+  };
+
+  return positions[handle];
+}
+
+function logInteraction(
+  phase: "start" | "move" | "end",
+  payload: {
+    viewportScale: number;
+    startPointer: { x: number; y: number };
+    currentPointer: { x: number; y: number };
+    rawDelta: { x: number; y: number };
+    sceneDelta: { x: number; y: number };
+    nextLayout: LayoutSnapshot;
+  }
+) {
+  if (!DEBUG_RESIZE) {
+    return;
+  }
+
+  console.debug(`[overlay-resize:${phase}]`, payload);
+}
+
+function getKeyboardDelta(event: KeyboardEvent) {
+  const step = event.shiftKey ? 10 : 1;
+
+  if (event.key === "ArrowLeft") {
+    return { x: -step, y: 0 };
+  }
+
+  if (event.key === "ArrowRight") {
+    return { x: step, y: 0 };
+  }
+
+  if (event.key === "ArrowUp") {
+    return { x: 0, y: -step };
+  }
+
+  if (event.key === "ArrowDown") {
+    return { x: 0, y: step };
+  }
+
+  return null;
+}
+
+function clampZoom(value: number) {
+  return Math.min(3, Math.max(0.25, Number(value.toFixed(2))));
 }

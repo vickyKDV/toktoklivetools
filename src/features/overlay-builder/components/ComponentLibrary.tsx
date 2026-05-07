@@ -14,6 +14,8 @@ type ComponentLibraryProps = {
 };
 
 const iconMap: Partial<Record<OverlayComponentType, ReactNode>> = {
+  raw_card: <Square className="size-4" />,
+  speech_bubble_card: <MessageSquareText className="size-4" />,
   container: <Square className="size-4" />,
   bubble_card: <Square className="size-4" />,
   glass_card: <Square className="size-4" />,

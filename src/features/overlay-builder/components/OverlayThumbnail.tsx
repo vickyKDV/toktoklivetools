@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { OverlaySceneRenderer } from "@/features/overlay-builder/components/OverlaySceneRenderer";
-import type { OverlayDesignSchema } from "@/features/overlay-builder/schema/overlaySchema";
+import { getSampleChatRenderData } from "@/features/overlay-builder/components/ChatStyleRenderer";
+import { OverlayRenderer } from "@/features/overlay-builder/components/OverlayRenderer";
+import { dummyOverlayData, type OverlayDesignSchema } from "@/features/overlay-builder/schema/overlaySchema";
 
 type OverlayThumbnailProps = {
   schema: OverlayDesignSchema;
@@ -13,6 +14,7 @@ export function OverlayThumbnail({ schema }: OverlayThumbnailProps) {
   const [frame, setFrame] = useState({ width: 320, height: 150 });
   const designWidth = schema.canvas.width;
   const designHeight = schema.canvas.height;
+  const sampleData = schema.layout.mode === "list" ? getSampleChatRenderData(1, getEnabledEventTypes(schema))[0] : dummyOverlayData;
   const padding = 18;
   const scale = Math.min(
     (frame.width - padding * 2) / designWidth,
@@ -67,8 +69,40 @@ export function OverlayThumbnail({ schema }: OverlayThumbnailProps) {
           transformOrigin: "top left"
         }}
       >
-        <OverlaySceneRenderer schema={schema} />
+        <OverlayRenderer designJson={schema} data={sampleData} enableRuntimeLayout={false} />
       </div>
     </div>
   );
+}
+
+function getEnabledEventTypes(schema: OverlayDesignSchema) {
+  const value = schema.dataSource.filters?.eventTypes;
+
+  if (Array.isArray(value)) {
+    return value.filter((item): item is string => typeof item === "string");
+  }
+
+  if (schema.dataSource.type === "gift") {
+    return ["GIFT"];
+  }
+
+  if (schema.dataSource.type === "leaderboard") {
+    const metric = schema.dataSource.filters?.metric;
+
+    if (metric === "like") {
+      return ["LEADERBOARD_LIKE"];
+    }
+
+    if (metric === "share") {
+      return ["LEADERBOARD_SHARE"];
+    }
+
+    if (metric === "chat") {
+      return ["LEADERBOARD_CHAT"];
+    }
+
+    return ["LEADERBOARD_GIFT"];
+  }
+
+  return ["CHAT"];
 }
