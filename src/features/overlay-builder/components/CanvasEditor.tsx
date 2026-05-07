@@ -482,25 +482,14 @@ export function CanvasEditor({
   }
 
   return (
-    <div
-      ref={areaRef}
-      onDrop={handleDrop}
-      onDragOver={(event) => {
-        event.preventDefault();
-        setHoverContainerId(findContainerAtPoint(event.clientX, event.clientY, null));
-      }}
-      onDragLeave={() => setHoverContainerId(null)}
-      onPointerDown={startPan}
-      onPointerMove={movePan}
-      onPointerUp={stopPan}
-      onPointerCancel={stopPan}
-      onWheel={handleWheel}
-      className={`relative h-full min-h-[420px] min-w-0 overflow-auto rounded-lg border bg-zinc-950/5 p-8 shadow-inner ${
-        spacePressed ? "cursor-grab active:cursor-grabbing" : ""
-      }`}
-    >
+    <div className="relative h-full min-h-[420px] min-w-0">
       {!previewMode && selectedNodes[0] ? (
-        <div className="pointer-events-none sticky top-3 z-[2147483001] flex h-0 justify-end">
+        <div
+          className="absolute left-4 top-4 z-[2147483001] pointer-events-auto"
+          data-editor-toolbar-shell="true"
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={(event) => event.stopPropagation()}
+        >
           <EditorNodeToolbar
             component={selectedNodes[0]}
             onUpdateComponent={onUpdateComponent}
@@ -513,7 +502,24 @@ export function CanvasEditor({
           />
         </div>
       ) : null}
-      <div className="flex min-h-full min-w-0 items-start justify-center">
+      <div
+        ref={areaRef}
+        onDrop={handleDrop}
+        onDragOver={(event) => {
+          event.preventDefault();
+          setHoverContainerId(findContainerAtPoint(event.clientX, event.clientY, null));
+        }}
+        onDragLeave={() => setHoverContainerId(null)}
+        onPointerDown={startPan}
+        onPointerMove={movePan}
+        onPointerUp={stopPan}
+        onPointerCancel={stopPan}
+        onWheel={handleWheel}
+        className={`h-full min-h-[420px] min-w-0 overflow-auto rounded-lg border bg-zinc-950/5 p-8 shadow-inner ${
+          spacePressed ? "cursor-grab active:cursor-grabbing" : ""
+        }`}
+      >
+        <div className="flex min-h-full min-w-0 items-start justify-center">
         <div
           data-canvas-shell
           style={{
@@ -635,6 +641,7 @@ export function CanvasEditor({
           </div>
         </div>
       </div>
+      </div>
     </div>
   );
 }
@@ -659,7 +666,9 @@ function EditorNodeToolbar({
   onSendToBack?: (id: string) => void;
 }) {
   const stopEditorToolbarPointer = (event: ReactPointerEvent<HTMLElement>) => {
-    event.preventDefault();
+    event.stopPropagation();
+  };
+  const stopEditorToolbarClick = (event: React.MouseEvent<HTMLElement>) => {
     event.stopPropagation();
   };
   const isLocked = Boolean(component.locked);
@@ -668,7 +677,7 @@ function EditorNodeToolbar({
     <div
       data-editor-toolbar="true"
       onPointerDown={stopEditorToolbarPointer}
-      onPointerDownCapture={stopEditorToolbarPointer}
+      onClick={stopEditorToolbarClick}
       className="pointer-events-auto flex w-fit items-center gap-1 rounded-md border bg-card/95 p-1 shadow-lg backdrop-blur"
     >
       <ToolbarButton label="Send to back" onClick={() => onSendToBack?.(component.id)} disabled={!onSendToBack}>
@@ -728,6 +737,9 @@ function ToolbarButton({
       aria-label={label}
       title={label}
       disabled={disabled}
+      onPointerDown={(event) => {
+        event.stopPropagation();
+      }}
       onClick={(event) => {
         event.preventDefault();
         event.stopPropagation();
@@ -773,6 +785,7 @@ function isEditorControlTarget(target: EventTarget | null) {
         ".moveable-origin",
         ".moveable-area",
         ".selecto-selection",
+        "[data-editor-toolbar-shell='true']",
         "[data-editor-toolbar='true']"
       ].join(", ")
     )
@@ -792,7 +805,7 @@ function shouldClearSelectionFromPointer(target: EventTarget | null, canvasEleme
     return false;
   }
 
-  return !target.closest(".overlay-editor-node, [data-overlay-component-id], [data-editor-toolbar='true']");
+  return !target.closest(".overlay-editor-node, [data-overlay-component-id], [data-editor-toolbar-shell='true'], [data-editor-toolbar='true']");
 }
 
 function getResizeHandleStyle(handle: ResizeHandle): CSSProperties {

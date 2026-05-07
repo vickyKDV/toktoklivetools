@@ -481,24 +481,6 @@ function CanvasFields({
         <ColorField label="Background" value={canvas.background.color} onChange={(color) => onUpdateCanvas({ background: { ...canvas.background, type: "solid", color } })} />
       </Section>
       ) : null}
-      {group === "advanced" || group === "all" ? (
-      <>
-      <Section title="Canvas Stroke">
-        <ToggleField label="Enabled" checked={canvas.stroke.enabled} onChange={(enabled) => onUpdateCanvas({ stroke: { ...canvas.stroke, enabled } })} />
-        <ColorField label="Color" value={canvas.stroke.color} onChange={(color) => onUpdateCanvas({ stroke: { ...canvas.stroke, color } })} />
-        <NumberField label="Width" value={canvas.stroke.width} min={0} onChange={(width) => onUpdateCanvas({ stroke: { ...canvas.stroke, width } })} />
-      </Section>
-      <Section title="Canvas Shadow">
-        <ToggleField label="Enabled" checked={canvas.shadow.enabled} onChange={(enabled) => onUpdateCanvas({ shadow: { ...canvas.shadow, enabled } })} />
-        <ColorField label="Color" value={canvas.shadow.color} onChange={(color) => onUpdateCanvas({ shadow: { ...canvas.shadow, color } })} />
-        <div className="grid grid-cols-3 gap-3">
-          <NumberField label="Blur" value={canvas.shadow.blur} min={0} onChange={(blur) => onUpdateCanvas({ shadow: { ...canvas.shadow, blur } })} />
-          <NumberField label="X" value={canvas.shadow.x} onChange={(x) => onUpdateCanvas({ shadow: { ...canvas.shadow, x } })} />
-          <NumberField label="Y" value={canvas.shadow.y} onChange={(y) => onUpdateCanvas({ shadow: { ...canvas.shadow, y } })} />
-        </div>
-      </Section>
-      </>
-      ) : null}
       {group === "animation" || group === "all" ? (
       <Section title="Canvas Animation">
         <ToggleField label="Enabled" checked={animation.enabled} onChange={(enabled) => onUpdateCanvas({ animation: { ...animation, enabled } })} />
@@ -515,6 +497,24 @@ function CanvasFields({
           <NumberField label="Intensity" value={animation.intensity} min={0} max={100} onChange={(intensity) => onUpdateCanvas({ animation: { ...animation, intensity } })} />
         </div>
       </Section>
+      ) : null}
+      {group === "appearance" || group === "all" ? (
+      <>
+      <Section title="Canvas Stroke">
+        <ToggleField label="Enabled" checked={canvas.stroke.enabled} onChange={(enabled) => onUpdateCanvas({ stroke: { ...canvas.stroke, enabled } })} />
+        <ColorField label="Color" value={canvas.stroke.color} onChange={(color) => onUpdateCanvas({ stroke: { ...canvas.stroke, color } })} />
+        <NumberField label="Width" value={canvas.stroke.width} min={0} onChange={(width) => onUpdateCanvas({ stroke: { ...canvas.stroke, width } })} />
+      </Section>
+      <Section title="Canvas Shadow">
+        <ToggleField label="Enabled" checked={canvas.shadow.enabled} onChange={(enabled) => onUpdateCanvas({ shadow: { ...canvas.shadow, enabled } })} />
+        <ColorField label="Color" value={canvas.shadow.color} onChange={(color) => onUpdateCanvas({ shadow: { ...canvas.shadow, color } })} />
+        <div className="grid grid-cols-3 gap-3">
+          <NumberField label="Blur" value={canvas.shadow.blur} min={0} onChange={(blur) => onUpdateCanvas({ shadow: { ...canvas.shadow, blur } })} />
+          <NumberField label="X" value={canvas.shadow.x} onChange={(x) => onUpdateCanvas({ shadow: { ...canvas.shadow, x } })} />
+          <NumberField label="Y" value={canvas.shadow.y} onChange={(y) => onUpdateCanvas({ shadow: { ...canvas.shadow, y } })} />
+        </div>
+      </Section>
+      </>
       ) : null}
     </>
   );
@@ -687,7 +687,7 @@ function ComponentVisualFields({
         </>
       ) : null}
 
-      {group === "advanced" || group === "all" ? (
+      {group === "appearance" || group === "all" ? (
         <>
           <Section title="Border">
         <ToggleField
