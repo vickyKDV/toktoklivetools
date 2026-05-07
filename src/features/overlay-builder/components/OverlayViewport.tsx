@@ -11,11 +11,25 @@ type OverlayViewportProps = {
   debug?: boolean;
   transparent?: boolean;
   fit?: "contain" | "none";
+  verticalAnchor?: "top" | "center" | "bottom";
 };
 
-export function OverlayViewport({ schema, children, debug = false, transparent = true, fit = "contain" }: OverlayViewportProps) {
+export function OverlayViewport({
+  schema,
+  children,
+  debug = false,
+  transparent = true,
+  fit = "contain",
+  verticalAnchor = "center"
+}: OverlayViewportProps) {
   return (
-    <SceneViewport scene={migrateOverlayDesignToScene(schema)} debug={debug} transparent={transparent} fit={fit}>
+    <SceneViewport
+      scene={migrateOverlayDesignToScene(schema)}
+      debug={debug}
+      transparent={transparent}
+      fit={fit}
+      verticalAnchor={verticalAnchor}
+    >
       {children}
     </SceneViewport>
   );

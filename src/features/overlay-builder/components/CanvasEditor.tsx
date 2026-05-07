@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type CSSProperties, type DragEvent, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from "react";
+import { ArrowDown, ArrowUp, ChevronsDown, ChevronsUp, Copy, Eye, EyeOff, Lock, Trash2, Unlock } from "lucide-react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type DragEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type WheelEvent as ReactWheelEvent } from "react";
 import { OverlaySceneRenderer } from "@/components/overlay/OverlaySceneRenderer";
 import type {
   OverlayComponentSchema,
@@ -32,6 +33,8 @@ type CanvasEditorProps = {
   onZoomChange?: (zoom: number) => void;
   onDeleteComponent?: (id: string) => void;
   onDuplicateComponent?: (id: string) => void;
+  onBringForward?: (id: string) => void;
+  onSendBackward?: (id: string) => void;
   onBringToFront?: (id: string) => void;
   onSendToBack?: (id: string) => void;
   onUndo?: () => void;
@@ -86,6 +89,10 @@ export function CanvasEditor({
   onZoomChange,
   onDeleteComponent,
   onDuplicateComponent,
+  onBringForward,
+  onSendBackward,
+  onBringToFront,
+  onSendToBack,
   onUndo,
   onRedo,
   onDropComponent,
@@ -488,10 +495,24 @@ export function CanvasEditor({
       onPointerUp={stopPan}
       onPointerCancel={stopPan}
       onWheel={handleWheel}
-      className={`h-full min-h-[420px] min-w-0 overflow-auto rounded-lg border bg-zinc-950/5 p-8 shadow-inner ${
+      className={`relative h-full min-h-[420px] min-w-0 overflow-auto rounded-lg border bg-zinc-950/5 p-8 shadow-inner ${
         spacePressed ? "cursor-grab active:cursor-grabbing" : ""
       }`}
     >
+      {!previewMode && selectedNodes[0] ? (
+        <div className="pointer-events-none sticky top-3 z-[2147483001] flex h-0 justify-end">
+          <EditorNodeToolbar
+            component={selectedNodes[0]}
+            onUpdateComponent={onUpdateComponent}
+            onDeleteComponent={onDeleteComponent}
+            onDuplicateComponent={onDuplicateComponent}
+            onBringForward={onBringForward}
+            onSendBackward={onSendBackward}
+            onBringToFront={onBringToFront}
+            onSendToBack={onSendToBack}
+          />
+        </div>
+      ) : null}
       <div className="flex min-h-full min-w-0 items-start justify-center">
         <div
           data-canvas-shell
@@ -520,7 +541,6 @@ export function CanvasEditor({
               data={data}
               enableRuntimeLayout={previewMode}
               renderRuntime={false}
-              className={previewMode ? undefined : "outline outline-1 outline-primary/50"}
               getComponentProps={(component) => ({
                 role: "button",
                 tabIndex: 0,
@@ -616,6 +636,109 @@ export function CanvasEditor({
         </div>
       </div>
     </div>
+  );
+}
+
+function EditorNodeToolbar({
+  component,
+  onUpdateComponent,
+  onDeleteComponent,
+  onDuplicateComponent,
+  onBringForward,
+  onSendBackward,
+  onBringToFront,
+  onSendToBack
+}: {
+  component: OverlayComponentSchema;
+  onUpdateComponent: (id: string, patch: Partial<OverlayComponentSchema>) => void;
+  onDeleteComponent?: (id: string) => void;
+  onDuplicateComponent?: (id: string) => void;
+  onBringForward?: (id: string) => void;
+  onSendBackward?: (id: string) => void;
+  onBringToFront?: (id: string) => void;
+  onSendToBack?: (id: string) => void;
+}) {
+  const stopEditorToolbarPointer = (event: ReactPointerEvent<HTMLElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+  };
+  const isLocked = Boolean(component.locked);
+
+  return (
+    <div
+      data-editor-toolbar="true"
+      onPointerDown={stopEditorToolbarPointer}
+      onPointerDownCapture={stopEditorToolbarPointer}
+      className="pointer-events-auto flex w-fit items-center gap-1 rounded-md border bg-card/95 p-1 shadow-lg backdrop-blur"
+    >
+      <ToolbarButton label="Send to back" onClick={() => onSendToBack?.(component.id)} disabled={!onSendToBack}>
+        <ChevronsDown />
+      </ToolbarButton>
+      <ToolbarButton label="Send backward" onClick={() => onSendBackward?.(component.id)} disabled={!onSendBackward}>
+        <ArrowDown />
+      </ToolbarButton>
+      <ToolbarButton label="Bring forward" onClick={() => onBringForward?.(component.id)} disabled={!onBringForward}>
+        <ArrowUp />
+      </ToolbarButton>
+      <ToolbarButton label="Bring to front" onClick={() => onBringToFront?.(component.id)} disabled={!onBringToFront}>
+        <ChevronsUp />
+      </ToolbarButton>
+      <span className="mx-0.5 h-5 w-px bg-border" />
+      <ToolbarButton label="Duplicate" onClick={() => onDuplicateComponent?.(component.id)} disabled={isLocked || !onDuplicateComponent}>
+        <Copy />
+      </ToolbarButton>
+      <ToolbarButton
+        label={component.visible && !component.hidden ? "Hide" : "Show"}
+        onClick={() => onUpdateComponent(component.id, {
+          visible: !(component.visible && !component.hidden),
+          hidden: component.visible && !component.hidden
+        })}
+      >
+        {component.visible && !component.hidden ? <EyeOff /> : <Eye />}
+      </ToolbarButton>
+      <ToolbarButton
+        label={isLocked ? "Unlock" : "Lock"}
+        onClick={() => onUpdateComponent(component.id, { locked: !isLocked })}
+      >
+        {isLocked ? <Unlock /> : <Lock />}
+      </ToolbarButton>
+      <ToolbarButton label="Delete" destructive onClick={() => onDeleteComponent?.(component.id)} disabled={isLocked || !onDeleteComponent}>
+        <Trash2 />
+      </ToolbarButton>
+    </div>
+  );
+}
+
+function ToolbarButton({
+  label,
+  children,
+  onClick,
+  disabled = false,
+  destructive = false
+}: {
+  label: string;
+  children: ReactNode;
+  onClick: () => void;
+  disabled?: boolean;
+  destructive?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      disabled={disabled}
+      onClick={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        onClick();
+      }}
+      className={`grid size-7 place-items-center rounded border text-muted-foreground transition-colors disabled:pointer-events-none disabled:opacity-40 [&_svg]:size-3.5 ${
+        destructive ? "hover:border-destructive hover:bg-destructive hover:text-destructive-foreground" : "hover:bg-muted hover:text-foreground"
+      }`}
+    >
+      {children}
+    </button>
   );
 }
 

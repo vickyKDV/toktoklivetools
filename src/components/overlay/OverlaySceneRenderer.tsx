@@ -39,6 +39,7 @@ type OverlaySceneRendererProps = {
 type OverlayViewportSceneRendererProps = Omit<OverlaySceneRendererProps, "scale" | "className" | "style"> & {
   transparent?: boolean;
   fit?: "contain" | "none";
+  verticalAnchor?: "top" | "center" | "bottom";
 };
 
 export const OverlaySceneRenderer = memo(function OverlaySceneRenderer({
@@ -60,7 +61,16 @@ export const OverlaySceneRenderer = memo(function OverlaySceneRenderer({
   const normalizedScene = useMemo(() => normalizeSceneSchema(sceneInput ?? schema), [sceneInput, schema]);
   const legacyDesign = useMemo(() => migrateSceneToOverlayDesign(normalizedScene), [normalizedScene]);
   const isList = renderRuntime && isListSchema(legacyDesign);
-  const runtimeCanvas = useMemo(() => getRuntimeCanvasSize(legacyDesign), [legacyDesign]);
+  const runtimeCanvas = useMemo(() => {
+    if (!renderRuntime) {
+      return {
+        width: normalizedScene.canvas.width,
+        height: normalizedScene.canvas.height
+      };
+    }
+
+    return getRuntimeCanvasSize(legacyDesign);
+  }, [legacyDesign, normalizedScene.canvas.height, normalizedScene.canvas.width, renderRuntime]);
   const renderItems = useMemo(
     () => isList ? items ?? getSampleChatRenderData(legacyDesign.layout.maxItems, getEnabledEventTypes(legacyDesign)) : undefined,
     [isList, items, legacyDesign]
@@ -157,13 +167,21 @@ export function OverlayViewportSceneRenderer({
   items,
   debug = false,
   transparent = true,
-  fit = "contain"
+  fit = "contain",
+  verticalAnchor
 }: OverlayViewportSceneRendererProps) {
   const normalizedScene = normalizeSceneSchema(scene ?? schema);
   const legacyDesign = migrateSceneToOverlayDesign(normalizedScene);
+  const runtimeAnchor = verticalAnchor ?? getRuntimeVerticalAnchor(legacyDesign);
 
   return (
-    <SceneViewport scene={{ ...normalizedScene, canvas: { ...normalizedScene.canvas, ...getRuntimeCanvasSize(legacyDesign) } }} debug={debug} transparent={transparent} fit={fit}>
+    <SceneViewport
+      scene={{ ...normalizedScene, canvas: { ...normalizedScene.canvas, ...getRuntimeCanvasSize(legacyDesign) } }}
+      debug={debug}
+      transparent={transparent}
+      fit={fit}
+      verticalAnchor={runtimeAnchor}
+    >
       <OverlaySceneRenderer scene={normalizedScene} data={data} items={items} debug={debug} />
     </SceneViewport>
   );
@@ -203,6 +221,14 @@ function getEnabledEventTypes(schema: OverlayDesignSchema) {
   }
 
   return ["CHAT"];
+}
+
+function getRuntimeVerticalAnchor(schema: OverlayDesignSchema): "top" | "center" | "bottom" {
+  if (isListSchema(schema) && schema.layout.direction !== "horizontal") {
+    return schema.layout.reverse ? "bottom" : "top";
+  }
+
+  return "center";
 }
 
 function findSceneElement(elements: OverlaySceneSchema["elements"], id: string): OverlaySceneSchema["elements"][number] | null {

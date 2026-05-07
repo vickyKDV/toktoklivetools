@@ -9,9 +9,17 @@ type SceneViewportProps = {
   debug?: boolean;
   transparent?: boolean;
   fit?: "contain" | "none";
+  verticalAnchor?: "top" | "center" | "bottom";
 };
 
-export function SceneViewport({ scene, children, debug = false, transparent = true, fit = "contain" }: SceneViewportProps) {
+export function SceneViewport({
+  scene,
+  children,
+  debug = false,
+  transparent = true,
+  fit = "contain",
+  verticalAnchor = "center"
+}: SceneViewportProps) {
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const [viewport, setViewport] = useState({ width: scene.canvas.width, height: scene.canvas.height });
   const scale = fit === "none"
@@ -20,7 +28,7 @@ export function SceneViewport({ scene, children, debug = false, transparent = tr
   const scaledWidth = scene.canvas.width * scale;
   const scaledHeight = scene.canvas.height * scale;
   const offsetX = (viewport.width - scaledWidth) / 2;
-  const offsetY = (viewport.height - scaledHeight) / 2;
+  const offsetY = getVerticalOffset(viewport.height, scaledHeight, verticalAnchor);
 
   useEffect(() => {
     function updateViewport() {
@@ -63,9 +71,10 @@ export function SceneViewport({ scene, children, debug = false, transparent = tr
       scaledWidth,
       scaledHeight,
       viewportRatio: viewport.width / viewport.height,
-      designRatio: scene.canvas.width / scene.canvas.height
+      designRatio: scene.canvas.width / scene.canvas.height,
+      verticalAnchor
     });
-  }, [debug, scale, scaledHeight, scaledWidth, scene.canvas.height, scene.canvas.width, viewport.height, viewport.width]);
+  }, [debug, scale, scaledHeight, scaledWidth, scene.canvas.height, scene.canvas.width, verticalAnchor, viewport.height, viewport.width]);
 
   const transform = useMemo(() => {
     if (fit === "none") {
@@ -106,4 +115,16 @@ export function SceneViewport({ scene, children, debug = false, transparent = tr
       </div>
     </div>
   );
+}
+
+function getVerticalOffset(viewportHeight: number, scaledHeight: number, anchor: SceneViewportProps["verticalAnchor"]) {
+  if (anchor === "top") {
+    return 0;
+  }
+
+  if (anchor === "bottom") {
+    return viewportHeight - scaledHeight;
+  }
+
+  return (viewportHeight - scaledHeight) / 2;
 }

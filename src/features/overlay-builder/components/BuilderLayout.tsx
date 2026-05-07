@@ -199,6 +199,21 @@ export function BuilderLayout({
     () => getSampleChatRenderData(designSchema.layout.maxItems, getEnabledEventTypes(designSchema)),
     [designSchema]
   );
+  const previewRenderItems = useMemo(() => {
+    if (!isListPreview) {
+      return undefined;
+    }
+
+    if (previewDataMode === "live") {
+      return previewItems;
+    }
+
+    if (previewDataMode === "sample") {
+      return previewSampleItems;
+    }
+
+    return padPreviewItems(previewItems, previewSampleItems, designSchema.layout.maxItems);
+  }, [designSchema.layout.maxItems, isListPreview, previewDataMode, previewItems, previewSampleItems]);
   const isGiftOverlay = overlayKind === "GIFT" || designSchema.kind === "GIFT" || designSchema.dataSource.type === "gift";
   const isLeaderboardOverlay = overlayKind === "LEADERBOARD" || designSchema.kind === "LEADERBOARD" || designSchema.dataSource.type === "leaderboard";
   const listExitDurationMs = Math.max(designSchema.layout.animationDurationMs ?? 620, 720);
@@ -346,18 +361,21 @@ export function BuilderLayout({
       return;
     }
 
+    const parentId = findParentId(designSchema.components, id);
+    const parent = parentId ? findComponent(designSchema.components, parentId) : null;
+    const siblings = parentId ? parent?.children ?? [] : designSchema.components;
     const duplicate = {
       ...structuredClone(component),
       id: `${component.type}_${Date.now()}`,
       name: `${component.name} Copy`,
       x: component.x + 16,
       y: component.y + 16,
-      zIndex: Math.max(...designSchema.components.map((item) => item.zIndex), 0) + 1
+      zIndex: Math.max(...siblings.map((item) => item.zIndex), 0) + 1
     };
 
     commit({
       ...designSchema,
-      components: appendComponentToParent(designSchema.components, findParentId(designSchema.components, id), duplicate)
+      components: appendComponentToParent(designSchema.components, parentId, duplicate)
     });
     setSelectedComponentId(duplicate.id);
   }
@@ -407,13 +425,52 @@ export function BuilderLayout({
   }
 
   function bringToFront(id: string) {
-    const maxZ = Math.max(0, ...flatComponents.map((component) => component.zIndex));
-    updateComponent(id, { zIndex: maxZ + 1 });
+    updateZIndexOrder(id, "front");
   }
 
   function sendToBack(id: string) {
-    const minZ = Math.min(0, ...flatComponents.map((component) => component.zIndex));
-    updateComponent(id, { zIndex: minZ - 1 });
+    updateZIndexOrder(id, "back");
+  }
+
+  function bringForward(id: string) {
+    updateZIndexOrder(id, "forward");
+  }
+
+  function sendBackward(id: string) {
+    updateZIndexOrder(id, "backward");
+  }
+
+  function updateZIndexOrder(id: string, action: "front" | "back" | "forward" | "backward") {
+    const parentId = findParentId(designSchema.components, id);
+    const parent = parentId ? findComponent(designSchema.components, parentId) : null;
+    const siblings = parentId ? parent?.children ?? [] : designSchema.components;
+    const ordered = siblings
+      .map((component, index) => ({ component, index }))
+      .sort((a, b) => a.component.zIndex - b.component.zIndex || a.index - b.index);
+    const currentIndex = ordered.findIndex((item) => item.component.id === id);
+
+    if (currentIndex < 0) {
+      return;
+    }
+
+    const [current] = ordered.splice(currentIndex, 1);
+
+    if (action === "front") {
+      ordered.push(current);
+    } else if (action === "back") {
+      ordered.unshift(current);
+    } else if (action === "forward") {
+      ordered.splice(Math.min(currentIndex + 1, ordered.length), 0, current);
+    } else {
+      ordered.splice(Math.max(currentIndex - 1, 0), 0, current);
+    }
+
+    const zIndexById = new Map(ordered.map((item, index) => [item.component.id, index + 1]));
+
+    commit({
+      ...designSchema,
+      components: applyZIndexMap(designSchema.components, zIndexById)
+    });
   }
 
   function reorderLayer(sourceId: string, targetId: string) {
@@ -928,6 +985,8 @@ export function BuilderLayout({
               onZoomChange={setZoom}
               onDeleteComponent={deleteComponent}
               onDuplicateComponent={duplicateComponent}
+              onBringForward={bringForward}
+              onSendBackward={sendBackward}
               onBringToFront={bringToFront}
               onSendToBack={sendToBack}
               onUndo={undo}
@@ -955,7 +1014,7 @@ export function BuilderLayout({
               <OverlaySceneRenderer
                 schema={designSchema}
                 data={previewDataMode === "sample" ? dummyOverlayData : previewSingleData}
-                items={isListPreview ? (previewDataMode === "sample" ? previewSampleItems : previewItems) : undefined}
+                items={previewRenderItems}
                 scale={zoom}
               />
             </div>
@@ -1010,6 +1069,22 @@ function normalizePreviewDataMode(value: string): PreviewDataMode {
   }
 
   return "sample";
+}
+
+function padPreviewItems(current: OverlayRenderData[], samples: OverlayRenderData[], maxItems: number) {
+  const limit = Math.max(1, maxItems);
+  const visibleCount = current.filter((item) => !item.meta?.exiting).length;
+
+  if (visibleCount >= limit) {
+    return current;
+  }
+
+  const usedIds = new Set(current.map((item) => item.meta?.instanceId ?? item.meta?.id).filter(Boolean));
+  const padding = samples
+    .filter((item) => !usedIds.has(item.meta?.instanceId ?? item.meta?.id))
+    .slice(0, limit - visibleCount);
+
+  return [...current, ...padding];
 }
 
 function getTemplateKind(schema: unknown) {

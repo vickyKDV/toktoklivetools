@@ -15,6 +15,7 @@ import {
   type OverlayDesignSchema,
   type OverlayRenderData
 } from "@/features/overlay-builder/schema/overlaySchema";
+import { getRuntimeComponentBounds } from "@/features/overlay-builder/utils/runtimeLayout";
 import type { OverlayEventPayload } from "@/types/live";
 
 type OverlayRuntimeClientProps = {
@@ -37,7 +38,7 @@ export function OverlayRuntimeClient({ schema, overlayKey, preview = false, debu
   const [queuedSingleData, setQueuedSingleData] = useState<OverlayRenderData | null>(null);
   const [items, setItems] = useState<OverlayRenderData[]>([]);
   const layout = schema.layout;
-  const isList = layout.mode === "list" || schema.kind === "CHAT" || schema.kind === "LEADERBOARD" || schema.kind === "DOCK";
+  const isList = layout.mode === "list" || schema.kind === "LEADERBOARD" || schema.kind === "DOCK";
   const animationDurationMs = layout.animationDurationMs ?? 620;
   const listExitDurationMs = Math.max(animationDurationMs, 720);
   const autoCloseMs = layout.autoCloseMs ?? 0;
@@ -175,18 +176,20 @@ export function OverlayRuntimeClient({ schema, overlayKey, preview = false, debu
 
   const previewData = getSampleChatRenderData(1, getEnabledEventTypes(schema))[0];
   const runtimeItem = singleItem ?? createSingleItem(previewData);
+  const runtimeData = preview ? previewData : runtimeItem.data;
+  const runtimeSchema = createVerticallyCenteredSingleSchema(schema, runtimeData);
 
   return (
-    <OverlayViewport schema={schema} debug={debug}>
+    <OverlayViewport schema={runtimeSchema} debug={debug}>
       <div
         key={runtimeItem.instanceId}
         style={{
-          width: schema.canvas.width,
-          height: schema.canvas.height,
+          width: runtimeSchema.canvas.width,
+          height: runtimeSchema.canvas.height,
           animation: `${runtimeItem.exiting ? exitAnimation : enterAnimation} ${animationDurationMs}ms cubic-bezier(.22, 1, .36, 1) both`
         }}
       >
-        <OverlaySceneRenderer schema={schema} data={preview ? previewData : runtimeItem.data} debug={debug} />
+        <OverlaySceneRenderer schema={runtimeSchema} data={runtimeData} debug={debug} />
         <style dangerouslySetInnerHTML={{ __html: overlayAnimationCss }} />
       </div>
     </OverlayViewport>
@@ -200,6 +203,28 @@ function createSingleItem(data: OverlayRenderData): SingleRuntimeItem {
     instanceId: `${data.meta?.id ?? "single"}-${Date.now()}-${runtimeItemSequence += 1}`
   };
 }
+
+function createVerticallyCenteredSingleSchema(schema: OverlayDesignSchema, data: OverlayRenderData): OverlayDesignSchema {
+  if (schema.layout.mode !== "single") {
+    return schema;
+  }
+
+  const bounds = getRuntimeComponentBounds(schema.components, data, schema.canvas.width, schema.canvas.height);
+  const offsetY = Math.round((schema.canvas.height - bounds.height) / 2 - bounds.top);
+
+  if (!Number.isFinite(offsetY) || offsetY === 0) {
+    return schema;
+  }
+
+  return {
+    ...schema,
+    components: schema.components.map((component) => ({
+      ...component,
+      y: component.y + offsetY
+    }))
+  };
+}
+
 function acceptsFocusDock(schema: OverlayDesignSchema) {
   return schema.kind === "CUSTOM" && schema.layout.mode === "single" && schema.dataSource.type === "manual";
 }
