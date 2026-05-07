@@ -10,6 +10,14 @@ import type {
 } from "@/features/overlay-builder/schema/overlaySchema";
 import { isContainerType } from "@/features/overlay-builder/utils/componentTree";
 import { flattenComponents } from "@/features/overlay-builder/utils/componentTree";
+import {
+  getDragLayout,
+  getPointerDelta,
+  getResizedLayout,
+  sanitizeInteractionLayout,
+  type InteractionLayout,
+  type ResizeHandle
+} from "@/features/overlay-builder/utils/interactionMath";
 
 type CanvasEditorProps = {
   designSchema: OverlayDesignSchema;
@@ -35,17 +43,7 @@ type CanvasEditorProps = {
 };
 
 const SNAP_SIZE = 8;
-const MIN_COMPONENT_SIZE = 12;
 const DEBUG_RESIZE = true;
-
-type ResizeHandle = "n" | "s" | "e" | "w" | "nw" | "ne" | "sw" | "se";
-
-type LayoutSnapshot = {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-};
 
 type EditorPointerInteraction = {
   kind: "move" | "resize";
@@ -60,9 +58,9 @@ type EditorPointerInteraction = {
     x: number;
     y: number;
   };
-  startLayout: LayoutSnapshot;
+  startLayout: InteractionLayout;
   resizeHandle?: ResizeHandle;
-  latestLayout: LayoutSnapshot;
+  latestLayout: InteractionLayout;
 };
 
 const resizeHandles: ResizeHandle[] = ["nw", "n", "ne", "w", "e", "sw", "s", "se"];
@@ -267,7 +265,7 @@ export function CanvasEditor({
     resizeHandle?: ResizeHandle
   ) {
     const viewportScale = Math.max(scale, 0.001);
-    const startLayout = sanitizeLayoutSnapshot({
+    const startLayout = sanitizeInteractionLayout({
       x: component.x,
       y: component.y,
       width: component.width,
@@ -310,20 +308,21 @@ export function CanvasEditor({
     event.preventDefault();
     event.stopPropagation();
 
-    const rawDelta = {
-      x: event.clientX - interaction.startPointer.x,
-      y: event.clientY - interaction.startPointer.y
-    };
-    const sceneDelta = {
-      x: rawDelta.x / interaction.viewportScale,
-      y: rawDelta.y / interaction.viewportScale
-    };
+    const { rawDelta, sceneDelta } = getPointerDelta({
+      startPointer: interaction.startPointer,
+      currentPointer: { x: event.clientX, y: event.clientY },
+      viewportScale: interaction.viewportScale
+    });
     const nextLayout = interaction.kind === "resize"
-      ? getResizedLayout(interaction.startLayout, sceneDelta, interaction.resizeHandle ?? "se", event.shiftKey)
-      : sanitizeLayoutSnapshot({
-        ...interaction.startLayout,
-        x: interaction.startLayout.x + sceneDelta.x,
-        y: interaction.startLayout.y + sceneDelta.y
+      ? getResizedLayout({
+        startLayout: interaction.startLayout,
+        sceneDelta,
+        handle: interaction.resizeHandle ?? "se",
+        lockAspectRatio: event.shiftKey
+      })
+      : getDragLayout({
+        startLayout: interaction.startLayout,
+        sceneDelta
       });
 
     interaction.currentPointer = { x: event.clientX, y: event.clientY };
@@ -358,14 +357,11 @@ export function CanvasEditor({
       viewportScale: interaction.viewportScale,
       startPointer: interaction.startPointer,
       currentPointer: interaction.currentPointer,
-      rawDelta: {
-        x: interaction.currentPointer.x - interaction.startPointer.x,
-        y: interaction.currentPointer.y - interaction.startPointer.y
-      },
-      sceneDelta: {
-        x: (interaction.currentPointer.x - interaction.startPointer.x) / interaction.viewportScale,
-        y: (interaction.currentPointer.y - interaction.startPointer.y) / interaction.viewportScale
-      },
+      ...getPointerDelta({
+        startPointer: interaction.startPointer,
+        currentPointer: interaction.currentPointer,
+        viewportScale: interaction.viewportScale
+      }),
       nextLayout: interaction.latestLayout
     });
 
@@ -676,93 +672,6 @@ function shouldClearSelectionFromPointer(target: EventTarget | null, canvasEleme
   return !target.closest(".overlay-editor-node, [data-overlay-component-id], [data-editor-toolbar='true']");
 }
 
-function getResizedLayout(
-  startLayout: LayoutSnapshot,
-  sceneDelta: { x: number; y: number },
-  handle: ResizeHandle,
-  lockAspectRatio: boolean
-): LayoutSnapshot {
-  let nextX = startLayout.x;
-  let nextY = startLayout.y;
-  let nextWidth = startLayout.width;
-  let nextHeight = startLayout.height;
-
-  if (handle.includes("e")) {
-    nextWidth = startLayout.width + sceneDelta.x;
-  }
-
-  if (handle.includes("s")) {
-    nextHeight = startLayout.height + sceneDelta.y;
-  }
-
-  if (handle.includes("w")) {
-    nextWidth = startLayout.width - sceneDelta.x;
-    nextX = startLayout.x + sceneDelta.x;
-  }
-
-  if (handle.includes("n")) {
-    nextHeight = startLayout.height - sceneDelta.y;
-    nextY = startLayout.y + sceneDelta.y;
-  }
-
-  if (lockAspectRatio && handle.length === 2) {
-    const aspectRatio = Math.max(0.001, startLayout.width / Math.max(1, startLayout.height));
-    const widthDelta = Math.abs(nextWidth - startLayout.width);
-    const heightDelta = Math.abs(nextHeight - startLayout.height);
-
-    if (widthDelta >= heightDelta) {
-      nextHeight = nextWidth / aspectRatio;
-    } else {
-      nextWidth = nextHeight * aspectRatio;
-    }
-
-    if (handle.includes("w")) {
-      nextX = startLayout.x + startLayout.width - nextWidth;
-    }
-
-    if (handle.includes("n")) {
-      nextY = startLayout.y + startLayout.height - nextHeight;
-    }
-  }
-
-  if (nextWidth < MIN_COMPONENT_SIZE) {
-    if (handle.includes("w")) {
-      nextX = startLayout.x + startLayout.width - MIN_COMPONENT_SIZE;
-    }
-
-    nextWidth = MIN_COMPONENT_SIZE;
-  }
-
-  if (nextHeight < MIN_COMPONENT_SIZE) {
-    if (handle.includes("n")) {
-      nextY = startLayout.y + startLayout.height - MIN_COMPONENT_SIZE;
-    }
-
-    nextHeight = MIN_COMPONENT_SIZE;
-  }
-
-  return sanitizeLayoutSnapshot({
-    x: nextX,
-    y: nextY,
-    width: nextWidth,
-    height: nextHeight
-  });
-}
-
-function sanitizeLayoutSnapshot(layout: LayoutSnapshot): LayoutSnapshot {
-  return {
-    x: safeFinite(layout.x, 0),
-    y: safeFinite(layout.y, 0),
-    width: Math.max(MIN_COMPONENT_SIZE, safeFinite(layout.width, MIN_COMPONENT_SIZE)),
-    height: Math.max(MIN_COMPONENT_SIZE, safeFinite(layout.height, MIN_COMPONENT_SIZE))
-  };
-}
-
-function safeFinite(value: unknown, fallback: number) {
-  const number = Number(value);
-  return Number.isFinite(number) ? Math.round(number) : fallback;
-}
-
 function getResizeHandleStyle(handle: ResizeHandle): CSSProperties {
   const positions: Record<ResizeHandle, CSSProperties> = {
     nw: { left: -6, top: -6, cursor: "nwse-resize" },
@@ -786,7 +695,7 @@ function logInteraction(
     currentPointer: { x: number; y: number };
     rawDelta: { x: number; y: number };
     sceneDelta: { x: number; y: number };
-    nextLayout: LayoutSnapshot;
+    nextLayout: InteractionLayout;
   }
 ) {
   if (!DEBUG_RESIZE) {
