@@ -46,6 +46,7 @@ type CanvasEditorProps = {
 };
 
 const SNAP_SIZE = 8;
+const SNAP_THRESHOLD = 6;
 const DEBUG_RESIZE = true;
 
 type EditorPointerInteraction = {
@@ -64,6 +65,22 @@ type EditorPointerInteraction = {
   startLayout: InteractionLayout;
   resizeHandle?: ResizeHandle;
   latestLayout: InteractionLayout;
+};
+
+type SnapGuide = {
+  orientation: "vertical" | "horizontal";
+  position: number;
+};
+
+type SnapAxisTarget = {
+  value: number;
+  guidePosition: number;
+};
+
+type SnapDelta = {
+  delta: number;
+  distance: number;
+  target: SnapAxisTarget;
 };
 
 const resizeHandles: ResizeHandle[] = ["nw", "n", "ne", "w", "e", "sw", "s", "se"];
@@ -107,6 +124,7 @@ export function CanvasEditor({
   const [fitScale, setFitScale] = useState(1);
   const [interactionScale, setInteractionScale] = useState<number | null>(null);
   const [hoverContainerId, setHoverContainerId] = useState<string | null>(null);
+  const [snapGuides, setSnapGuides] = useState<SnapGuide[]>([]);
   const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>(selectedComponentId ? [selectedComponentId] : []);
   const [spacePressed, setSpacePressed] = useState(false);
   const scale = interactionScale ?? fitScale * zoom;
@@ -320,7 +338,7 @@ export function CanvasEditor({
       currentPointer: { x: event.clientX, y: event.clientY },
       viewportScale: interaction.viewportScale
     });
-    const nextLayout = interaction.kind === "resize"
+    const rawNextLayout = interaction.kind === "resize"
       ? getResizedLayout({
         startLayout: interaction.startLayout,
         sceneDelta,
@@ -331,9 +349,18 @@ export function CanvasEditor({
         startLayout: interaction.startLayout,
         sceneDelta
       });
+    const snapResult = getSnappedInteractionLayout({
+      componentId: interaction.componentId,
+      layout: rawNextLayout,
+      kind: interaction.kind,
+      resizeHandle: interaction.resizeHandle,
+      snapDisabled: event.altKey
+    });
+    const nextLayout = snapResult.layout;
 
     interaction.currentPointer = { x: event.clientX, y: event.clientY };
     interaction.latestLayout = nextLayout;
+    setSnapGuides(snapResult.guides);
     patchNode(interaction.componentId, nextLayout);
     logInteraction("move", {
       viewportScale: interaction.viewportScale,
@@ -374,6 +401,7 @@ export function CanvasEditor({
 
     interactionRef.current = null;
     setInteractionScale(null);
+    setSnapGuides([]);
   }
 
   function startPan(event: ReactPointerEvent<HTMLDivElement>) {
@@ -479,6 +507,109 @@ export function CanvasEditor({
 
   function getComponentRect(id: string) {
     return areaRef.current?.querySelector(`[data-overlay-component-id="${id}"]`)?.getBoundingClientRect() ?? null;
+  }
+
+  function getSnappedInteractionLayout({
+    componentId,
+    layout,
+    kind,
+    resizeHandle,
+    snapDisabled
+  }: {
+    componentId: string;
+    layout: InteractionLayout;
+    kind: EditorPointerInteraction["kind"];
+    resizeHandle?: ResizeHandle;
+    snapDisabled: boolean;
+  }) {
+    if (snapDisabled) {
+      return { layout, guides: [] };
+    }
+
+    const snapContext = getSnapContext(componentId);
+    const snapX = getSnapDelta(
+      getSnapPointsForAxis(layout.x, layout.width, kind, resizeHandle, "x"),
+      snapContext.xTargets
+    );
+    const snapY = getSnapDelta(
+      getSnapPointsForAxis(layout.y, layout.height, kind, resizeHandle, "y"),
+      snapContext.yTargets
+    );
+    let nextLayout = layout;
+    const guides: SnapGuide[] = [];
+
+    if (snapX) {
+      nextLayout = applySnapToAxis(nextLayout, "x", snapX.delta, kind, resizeHandle);
+      guides.push({
+        orientation: "vertical",
+        position: snapX.target.guidePosition
+      });
+    }
+
+    if (snapY) {
+      nextLayout = applySnapToAxis(nextLayout, "y", snapY.delta, kind, resizeHandle);
+      guides.push({
+        orientation: "horizontal",
+        position: snapY.target.guidePosition
+      });
+    }
+
+    return {
+      layout: sanitizeInteractionLayout(nextLayout),
+      guides
+    };
+  }
+
+  function getSnapContext(componentId: string) {
+    const relation = findComponentRelation(componentId, designSchema.components);
+    const parent = relation.parentId ? flatComponents.find((component) => component.id === relation.parentId) ?? null : null;
+    const siblings = relation.siblings.filter((component) => component.id !== componentId && !component.hidden && component.visible !== false);
+    const parentFrame = parent ? getComponentCanvasFrame(parent.id) : null;
+    const baseOffset = parentFrame ? { x: parentFrame.x, y: parentFrame.y } : { x: 0, y: 0 };
+    const bounds = parent ? { width: parent.width, height: parent.height } : {
+      width: designSchema.canvas.width,
+      height: designSchema.canvas.height
+    };
+    const xTargets: SnapAxisTarget[] = [
+      { value: 0, guidePosition: baseOffset.x },
+      { value: bounds.width / 2, guidePosition: baseOffset.x + bounds.width / 2 },
+      { value: bounds.width, guidePosition: baseOffset.x + bounds.width }
+    ];
+    const yTargets: SnapAxisTarget[] = [
+      { value: 0, guidePosition: baseOffset.y },
+      { value: bounds.height / 2, guidePosition: baseOffset.y + bounds.height / 2 },
+      { value: bounds.height, guidePosition: baseOffset.y + bounds.height }
+    ];
+
+    siblings.forEach((sibling) => {
+      xTargets.push(
+        { value: sibling.x, guidePosition: baseOffset.x + sibling.x },
+        { value: sibling.x + sibling.width / 2, guidePosition: baseOffset.x + sibling.x + sibling.width / 2 },
+        { value: sibling.x + sibling.width, guidePosition: baseOffset.x + sibling.x + sibling.width }
+      );
+      yTargets.push(
+        { value: sibling.y, guidePosition: baseOffset.y + sibling.y },
+        { value: sibling.y + sibling.height / 2, guidePosition: baseOffset.y + sibling.y + sibling.height / 2 },
+        { value: sibling.y + sibling.height, guidePosition: baseOffset.y + sibling.y + sibling.height }
+      );
+    });
+
+    return { xTargets, yTargets };
+  }
+
+  function getComponentCanvasFrame(id: string) {
+    const path = findComponentPath(id, designSchema.components);
+
+    if (!path.length) {
+      return null;
+    }
+
+    return path.reduce((frame, component) => ({
+      x: frame.x + component.x,
+      y: frame.y + component.y,
+      width: component.width,
+      height: component.height
+    }), { x: 0, y: 0, width: 0, height: 0 });
   }
 
   return (
@@ -638,6 +769,13 @@ export function CanvasEditor({
                 </div>
               </div>
             ) : null}
+            {!previewMode ? (
+              <EditorSnapGuides
+                guides={snapGuides}
+                canvasWidth={designSchema.canvas.width}
+                canvasHeight={designSchema.canvas.height}
+              />
+            ) : null}
           </div>
         </div>
       </div>
@@ -718,6 +856,44 @@ function EditorNodeToolbar({
   );
 }
 
+function EditorSnapGuides({
+  guides,
+  canvasWidth,
+  canvasHeight
+}: {
+  guides: SnapGuide[];
+  canvasWidth: number;
+  canvasHeight: number;
+}) {
+  const uniqueGuides = [...new Map(guides.map((guide) => [`${guide.orientation}-${guide.position}`, guide])).values()];
+
+  return (
+    <div className="pointer-events-none absolute inset-0 z-[2147482999]">
+      {uniqueGuides.map((guide) => (
+        guide.orientation === "vertical" ? (
+          <div
+            key={`vertical-${guide.position}`}
+            className="absolute top-0 w-px bg-sky-400 shadow-[0_0_8px_rgba(56,189,248,0.85)]"
+            style={{
+              left: guide.position,
+              height: canvasHeight
+            }}
+          />
+        ) : (
+          <div
+            key={`horizontal-${guide.position}`}
+            className="absolute left-0 h-px bg-sky-400 shadow-[0_0_8px_rgba(56,189,248,0.85)]"
+            style={{
+              top: guide.position,
+              width: canvasWidth
+            }}
+          />
+        )
+      ))}
+    </div>
+  );
+}
+
 function ToolbarButton({
   label,
   children,
@@ -752,6 +928,164 @@ function ToolbarButton({
       {children}
     </button>
   );
+}
+
+function getSnapPointsForAxis(
+  start: number,
+  size: number,
+  kind: EditorPointerInteraction["kind"],
+  resizeHandle: ResizeHandle | undefined,
+  axis: "x" | "y"
+) {
+  if (kind === "move") {
+    return [
+      { value: start },
+      { value: start + size / 2 },
+      { value: start + size }
+    ];
+  }
+
+  if (!resizeHandle) {
+    return [];
+  }
+
+  if (axis === "x") {
+    if (resizeHandle.includes("w")) {
+      return [{ value: start }];
+    }
+
+    if (resizeHandle.includes("e")) {
+      return [{ value: start + size }];
+    }
+
+    return [];
+  }
+
+  if (resizeHandle.includes("n")) {
+    return [{ value: start }];
+  }
+
+  if (resizeHandle.includes("s")) {
+    return [{ value: start + size }];
+  }
+
+  return [];
+}
+
+function getSnapDelta(points: Array<{ value: number }>, targets: SnapAxisTarget[]): SnapDelta | null {
+  let best: SnapDelta | null = null;
+
+  points.forEach((point) => {
+    targets.forEach((target) => {
+      const delta = target.value - point.value;
+      const distance = Math.abs(delta);
+
+      if (distance > SNAP_THRESHOLD) {
+        return;
+      }
+
+      if (!best || distance < best.distance) {
+        best = { delta, distance, target };
+      }
+    });
+  });
+
+  return best;
+}
+
+function applySnapToAxis(
+  layout: InteractionLayout,
+  axis: "x" | "y",
+  delta: number,
+  kind: EditorPointerInteraction["kind"],
+  resizeHandle: ResizeHandle | undefined
+): InteractionLayout {
+  if (kind === "move") {
+    return axis === "x"
+      ? { ...layout, x: layout.x + delta }
+      : { ...layout, y: layout.y + delta };
+  }
+
+  if (!resizeHandle) {
+    return layout;
+  }
+
+  if (axis === "x" && resizeHandle.includes("w")) {
+    return {
+      ...layout,
+      x: layout.x + delta,
+      width: layout.width - delta
+    };
+  }
+
+  if (axis === "x" && resizeHandle.includes("e")) {
+    return {
+      ...layout,
+      width: layout.width + delta
+    };
+  }
+
+  if (axis === "y" && resizeHandle.includes("n")) {
+    return {
+      ...layout,
+      y: layout.y + delta,
+      height: layout.height - delta
+    };
+  }
+
+  if (axis === "y" && resizeHandle.includes("s")) {
+    return {
+      ...layout,
+      height: layout.height + delta
+    };
+  }
+
+  return layout;
+}
+
+function findComponentRelation(
+  componentId: string,
+  components: OverlayComponentSchema[],
+  parentId: string | null = null
+): {
+  parentId: string | null;
+  siblings: OverlayComponentSchema[];
+} {
+  for (const component of components) {
+    if (component.id === componentId) {
+      return { parentId, siblings: components };
+    }
+
+    const childRelation = findComponentRelation(componentId, component.children ?? [], component.id);
+
+    if (childRelation.siblings.length > 0) {
+      return childRelation;
+    }
+  }
+
+  return { parentId: null, siblings: [] };
+}
+
+function findComponentPath(
+  componentId: string,
+  components: OverlayComponentSchema[],
+  ancestors: OverlayComponentSchema[] = []
+): OverlayComponentSchema[] {
+  for (const component of components) {
+    const path = [...ancestors, component];
+
+    if (component.id === componentId) {
+      return path;
+    }
+
+    const childPath = findComponentPath(componentId, component.children ?? [], path);
+
+    if (childPath.length > 0) {
+      return childPath;
+    }
+  }
+
+  return [];
 }
 
 function isEditableTarget(target: EventTarget | null) {
