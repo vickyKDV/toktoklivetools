@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { getSampleChatRenderData } from "@/features/overlay-builder/components/ChatStyleRenderer";
-import { OverlayRenderer } from "@/features/overlay-builder/components/OverlayRenderer";
+import { OverlaySceneRenderer } from "@/features/overlay-builder/components/OverlaySceneRenderer";
 import { dummyOverlayData, type OverlayDesignSchema } from "@/features/overlay-builder/schema/overlaySchema";
+import { getRuntimeCanvasSize } from "@/features/overlay-builder/utils/runtimeCanvas";
 
 type OverlayThumbnailProps = {
   schema: OverlayDesignSchema;
@@ -12,9 +13,13 @@ type OverlayThumbnailProps = {
 export function OverlayThumbnail({ schema }: OverlayThumbnailProps) {
   const frameRef = useRef<HTMLDivElement | null>(null);
   const [frame, setFrame] = useState({ width: 320, height: 150 });
-  const designWidth = schema.canvas.width;
-  const designHeight = schema.canvas.height;
-  const sampleData = schema.layout.mode === "list" ? getSampleChatRenderData(1, getEnabledEventTypes(schema))[0] : dummyOverlayData;
+  const runtimeCanvas = getRuntimeCanvasSize(schema);
+  const designWidth = runtimeCanvas.width;
+  const designHeight = runtimeCanvas.height;
+  const sampleItems = schema.layout.mode === "list"
+    ? getSampleChatRenderData(schema.layout.maxItems, getEnabledEventTypes(schema))
+    : undefined;
+  const sampleData = sampleItems?.[0] ?? dummyOverlayData;
   const padding = 18;
   const scale = Math.min(
     (frame.width - padding * 2) / designWidth,
@@ -69,7 +74,12 @@ export function OverlayThumbnail({ schema }: OverlayThumbnailProps) {
           transformOrigin: "top left"
         }}
       >
-        <OverlayRenderer designJson={schema} data={sampleData} enableRuntimeLayout={false} />
+        <OverlaySceneRenderer
+          schema={schema}
+          data={sampleData}
+          items={sampleItems}
+          renderRuntime
+        />
       </div>
     </div>
   );
