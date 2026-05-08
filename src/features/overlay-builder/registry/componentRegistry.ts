@@ -1,4 +1,4 @@
-import { type CSSProperties, createElement, type ReactNode } from "react";
+import { type CSSProperties, createElement, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Crown, Eye, Gift, Heart, MessageCircle } from "lucide-react";
 import type {
   OverlayComponentSchema,
@@ -116,6 +116,44 @@ export const componentRegistry: Record<OverlayComponentType, ComponentRegistryIt
     defaultStyle: { radius: 12, opacity: 100, objectFit: "contain" },
     render: renderImage,
     settings: baseImageSettings()
+  },
+  media_switch: {
+    type: "media_switch",
+    label: "Media Switch",
+    defaultSize: { width: 800, height: 400 },
+    defaultProps: {
+      items: [],
+      intervalMs: 5000,
+      transition: "fade",
+      videoSwitchMode: "ended",
+      muted: true,
+      autoplay: true,
+      loopSingle: true
+    },
+    defaultStyle: { radius: 0, opacity: 100, objectFit: "contain", overflow: "hidden", backgroundColor: "transparent" },
+    render: renderMediaSwitch,
+    settings: [
+      { key: "props.intervalMs", label: "Switch Interval ms", type: "number", min: 500, max: 600000, step: 100 },
+      { key: "props.transition", label: "Transition", type: "select", options: [
+        { label: "None", value: "none" },
+        { label: "Fade", value: "fade" },
+        { label: "Slide", value: "slide" }
+      ] },
+      { key: "props.videoSwitchMode", label: "Video / Lottie Switch", type: "select", options: [
+        { label: "When media ends", value: "ended" },
+        { label: "By interval", value: "interval" }
+      ] },
+      { key: "props.muted", label: "Muted", type: "toggle" },
+      { key: "props.autoplay", label: "Autoplay", type: "toggle" },
+      { key: "props.loopSingle", label: "Loop Single File", type: "toggle" },
+      { key: "style.objectFit", label: "Object Fit", type: "select", options: [
+        { label: "Contain", value: "contain" },
+        { label: "Cover", value: "cover" },
+        { label: "Fill", value: "fill" }
+      ] },
+      { key: "style.radius", label: "Radius", type: "number", min: 0, max: 999, step: 1 },
+      { key: "style.opacity", label: "Opacity", type: "number", min: 0, max: 100, step: 1 }
+    ]
   },
   running_text: textItem("running_text", "Running Text", "{{viewer.name}}: {{comment.text}}", 620, 36, 20, 700)
 };
@@ -241,6 +279,252 @@ function baseImageSettings(): ComponentSetting[] {
       { label: "Contain", value: "contain" }
     ] }
   ];
+}
+
+type MediaSwitchItem = {
+  id?: string;
+  url: string;
+  type?: "image" | "video" | "lottie";
+  label?: string;
+};
+
+function renderMediaSwitch(component: OverlayComponentSchema) {
+  return createElement(MediaSwitchRenderer, { component });
+}
+
+function MediaSwitchRenderer({ component }: { component: OverlayComponentSchema }) {
+  const items = useMemo(() => normalizeMediaItems(component.props.items, component.props.src), [component.props.items, component.props.src]);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const intervalMs = clampNumber(component.props.intervalMs, 500, 600000, 5000);
+  const transition = typeof component.props.transition === "string" ? component.props.transition : "fade";
+  const videoSwitchMode = typeof component.props.videoSwitchMode === "string" ? component.props.videoSwitchMode : "ended";
+  const item = items[activeIndex] ?? null;
+  const shouldSwitchByInterval = items.length > 1 && (videoSwitchMode !== "ended" || !isEndDrivenMedia(item));
+  const goNext = useCallback(() => {
+    if (items.length <= 1) {
+      return;
+    }
+
+    setActiveIndex((current) => (current + 1) % items.length);
+  }, [items.length]);
+
+  useEffect(() => {
+    if (items.some((entry) => entry.type === "lottie")) {
+      void import("@lottiefiles/dotlottie-wc");
+    }
+  }, [items]);
+
+  useEffect(() => {
+    setActiveIndex((current) => items.length ? Math.min(current, items.length - 1) : 0);
+  }, [items.length]);
+
+  useEffect(() => {
+    if (!shouldSwitchByInterval) {
+      return;
+    }
+
+    const timer = window.setInterval(() => {
+      goNext();
+    }, intervalMs);
+
+    return () => window.clearInterval(timer);
+  }, [goNext, intervalMs, shouldSwitchByInterval]);
+
+  const fit = component.style.objectFit === "cover" || component.style.objectFit === "fill" ? component.style.objectFit : "contain";
+  const mediaStyle = {
+    width: "100%",
+    height: "100%",
+    objectFit: fit,
+    display: "block",
+    borderRadius: "inherit",
+    imageRendering: "auto" as const,
+    backfaceVisibility: "hidden" as const
+  } satisfies CSSProperties;
+  const wrapperStyle = {
+    width: component.width,
+    height: component.height,
+    overflow: component.style.overflow === "visible" ? "visible" : "hidden",
+    borderRadius: "inherit",
+    background: component.style.backgroundColor ?? "transparent",
+    opacity: (component.style.opacity ?? 100) / 100,
+    transition: transition === "fade" ? "opacity 220ms ease" : transition === "slide" ? "transform 220ms ease, opacity 220ms ease" : undefined
+  } satisfies CSSProperties;
+
+  if (!item) {
+    return createElement(
+      "div",
+      {
+        style: {
+          ...wrapperStyle,
+          display: "grid",
+          placeItems: "center",
+          border: "1px dashed rgba(255,255,255,.35)",
+          color: "rgba(255,255,255,.72)",
+          fontSize: 14,
+          fontWeight: 700
+        } satisfies CSSProperties
+      },
+      "Tambahkan file media"
+    );
+  }
+
+  if (item.type === "video") {
+    return createElement(
+      "div",
+      { style: wrapperStyle },
+      createElement("video", {
+        key: item.url,
+        ref: videoRef,
+        src: item.url,
+        autoPlay: component.props.autoplay !== false,
+        muted: component.props.muted !== false,
+        playsInline: true,
+        loop: items.length === 1 && component.props.loopSingle !== false,
+        onEnded: items.length > 1 && videoSwitchMode === "ended"
+          ? goNext
+          : undefined,
+        style: mediaStyle
+      })
+    );
+  }
+
+  if (item.type === "lottie") {
+    return createElement(
+      "div",
+      { style: wrapperStyle },
+      createElement(LottieSwitchMedia, {
+        key: item.url,
+        item,
+        component,
+        loop: items.length === 1 ? component.props.loopSingle !== false : videoSwitchMode !== "ended",
+        onComplete: items.length > 1 && videoSwitchMode === "ended" ? goNext : undefined
+      })
+    );
+  }
+
+  return createElement(
+    "div",
+    { style: wrapperStyle },
+    createElement("img", {
+      key: item.url,
+      src: item.url,
+      alt: item.label ?? component.name,
+      referrerPolicy: "no-referrer",
+      style: mediaStyle
+    })
+  );
+}
+
+function LottieSwitchMedia({
+  item,
+  component,
+  loop,
+  onComplete
+}: {
+  item: MediaSwitchItem;
+  component: OverlayComponentSchema;
+  loop: boolean;
+  onComplete?: () => void;
+}) {
+  const elementRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    const element = elementRef.current;
+
+    if (!element || !onComplete) {
+      return;
+    }
+
+    const handleComplete = () => onComplete();
+    const completeEvents = ["complete", "finish", "ended", "dotlottie-complete", "dotlottie:complete"];
+
+    completeEvents.forEach((eventName) => {
+      element.addEventListener(eventName, handleComplete);
+    });
+
+    return () => {
+      completeEvents.forEach((eventName) => {
+        element.removeEventListener(eventName, handleComplete);
+      });
+    };
+  }, [item.url, onComplete]);
+
+  return createElement("dotlottie-wc", {
+    ref: (node: HTMLElement | null) => {
+      elementRef.current = node;
+    },
+    src: item.url,
+    autoplay: component.props.autoplay !== false,
+    loop,
+    style: {
+      display: "block",
+      width: "100%",
+      height: "100%"
+    } satisfies CSSProperties
+  });
+}
+
+function normalizeMediaItems(rawItems: unknown, rawSrc: unknown): MediaSwitchItem[] {
+  if (Array.isArray(rawItems)) {
+    return rawItems
+      .map((item) => normalizeMediaItem(item))
+      .filter((item): item is MediaSwitchItem => Boolean(item?.url));
+  }
+
+  const src = typeof rawSrc === "string" ? rawSrc.trim() : "";
+
+  return src ? [{ url: src, type: inferMediaType(src), label: src.split("/").pop() ?? "Media" }] : [];
+}
+
+function normalizeMediaItem(value: unknown): MediaSwitchItem | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  const record = value as Record<string, unknown>;
+  const url = typeof record.url === "string" ? record.url : "";
+
+  if (!url) {
+    return null;
+  }
+
+  const type = record.type === "video" || record.type === "lottie" || record.type === "image"
+    ? record.type
+    : inferMediaType(url);
+
+  return {
+    id: typeof record.id === "string" ? record.id : url,
+    url,
+    type,
+    label: typeof record.label === "string" ? record.label : typeof record.name === "string" ? record.name : url.split("/").pop()
+  };
+}
+
+function inferMediaType(url: string): MediaSwitchItem["type"] {
+  if (/\.(mp4|webm|mov)(?:$|[?#])/i.test(url)) {
+    return "video";
+  }
+
+  if (/\.(json|lottie)(?:$|[?#])/i.test(url)) {
+    return "lottie";
+  }
+
+  return "image";
+}
+
+function isEndDrivenMedia(item: MediaSwitchItem | undefined) {
+  return item?.type === "video" || item?.type === "lottie";
+}
+
+function clampNumber(value: unknown, min: number, max: number, fallback: number) {
+  const number = Number(value);
+
+  if (!Number.isFinite(number)) {
+    return fallback;
+  }
+
+  return Math.min(max, Math.max(min, number));
 }
 
 function renderText(component: OverlayComponentSchema, data: OverlayRenderData) {

@@ -1,6 +1,6 @@
 "use client";
 
-import { FilePlus2, Hash, ImageIcon, LayoutTemplate, MessageSquareText, Plus, Square, Type, User } from "lucide-react";
+import { FilePlus2, Files, Hash, ImageIcon, LayoutTemplate, MessageSquareText, Plus, Square, Type, User } from "lucide-react";
 import type { ReactNode } from "react";
 import { componentLibrary } from "@/features/overlay-builder/registry/componentRegistry";
 import { overlayTemplates } from "@/features/overlay-builder/registry/templateRegistry";
@@ -31,14 +31,20 @@ const iconMap: Partial<Record<OverlayComponentType, ReactNode>> = {
   gift_name: <Type className="size-4" />,
   gift_count: <Type className="size-4" />,
   gift_image: <ImageIcon className="size-4" />,
+  media_switch: <Files className="size-4" />,
   running_text: <Type className="size-4" />
 };
 
 export function ComponentLibrary({ onAddComponent, onLoadTemplate, onBlankCanvas, overlayKind }: ComponentLibraryProps) {
   const isLeaderboard = overlayKind === "LEADERBOARD";
+  const isStatic = overlayKind === "STATIC";
   const components = componentLibrary.filter((component) => {
     if (isLeaderboard) {
       return component.type === "leaderboard_rank";
+    }
+
+    if (isStatic) {
+      return ["media_switch", "raw_card", "viewer_name", "comment", "running_text"].includes(component.type);
     }
 
     return component.type !== "leaderboard_rank";
@@ -50,7 +56,11 @@ export function ComponentLibrary({ onAddComponent, onLoadTemplate, onBlankCanvas
       return kind === "LEADERBOARD";
     }
 
-    return kind !== "LEADERBOARD";
+    if (isStatic) {
+      return kind === "STATIC";
+    }
+
+    return kind !== "LEADERBOARD" && kind !== "STATIC";
   });
 
   return (

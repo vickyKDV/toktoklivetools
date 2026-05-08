@@ -211,6 +211,13 @@ function fallbackSchemaByKind(kind: OverlayDesignSchema["kind"]): Pick<OverlayDe
     };
   }
 
+  if (kind === "STATIC") {
+    return {
+      dataSource: { type: "static", filters: {} },
+      layout: { mode: "single", maxItems: 1, gap: 0, direction: "vertical", reverse: false, align: "start", listStyle: "default", enterAnimation: "fade", exitAnimation: "fade", autoCloseMs: 0, animationDurationMs: 620 }
+    };
+  }
+
   return {
     dataSource: { type: "manual", filters: {} },
     layout: { mode: "single", maxItems: 1, gap: 12, direction: "vertical", reverse: false, align: "start", listStyle: "stacked_card", enterAnimation: "fade", exitAnimation: "fade", autoCloseMs: 0, animationDurationMs: 620 }

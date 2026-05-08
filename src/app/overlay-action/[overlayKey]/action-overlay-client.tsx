@@ -202,12 +202,12 @@ function ActionLayer({
   }, []);
 
   useEffect(() => {
-    const shouldWaitForVideoEnd =
+    const shouldWaitForMediaEnd =
       action.action === "SHOW_ANIMATION" &&
       action.useMediaDuration === true &&
-      isVideoUrl(action.animationUrl);
+      isEndDrivenAnimationUrl(action.animationUrl);
 
-    if (shouldWaitForVideoEnd) {
+    if (shouldWaitForMediaEnd) {
       return;
     }
 
@@ -267,7 +267,7 @@ function ActionContent({ action, onMediaEnd }: { action: VisibleAction; onMediaE
 function ActionMedia({ action, onMediaEnd }: { action: VisibleAction; onMediaEnd: () => void }) {
   const url = action.animationUrl ?? "";
   const isVideo = isVideoUrl(url);
-  const isLottie = /\.(json|lottie)(?:$|[?#])/i.test(url);
+  const isLottie = isLottieUrl(url);
   const fit = normalizeAnimationFit(action.animationFit);
   const { width, height } = getActionMediaSize(action);
   const mediaStyle = {
@@ -290,21 +290,68 @@ function ActionMedia({ action, onMediaEnd }: { action: VisibleAction; onMediaEnd
   }
 
   if (isLottie) {
-    return createElement("dotlottie-wc", {
-      src: url,
-      autoplay: true,
-      loop: true,
-      style: {
-        display: "block",
-        width,
-        height
-      }
-    });
+    return (
+      <ActionLottieMedia
+        url={url}
+        loop={action.useMediaDuration !== true}
+        onComplete={action.useMediaDuration === true ? onMediaEnd : undefined}
+        style={{
+          display: "block",
+          width,
+          height
+        }}
+      />
+    );
   }
 
   // OBS animation assets can be workspace uploads or remote URLs, so avoid Next image optimization here.
   // eslint-disable-next-line @next/next/no-img-element
   return <img src={url} alt="" style={mediaStyle} />;
+}
+
+function ActionLottieMedia({
+  url,
+  loop,
+  onComplete,
+  style
+}: {
+  url: string;
+  loop: boolean;
+  onComplete?: () => void;
+  style: React.CSSProperties;
+}) {
+  const elementRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    const element = elementRef.current;
+
+    if (!element || !onComplete) {
+      return;
+    }
+
+    const handleComplete = () => onComplete();
+    const completeEvents = ["complete", "finish", "ended", "dotlottie-complete", "dotlottie:complete"];
+
+    completeEvents.forEach((eventName) => {
+      element.addEventListener(eventName, handleComplete);
+    });
+
+    return () => {
+      completeEvents.forEach((eventName) => {
+        element.removeEventListener(eventName, handleComplete);
+      });
+    };
+  }, [onComplete, url]);
+
+  return createElement("dotlottie-wc", {
+    ref: (node: HTMLElement | null) => {
+      elementRef.current = node;
+    },
+    src: url,
+    autoplay: true,
+    loop,
+    style
+  });
 }
 
 function getActionMediaSize(action: OverlayEventPayload) {
@@ -481,6 +528,14 @@ function normalizeAnimationFit(value: unknown): React.CSSProperties["objectFit"]
 
 function isVideoUrl(value: unknown) {
   return typeof value === "string" && /\.(mp4|webm|mov)(?:$|[?#])/i.test(value);
+}
+
+function isLottieUrl(value: unknown) {
+  return typeof value === "string" && /\.(json|lottie)(?:$|[?#])/i.test(value);
+}
+
+function isEndDrivenAnimationUrl(value: unknown) {
+  return isVideoUrl(value) || isLottieUrl(value);
 }
 
 function resolveActionText(template: string, action: OverlayEventPayload) {

@@ -359,9 +359,79 @@ const chatBubbleTemplates: OverlayTemplate[] = [
   })
 ];
 
+const staticTemplates: OverlayTemplate[] = [
+  {
+    id: "static-media-switch",
+    name: "Static Media Switch",
+    description: "Overlay statis untuk rotasi image, GIF, JSON/Lottie, atau video promo.",
+    schema: {
+      version: 2,
+      kind: "STATIC",
+      name: "Static Media Switch",
+      canvas: {
+        width: 800,
+        height: 400,
+        background: { type: "transparent", color: "transparent", opacity: 0 },
+        radius: 0,
+        stroke: { enabled: false, color: "#ffffff", width: 0 },
+        shadow: { enabled: false, color: "#000000", blur: 0, x: 0, y: 0 },
+        animation: { type: "none", enabled: false, color: "#22d3ee", color2: "#f43f5e", durationMs: 2400, intensity: 70 }
+      },
+      dataSource: {
+        type: "static",
+        filters: {}
+      },
+      layout: {
+        mode: "single",
+        maxItems: 1,
+        gap: 0,
+        direction: "vertical",
+        reverse: false,
+        align: "start",
+        listStyle: "default",
+        enterAnimation: "fade",
+        exitAnimation: "fade",
+        autoCloseMs: 0,
+        animationDurationMs: 620
+      },
+      components: [
+        {
+          id: "static_media_switch_1",
+          type: "media_switch",
+          name: "Media Switch",
+          x: 0,
+          y: 0,
+          width: 800,
+          height: 400,
+          zIndex: 1,
+          visible: true,
+          locked: false,
+          props: {
+            items: [],
+            intervalMs: 5000,
+            transition: "fade",
+            videoSwitchMode: "ended",
+            muted: true,
+            autoplay: true,
+            loopSingle: true
+          },
+          style: {
+            radius: 0,
+            opacity: 100,
+            objectFit: "contain",
+            overflow: "hidden",
+            backgroundColor: "transparent"
+          }
+        }
+      ]
+    }
+  }
+];
+
 export const overlayTemplates: OverlayTemplate[] = [
   ...leaderboardTemplates,
-  ...chatBubbleTemplates
+  ...chatBubbleTemplates,
+  ...staticTemplates
 ];
 
 function createChatBubbleTemplate({

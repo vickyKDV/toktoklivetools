@@ -47,6 +47,7 @@ enum OverlayKind {
   LEADERBOARD
   DOCK
   CUSTOM
+  STATIC
 }
 
 model User {

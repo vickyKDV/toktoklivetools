@@ -39,6 +39,7 @@ export function OverlayRuntimeClient({ schema, overlayKey, preview = false, debu
   const [items, setItems] = useState<OverlayRenderData[]>([]);
   const layout = schema.layout;
   const isList = layout.mode === "list" || schema.kind === "LEADERBOARD" || schema.kind === "DOCK";
+  const isStaticOverlay = schema.kind === "STATIC" || schema.dataSource.type === "static";
   const animationDurationMs = layout.animationDurationMs ?? 620;
   const listExitDurationMs = Math.max(animationDurationMs, 720);
   const autoCloseMs = layout.autoCloseMs ?? 0;
@@ -65,7 +66,7 @@ export function OverlayRuntimeClient({ schema, overlayKey, preview = false, debu
   }, []);
 
   useEffect(() => {
-    if (preview) {
+    if (preview || isStaticOverlay) {
       return;
     }
     const socket: Socket = createRealtimeSocket();
@@ -119,7 +120,7 @@ export function OverlayRuntimeClient({ schema, overlayKey, preview = false, debu
     return () => {
       socket.disconnect();
     };
-  }, [debug, isList, layout.maxItems, layout.reverse, overlayKey, preview, schema, showSingleItem]);
+  }, [debug, isList, isStaticOverlay, layout.maxItems, layout.reverse, overlayKey, preview, schema, showSingleItem]);
 
   useEffect(() => {
     const hasExitingItems = items.some((item) => item.meta?.exiting);
@@ -167,6 +168,16 @@ export function OverlayRuntimeClient({ schema, overlayKey, preview = false, debu
         items={preview ? getSampleChatRenderData(layout.maxItems, getEnabledEventTypes(schema)) : items}
         debug={debug}
       />
+    );
+  }
+
+  if (isStaticOverlay) {
+    const staticData = getSampleChatRenderData(1, ["CHAT"])[0];
+
+    return (
+      <OverlayViewport schema={schema} debug={debug}>
+        <OverlaySceneRenderer schema={schema} data={staticData} debug={debug} />
+      </OverlayViewport>
     );
   }
 

@@ -8,6 +8,7 @@ import {
   Box,
   Cable,
   Gift,
+  Images,
   LayoutDashboard,
   ListTree,
   MessageSquareText,
@@ -67,6 +68,11 @@ const overlaySubItems = [
     hrefSuffix: "DOCK",
     label: "Dock",
     icon: PanelBottom
+  },
+  {
+    hrefSuffix: "STATIC",
+    label: "Static",
+    icon: Images
   },
   {
     hrefSuffix: "CUSTOM",

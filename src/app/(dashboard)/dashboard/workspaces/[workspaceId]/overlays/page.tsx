@@ -24,6 +24,7 @@ const overlayKindTabs = [
   { kind: "LEADERBOARD", label: "Leaderboard" },
   { kind: "GIFT", label: "Gift" },
   { kind: "DOCK", label: "Dock" },
+  { kind: "STATIC", label: "Static" },
   { kind: "CUSTOM", label: "Custom" }
 ] as const;
 

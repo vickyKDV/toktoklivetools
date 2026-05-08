@@ -18,10 +18,11 @@ export const overlayComponentTypes = [
   "gift_name",
   "gift_count",
   "gift_image",
+  "media_switch",
   "running_text"
 ] as const;
 
-export const overlayKinds = ["CHAT", "GIFT", "LEADERBOARD", "DOCK", "CUSTOM"] as const;
+export const overlayKinds = ["CHAT", "GIFT", "LEADERBOARD", "DOCK", "CUSTOM", "STATIC"] as const;
 export type OverlayKind = (typeof overlayKinds)[number];
 export const overlayLayoutModes = ["single", "list", "ticker", "dock", "grid"] as const;
 export type OverlayLayoutMode = (typeof overlayLayoutModes)[number];
@@ -147,7 +148,7 @@ export const overlayDesignSchema = z.object({
     animation: overlayAnimationEffectSchema.default({ type: "none", enabled: false, color: "#22d3ee", color2: "#f43f5e", durationMs: 2400, intensity: 70 })
   }),
   dataSource: z.object({
-    type: z.enum(["chat", "gift", "leaderboard", "dock", "manual"]).default("manual"),
+    type: z.enum(["chat", "gift", "leaderboard", "dock", "manual", "static"]).default("manual"),
     filters: z.record(z.unknown()).default({})
   }).default({ type: "manual", filters: {} }),
   layout: z.object({

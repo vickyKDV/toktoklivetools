@@ -70,7 +70,7 @@ type SaveResponse = {
 type BuilderView = "editor" | "json" | "preview";
 type PreviewDataMode = "sample" | "test" | "live";
 type OverlayBuilderType = "CUSTOM_OVERLAY" | "CHAT_STYLE";
-type OverlayKind = "CHAT" | "GIFT" | "LEADERBOARD" | "DOCK" | "CUSTOM";
+type OverlayKind = "CHAT" | "GIFT" | "LEADERBOARD" | "DOCK" | "CUSTOM" | "STATIC";
 type PopularGiftSample = {
   id: string;
   name: string;
@@ -519,11 +519,11 @@ export function BuilderLayout({
   }
 
   function switchOverlayKind(kind: OverlayKind) {
-    if (kind === "LEADERBOARD") {
-      const firstLeaderboardTemplate = overlayTemplates.find((template) => getTemplateKind(template.schema) === "LEADERBOARD");
+    if (kind === "LEADERBOARD" || kind === "STATIC") {
+      const firstTemplate = overlayTemplates.find((template) => getTemplateKind(template.schema) === kind);
 
-      if (firstLeaderboardTemplate) {
-        loadTemplate(firstLeaderboardTemplate.id);
+      if (firstTemplate) {
+        loadTemplate(firstTemplate.id);
       }
 
       return;
@@ -670,7 +670,7 @@ export function BuilderLayout({
           publish
         })
       });
-      const data = (await response.json()) as SaveResponse;
+      const data = await readSaveResponse(response);
 
       if (!response.ok || !data.ok || !data.design) {
         setStatus(data.message ?? "Design gagal disimpan.");
@@ -684,8 +684,8 @@ export function BuilderLayout({
       setSavedDesigns(data.designs ?? upsertDesign(savedDesigns, data.design));
       setIsDirty(false);
       setStatus(data.message ?? (publish ? "Overlay berhasil dipublish" : "Draft overlay berhasil disimpan"));
-    } catch {
-      setStatus("Server tidak merespon saat menyimpan design.");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Server tidak merespon saat menyimpan design.");
     } finally {
       setSaving(false);
     }
@@ -787,6 +787,7 @@ export function BuilderLayout({
                 <option value="CHAT">Chat</option>
                 <option value="GIFT">Gift</option>
                 <option value="LEADERBOARD">Leaderboard</option>
+                <option value="STATIC">Static</option>
                 <option value="CUSTOM">Custom</option>
               </select>
               {!isLeaderboardOverlay ? (
@@ -1016,6 +1017,7 @@ export function BuilderLayout({
           <Card>
             <CardContent className="p-5">
               <PropertyInspector
+                workspaceId={workspaceId}
                 designSchema={designSchema}
                 selectedComponent={selectedComponent}
                 onUpdateDesign={updateDesign}
@@ -1044,8 +1046,25 @@ function upsertDesign(current: BuilderSavedDesign[], design: BuilderSavedDesign)
   return next;
 }
 
+async function readSaveResponse(response: Response): Promise<SaveResponse> {
+  const text = await response.text();
+
+  if (!text) {
+    return { ok: false, message: `Server mengembalikan response kosong (${response.status}).` };
+  }
+
+  try {
+    return JSON.parse(text) as SaveResponse;
+  } catch {
+    return {
+      ok: false,
+      message: `Server mengembalikan response non-JSON (${response.status}). Cek terminal log Next.js.`
+    };
+  }
+}
+
 function normalizeKind(value: string | undefined): OverlayKind {
-  if (value === "CHAT" || value === "GIFT" || value === "LEADERBOARD" || value === "DOCK" || value === "CUSTOM") {
+  if (value === "CHAT" || value === "GIFT" || value === "LEADERBOARD" || value === "DOCK" || value === "CUSTOM" || value === "STATIC") {
     return value;
   }
 
@@ -1099,6 +1118,10 @@ function getDefaultDataSourceForKind(kind: OverlayKind, current: OverlayDesignSc
     return { type: "leaderboard", filters: { metric: "gift" } };
   }
 
+  if (kind === "STATIC") {
+    return { type: "static", filters: current.type === "static" ? current.filters : {} };
+  }
+
   return { type: "manual", filters: current.type === "manual" ? current.filters : {} };
 }
 
@@ -1109,6 +1132,10 @@ function getDefaultLayoutForKind(kind: OverlayKind, current: OverlayDesignSchema
 
   if (kind === "LEADERBOARD") {
     return { ...current, mode: "list", maxItems: Math.min(50, Math.max(3, current.maxItems || 10)), reverse: false, align: "start" };
+  }
+
+  if (kind === "STATIC") {
+    return { ...current, mode: "single", maxItems: 1, gap: 0, reverse: false, align: "start" };
   }
 
   return { ...current, mode: "single", maxItems: 1 };

@@ -1,7 +1,7 @@
 "use client";
 
-import { Copy, Eye, EyeOff, Lock, Trash2, Unlock } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { Copy, Eye, EyeOff, Lock, Trash2, Unlock, Upload } from "lucide-react";
+import { useEffect, useState, type ReactNode } from "react";
 import { componentRegistry, type ComponentSetting } from "@/features/overlay-builder/registry/componentRegistry";
 import type { OverlayComponentSchema, OverlayDesignSchema } from "@/features/overlay-builder/schema/overlaySchema";
 import { isContainerType } from "@/features/overlay-builder/utils/componentTree";
@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 type PropertyInspectorProps = {
+  workspaceId: string;
   designSchema: OverlayDesignSchema;
   selectedComponent: OverlayComponentSchema | null;
   onUpdateDesign: (patch: Partial<OverlayDesignSchema>) => void;
@@ -26,6 +27,7 @@ type PropertyInspectorProps = {
 type PropertyTab = "basic" | "layout" | "content" | "appearance" | "typography" | "animation" | "advanced";
 
 export function PropertyInspector({
+  workspaceId,
   designSchema,
   selectedComponent,
   onUpdateDesign,
@@ -99,6 +101,7 @@ export function PropertyInspector({
       ) : null}
       {activeTab === "content" ? (
         <ComponentContentSection
+          workspaceId={workspaceId}
           selectedComponent={selectedComponent}
           contentSettings={contentSettings}
           onUpdateComponent={onUpdateComponent}
@@ -247,14 +250,27 @@ function ComponentLayoutSection({
 }
 
 function ComponentContentSection({
+  workspaceId,
   selectedComponent,
   contentSettings,
   onUpdateComponent
 }: {
+  workspaceId: string;
   selectedComponent: OverlayComponentSchema;
   contentSettings: ComponentSetting[];
   onUpdateComponent: (id: string, patch: Partial<OverlayComponentSchema>) => void;
 }) {
+  if (selectedComponent.type === "media_switch") {
+    return (
+      <MediaSwitchContentSection
+        workspaceId={workspaceId}
+        selectedComponent={selectedComponent}
+        contentSettings={contentSettings}
+        onUpdateComponent={onUpdateComponent}
+      />
+    );
+  }
+
   if (!contentSettings.length) {
     return null;
   }
@@ -270,6 +286,185 @@ function ComponentContentSection({
         />
       ))}
     </Section>
+  );
+}
+
+type MediaAsset = {
+  id: string;
+  label: string;
+  name: string;
+  type: "image" | "video" | "lottie";
+  url: string;
+  sourceLabel?: string;
+};
+
+type MediaItem = {
+  id?: string;
+  label?: string;
+  type?: "image" | "video" | "lottie";
+  url: string;
+};
+
+function MediaSwitchContentSection({
+  workspaceId,
+  selectedComponent,
+  contentSettings,
+  onUpdateComponent
+}: {
+  workspaceId: string;
+  selectedComponent: OverlayComponentSchema;
+  contentSettings: ComponentSetting[];
+  onUpdateComponent: (id: string, patch: Partial<OverlayComponentSchema>) => void;
+}) {
+  const [assets, setAssets] = useState<MediaAsset[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const items = getMediaItems(selectedComponent);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadAssets() {
+      setLoading(true);
+      try {
+        const response = await fetch(`/api/workspaces/${workspaceId}/animation-assets`);
+        const data = await response.json() as { assets?: MediaAsset[] };
+
+        if (!cancelled) {
+          setAssets(Array.isArray(data.assets) ? data.assets : []);
+        }
+      } catch {
+        if (!cancelled) {
+          setAssets([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void loadAssets();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [workspaceId]);
+
+  function updateItems(nextItems: MediaItem[]) {
+    onUpdateComponent(selectedComponent.id, {
+      props: {
+        ...selectedComponent.props,
+        items: nextItems
+      }
+    });
+  }
+
+  async function uploadFile(file: File) {
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const response = await fetch(`/api/workspaces/${workspaceId}/animation-assets`, {
+        method: "POST",
+        body: formData
+      });
+      const data = await response.json() as { asset?: MediaAsset; error?: string };
+
+      if (!response.ok || !data.asset) {
+        window.alert(data.error ?? "Upload gagal.");
+        return;
+      }
+
+      setAssets((current) => [data.asset as MediaAsset, ...current]);
+      updateItems([...items, assetToMediaItem(data.asset)]);
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  return (
+    <div className="grid gap-4">
+      <Section title="Media Files">
+        <div className="grid gap-3">
+          <label className="flex h-10 cursor-pointer items-center justify-center gap-2 rounded-md border bg-background px-3 text-sm font-semibold transition-colors hover:bg-muted">
+            <Upload className="size-4" />
+            {uploading ? "Uploading..." : "Upload media"}
+            <input
+              type="file"
+              accept=".json,.lottie,.webm,.mp4,.mov,.png,.jpg,.jpeg,.gif,.webp,.svg,image/*,video/*"
+              className="sr-only"
+              disabled={uploading}
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                event.currentTarget.value = "";
+                if (file) {
+                  void uploadFile(file);
+                }
+              }}
+            />
+          </label>
+          <div className="grid gap-2">
+            <p className="text-xs font-semibold text-muted-foreground">Selected sequence</p>
+            {items.length ? (
+              items.map((item, index) => (
+                <div key={`${item.url}-${index}`} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-md border bg-background px-3 py-2">
+                  <div className="min-w-0">
+                    <p className="truncate text-xs font-semibold">{item.label ?? item.url}</p>
+                    <p className="text-[11px] uppercase text-muted-foreground">{item.type ?? inferMediaType(item.url)}</p>
+                  </div>
+                  <div className="flex gap-1">
+                    <Button type="button" variant="outline" size="sm" disabled={index === 0} onClick={() => updateItems(moveMediaItem(items, index, index - 1))}>Up</Button>
+                    <Button type="button" variant="outline" size="sm" disabled={index === items.length - 1} onClick={() => updateItems(moveMediaItem(items, index, index + 1))}>Down</Button>
+                    <Button type="button" variant="destructive" size="sm" onClick={() => updateItems(items.filter((_, itemIndex) => itemIndex !== index))}>Remove</Button>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <p className="rounded-md border border-dashed bg-muted/20 px-3 py-3 text-xs text-muted-foreground">
+                Belum ada file. Upload atau pilih asset di bawah.
+              </p>
+            )}
+          </div>
+        </div>
+      </Section>
+      <Section title="Asset Library">
+        {loading ? (
+          <p className="text-xs text-muted-foreground">Loading assets...</p>
+        ) : assets.length ? (
+          <div className="grid max-h-64 gap-2 overflow-y-auto pr-1">
+            {assets.map((asset) => (
+              <button
+                key={asset.id}
+                type="button"
+                onClick={() => updateItems([...items, assetToMediaItem(asset)])}
+                className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-md border bg-background px-3 py-2 text-left transition-colors hover:bg-muted"
+              >
+                <span className="min-w-0">
+                  <span className="block truncate text-xs font-semibold">{asset.label}</span>
+                  <span className="block text-[11px] uppercase text-muted-foreground">{asset.type} · {asset.sourceLabel ?? "Asset"}</span>
+                </span>
+                <span className="text-xs font-semibold text-primary">Add</span>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <p className="rounded-md border border-dashed bg-muted/20 px-3 py-3 text-xs text-muted-foreground">
+            Asset belum ada. Upload file dari tombol di atas.
+          </p>
+        )}
+      </Section>
+      <Section title="Switch Settings">
+        {contentSettings.map((setting) => (
+          <SettingField
+            key={setting.key}
+            setting={setting}
+            component={selectedComponent}
+            onChange={(value) => onUpdateComponent(selectedComponent.id, setPath(selectedComponent, setting.key, value))}
+          />
+        ))}
+      </Section>
+    </div>
   );
 }
 
@@ -1020,6 +1215,71 @@ function setNestedValue<T extends Record<string, unknown>>(source: T, keys: stri
     ...source,
     [key]: setNestedValue(current, rest, value)
   };
+}
+
+function getMediaItems(component: OverlayComponentSchema): MediaItem[] {
+  const rawItems = component.props.items;
+
+  if (Array.isArray(rawItems)) {
+    return rawItems
+      .map((item): MediaItem | null => {
+        if (!item || typeof item !== "object" || Array.isArray(item)) {
+          return null;
+        }
+
+        const record = item as Record<string, unknown>;
+        const url = typeof record.url === "string" ? record.url : "";
+
+        if (!url) {
+          return null;
+        }
+
+        return {
+          id: typeof record.id === "string" ? record.id : url,
+          label: typeof record.label === "string" ? record.label : typeof record.name === "string" ? record.name : url.split("/").pop(),
+          type: record.type === "image" || record.type === "video" || record.type === "lottie" ? record.type : inferMediaType(url),
+          url
+        } satisfies MediaItem;
+      })
+      .filter((item): item is MediaItem => item !== null);
+  }
+
+  const src = typeof component.props.src === "string" ? component.props.src.trim() : "";
+
+  return src ? [{ id: src, url: src, label: src.split("/").pop(), type: inferMediaType(src) }] : [];
+}
+
+function assetToMediaItem(asset: MediaAsset): MediaItem {
+  return {
+    id: asset.id,
+    label: asset.label,
+    type: asset.type,
+    url: asset.url
+  };
+}
+
+function moveMediaItem(items: MediaItem[], from: number, to: number) {
+  const next = [...items];
+  const [item] = next.splice(from, 1);
+
+  if (!item) {
+    return items;
+  }
+
+  next.splice(to, 0, item);
+  return next;
+}
+
+function inferMediaType(url: string): MediaItem["type"] {
+  if (/\.(mp4|webm|mov)(?:$|[?#])/i.test(url)) {
+    return "video";
+  }
+
+  if (/\.(json|lottie)(?:$|[?#])/i.test(url)) {
+    return "lottie";
+  }
+
+  return "image";
 }
 
 function toColorInput(value: string) {
