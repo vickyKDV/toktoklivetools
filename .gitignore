@@ -9,3 +9,4 @@ coverage
 tsconfig.tsbuildinfo
 .DS_Store
 prisma/migrations/dev.db
+storage/uploads

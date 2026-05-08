@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import {
   allowedAnimationAssetExtensions,
-  animationAssetUploadRoot,
+  defaultAnimationAssetRoot,
   getAnimationAssetType,
   getWorkspaceAnimationUploadDirectory,
   legacyAnimationAssetUploadRoot,
@@ -33,7 +33,7 @@ export async function GET(_request: Request, context: RouteContext) {
     ...(await readAssets(
       "default",
       "Default Template",
-      path.join(animationAssetUploadRoot, "default"),
+      path.join(defaultAnimationAssetRoot, "default"),
       "/media/animations/default"
     )),
     ...(await readAssets(

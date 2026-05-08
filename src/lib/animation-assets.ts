@@ -16,9 +16,11 @@ export const allowedAnimationAssetExtensions = new Set([
 
 export const maxAnimationUploadBytes = 25 * 1024 * 1024;
 
+export const defaultAnimationAssetRoot = path.join(process.cwd(), "public", "uploads", "animations");
+
 export const animationAssetUploadRoot = process.env.ANIMATION_UPLOAD_ROOT
   ? path.resolve(process.env.ANIMATION_UPLOAD_ROOT)
-  : path.join(process.cwd(), "public", "uploads", "animations");
+  : path.join(process.cwd(), "storage", "uploads", "animations");
 
 export const legacyAnimationAssetUploadRoot = path.join(process.cwd(), "public", "upload", "animations");
 

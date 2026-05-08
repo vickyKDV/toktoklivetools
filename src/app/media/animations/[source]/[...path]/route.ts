@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import {
   allowedAnimationAssetExtensions,
   animationAssetUploadRoot,
+  defaultAnimationAssetRoot,
   getAnimationAssetContentType,
   legacyAnimationAssetUploadRoot
 } from "@/lib/animation-assets";
@@ -76,7 +77,7 @@ function resolveAnimationFilePath(source: string, segments: string[]) {
       return null;
     }
 
-    const root = source === "default" ? animationAssetUploadRoot : legacyAnimationAssetUploadRoot;
+    const root = source === "default" ? defaultAnimationAssetRoot : legacyAnimationAssetUploadRoot;
     return path.join(root, "default", filename);
   }
 
