@@ -38,7 +38,7 @@ Overlay basic tetap jalan tanpa Rules atau Automation Builder. Rules dan Automat
 Satu tabel `Overlay` dipakai untuk semua jenis output:
 
 ```txt
-kind: CHAT | GIFT | LEADERBOARD | DOCK | CUSTOM
+kind: CHAT | GIFT | LEADERBOARD | DOCK | CUSTOM | STATIC
 name: nama overlay
 draftSchema: JSON yang sedang diedit di Builder
 publishedSchema: JSON yang dipakai OBS/live
@@ -58,7 +58,7 @@ Route Builder:
 
 Alur pengguna:
 
-1. Pilih kind overlay: `CHAT`, `GIFT`, `LEADERBOARD`, `DOCK`, atau `CUSTOM`.
+1. Pilih kind overlay: `CHAT`, `GIFT`, `LEADERBOARD`, `DOCK`, `CUSTOM`, atau `STATIC`.
 2. Mulai dari blank canvas atau template JSON.
 3. Tambahkan component dari library.
 4. Atur canvas, layout, binding, container/card, text, avatar, border, shadow, dan style lain.
@@ -150,6 +150,28 @@ Route widget tersebut redirect ke runtime action:
 
 Gunakan URL ini sebagai Browser Source terpisah di layer OBS paling atas. JSON overlay utama tetap dipakai untuk chat/gift/leaderboard/dock.
 
+Action overlay dapat menampilkan beberapa jenis action bersamaan. Node action yang berjalan dari trigger yang sama tidak saling menimpa selama z-index/layer-nya berbeda:
+
+- `Show Animation`: image, GIF, video, JSON/Lottie.
+- `Text Overlay`: text CSS/SVG ringan untuk ucapan gift dan dynamic message.
+- `Confetti Overlay`: efek canvas-confetti sebagai overlay terpisah.
+- `Play Sound`: putar audio overlay.
+- `Reply Comment`: siapkan balasan komentar otomatis.
+
+Untuk media upload, file disimpan oleh app sebagai file fisik di:
+
+```txt
+storage/uploads/overlay-assets
+```
+
+Client hanya memakai URL:
+
+```txt
+/api/assets/[filename]
+```
+
+Tidak ada asset BLOB di DB, tidak perlu build ulang, dan tidak perlu env upload root.
+
 ## Rules
 
 Rules adalah automation sederhana berbasis form.
@@ -188,6 +210,17 @@ Contoh flow:
 [Comment Received] -> [Comment contains harga] -> [Reply Comment]
 ```
 
+Contoh flow per nama gift:
+
+```txt
+[Gift Received]
+  -> [giftName equals Mawar] -> [Show Animation Mawar]
+  -> [giftName equals Doughnut] -> [Show Animation Doughnut]
+  -> [giftName equals Finger Heart] -> [Show Animation Heart]
+```
+
+Node tanpa condition langsung setelah trigger akan berjalan untuk semua event trigger tersebut. Ini berguna untuk 3 layer umum seperti text overlay dan confetti, lalu branch condition dipakai untuk video khusus per gift.
+
 Flow disimpan ke:
 
 ```txt
@@ -222,6 +255,77 @@ Integrasi TikTok:
 ```txt
 src/lib/tiktok/connection-manager.ts
 ```
+
+## Action Nodes
+
+### Show Animation
+
+Dipakai untuk menampilkan asset visual:
+
+- Image.
+- GIF.
+- Video.
+- JSON/Lottie.
+
+Setting penting:
+
+- Fit/sizing media.
+- Posisi.
+- Z-index / bring to front / send to back.
+- Fade in.
+- Fade out.
+- Ikuti durasi video jika aktif.
+- Durasi fallback untuk image/GIF/Lottie.
+
+Jika `ikuti durasi video` aktif, video akan ditutup setelah event `ended`, lalu fade out. Untuk image/GIF/Lottie, runtime memakai durasi ms sebagai fallback.
+
+### Text Overlay
+
+Text Overlay memakai CSS/SVG ringan, bukan WebGL, agar lebih aman untuk OBS dan tidak berat.
+
+Binding umum:
+
+```txt
+{{viewer.name}}
+{{gift.name}}
+{{gift.amount}}
+{{comment.text}}
+```
+
+Pastikan text ditempatkan di area yang cukup besar agar tidak terpotong saat dipakai di OBS.
+
+### Confetti Overlay
+
+Confetti memakai `canvas-confetti` dan dirender sebagai layer action sendiri. Preset yang tersedia:
+
+- Basic Cannon.
+- Random Direction.
+- Realistic Look.
+- Fireworks.
+- Stars.
+- Snow.
+- School Pride.
+- Custom Shapes.
+- Emoji.
+
+Mode:
+
+- `once`: jalan sekali.
+- `repeat`: jalan berulang dengan delay dan auto close.
+- `repeat until overlay end`: jalan berulang sampai action overlay selesai.
+
+Confetti dapat ditumpuk dengan video/text overlay. Atur z-index jika ingin confetti di depan atau di belakang text.
+
+### Test Trigger
+
+`Test Trigger` adalah tombol global di Automation Builder. Tombol ini menjalankan flow aktif tanpa menunggu event TikTok asli.
+
+Behavior:
+
+- Tidak wajib memilih node dulu.
+- Tidak peduli tipe gift/comment real.
+- Action overlay harus terbuka di URL flow yang sama.
+- Cocok untuk validasi video, text overlay, confetti, dan sound sebelum live.
 
 ## Checklist OBS Tidak Update
 

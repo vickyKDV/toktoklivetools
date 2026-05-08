@@ -8,7 +8,10 @@ Staging MVP for TikTok LIVE automation, realtime event storage, JSON overlays, a
 - Multi-workspace dashboard.
 - TikTok LIVE connector service with Socket.IO realtime rooms.
 - Rules and Automation Builder for conditional actions.
-- Unified JSON Overlay Runtime for chat, gift, leaderboard, dock, and custom overlays.
+- Unified JSON Overlay Runtime for chat, gift, leaderboard, dock, custom, and static overlays.
+- Overlay Design Builder with shared Builder/Public Preview/OBS renderer.
+- Runtime upload storage for overlay assets without rebuilds or upload-root env variables.
+- Dashboard theme selector in the header for light/dark and accent variants.
 
 ## Setup
 
@@ -46,12 +49,13 @@ Overlays are now standalone JSON resources. There is no active/inactive global s
 /overlay/leaderboard/[overlayId]
 /overlay/dock/[overlayId]
 /overlay/custom/[overlayId]
+/overlay/static/[overlayId]
 ```
 
 The `Overlay` table is the single source of truth:
 
 ```txt
-kind: CHAT | GIFT | LEADERBOARD | DOCK | CUSTOM
+kind: CHAT | GIFT | LEADERBOARD | DOCK | CUSTOM | STATIC
 draftSchema: JSON currently edited in builder
 publishedSchema: JSON used by OBS/live
 publishedAt: null means draft has not been published yet
@@ -99,6 +103,17 @@ Layout modes:
 - `dock`: dock/chat management surfaces.
 - `grid`: future grid/table layouts.
 
+Runtime asset upload:
+
+```txt
+POST /api/assets/upload
+GET  /api/assets/[filename]
+```
+
+Uploaded files are stored as physical files under `storage/uploads/overlay-assets`.
+The database/schema stores only the returned relative URL, for example `/api/assets/asset-name.mp4`.
+This avoids DB blobs, `public` rebuild issues, and VPS-specific upload-root env setup.
+
 ## Dashboard Routes
 
 ```txt
@@ -144,7 +159,7 @@ not require a rebuild.
 ## Builder Flow
 
 1. Open `/dashboard/workspaces/[workspaceId]/overlay-design-builder`.
-2. Pick `kind`: `CHAT`, `GIFT`, `LEADERBOARD`, `DOCK`, or `CUSTOM`.
+2. Pick `kind`: `CHAT`, `GIFT`, `LEADERBOARD`, `DOCK`, `CUSTOM`, or `STATIC`.
 3. Edit canvas, layout, components, bindings, and styles.
 4. Preview with dummy/live event data.
 5. Click `Save Draft` to persist `draftSchema`.
@@ -164,7 +179,12 @@ pnpm db:seed
 
 ## Docs
 
+- [Overlay Runtime dan Builder](docs/overlay-runtime.md)
 - [Automation Builder dan Rules](docs/automation-builder.md)
+- [Production / Cloud Deployment](docs/deployment.md)
+- [Coordinate System](docs/COORDINATE_SYSTEM.md)
+- [Coordinate Audit](docs/COORDINATE_AUDIT.md)
+- [Resize Debug Report](docs/RESIZE_DEBUG_REPORT.md)
 
 ## Notes
 
