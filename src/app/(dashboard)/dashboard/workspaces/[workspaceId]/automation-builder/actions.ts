@@ -19,6 +19,14 @@ const saveFlowSchema = z.object({
   edges: z.unknown()
 });
 
+const automationActionNodeTypes = new Set([
+  "showAnimation",
+  "show3dText",
+  "showConfetti",
+  "playSound",
+  "replyComment"
+]);
+
 export async function saveAutomationFlowAction(input: SaveAutomationFlowInput) {
   const user = await requireUser();
   const parsed = saveFlowSchema.safeParse(input);
@@ -41,7 +49,7 @@ export async function saveAutomationFlowAction(input: SaveAutomationFlowInput) {
     };
   }
 
-  if (!nodes.some((node) => ["showAnimation", "playSound", "replyComment"].includes(node.type))) {
+  if (!nodes.some((node) => automationActionNodeTypes.has(node.type))) {
     return {
       ok: false,
       message: "Flow harus punya minimal satu action node."

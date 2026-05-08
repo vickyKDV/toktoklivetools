@@ -32,6 +32,14 @@ const toggleFlowSchema = z.object({
   isActive: z.boolean()
 });
 
+const automationActionNodeTypes = new Set([
+  "showAnimation",
+  "show3dText",
+  "showConfetti",
+  "playSound",
+  "replyComment"
+]);
+
 export async function POST(request: Request, context: RouteContext) {
   const auth = await authorizeWorkspace(context);
 
@@ -65,7 +73,7 @@ export async function POST(request: Request, context: RouteContext) {
     );
   }
 
-  if (!nodes.some((node) => ["showAnimation", "playSound", "replyComment"].includes(node.type))) {
+  if (!nodes.some((node) => automationActionNodeTypes.has(node.type))) {
     return NextResponse.json(
       {
         ok: false,
