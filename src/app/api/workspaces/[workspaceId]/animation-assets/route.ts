@@ -2,6 +2,14 @@ import { mkdir, readdir, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
+import {
+  allowedAnimationAssetExtensions,
+  animationAssetUploadRoot,
+  getAnimationAssetType,
+  getWorkspaceAnimationUploadDirectory,
+  legacyAnimationAssetUploadRoot,
+  maxAnimationUploadBytes
+} from "@/lib/animation-assets";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
@@ -14,24 +22,6 @@ type RouteContext = {
 
 type AnimationAssetSource = "default" | "workspace";
 
-const allowedExtensions = new Set([
-  ".json",
-  ".lottie",
-  ".webm",
-  ".mp4",
-  ".mov",
-  ".png",
-  ".jpg",
-  ".jpeg",
-  ".gif",
-  ".webp",
-  ".svg"
-]);
-
-const maxUploadBytes = 25 * 1024 * 1024;
-const uploadRoot = path.join(process.cwd(), "public", "uploads", "animations");
-const legacyUploadRoot = path.join(process.cwd(), "public", "upload", "animations");
-
 export async function GET(_request: Request, context: RouteContext) {
   const auth = await authorizeWorkspace(context);
 
@@ -40,13 +30,23 @@ export async function GET(_request: Request, context: RouteContext) {
   }
 
   const assets = [
-    ...(await readAssets("default", "Default Template", path.join(uploadRoot, "default"), "/uploads/animations/default")),
-    ...(await readAssets("default", "Default Template", path.join(legacyUploadRoot, "default"), "/upload/animations/default")),
+    ...(await readAssets(
+      "default",
+      "Default Template",
+      path.join(animationAssetUploadRoot, "default"),
+      "/media/animations/default"
+    )),
+    ...(await readAssets(
+      "default",
+      "Default Template",
+      path.join(legacyAnimationAssetUploadRoot, "default"),
+      "/media/animations/legacy-default"
+    )),
     ...(await readAssets(
       "workspace",
       "Workspace Upload",
-      getWorkspaceUploadDirectory(auth.workspaceId),
-      `/uploads/animations/workspaces/${auth.workspaceId}`
+      getWorkspaceAnimationUploadDirectory(auth.workspaceId),
+      `/media/animations/workspaces/${auth.workspaceId}`
     ))
   ];
 
@@ -69,18 +69,18 @@ export async function POST(request: Request, context: RouteContext) {
 
   const extension = path.extname(file.name).toLowerCase();
 
-  if (!allowedExtensions.has(extension)) {
+  if (!allowedAnimationAssetExtensions.has(extension)) {
     return NextResponse.json(
       { error: "Format tidak didukung. Gunakan JSON/Lottie, video, atau image." },
       { status: 400 }
     );
   }
 
-  if (file.size > maxUploadBytes) {
+  if (file.size > maxAnimationUploadBytes) {
     return NextResponse.json({ error: "File terlalu besar. Maksimal 25MB." }, { status: 400 });
   }
 
-  const uploadDirectory = getWorkspaceUploadDirectory(auth.workspaceId);
+  const uploadDirectory = getWorkspaceAnimationUploadDirectory(auth.workspaceId);
   await mkdir(uploadDirectory, { recursive: true });
 
   const filename = `${Date.now()}-${sanitizeFilename(file.name)}`;
@@ -93,7 +93,7 @@ export async function POST(request: Request, context: RouteContext) {
     sourceLabel: "Workspace Upload",
     filename,
     directory: uploadDirectory,
-    urlPrefix: `/uploads/animations/workspaces/${auth.workspaceId}`
+    urlPrefix: `/media/animations/workspaces/${auth.workspaceId}`
   });
 
   return NextResponse.json({ asset });
@@ -154,7 +154,9 @@ async function readAssets(
   try {
     const entries = await readdir(directory, { withFileTypes: true });
     const files = entries
-      .filter((entry) => entry.isFile() && allowedExtensions.has(path.extname(entry.name).toLowerCase()))
+      .filter(
+        (entry) => entry.isFile() && allowedAnimationAssetExtensions.has(path.extname(entry.name).toLowerCase())
+      )
       .map((entry) => entry.name)
       .sort((a, b) => a.localeCompare(b));
 
@@ -196,14 +198,10 @@ async function toAsset({
     label: humanizeFilename(filename),
     source,
     sourceLabel,
-    type: getAssetType(extension),
+    type: getAnimationAssetType(extension),
     url: `${urlPrefix}/${encodeURIComponent(filename)}`,
     size: fileStat.size
   };
-}
-
-function getWorkspaceUploadDirectory(workspaceId: string) {
-  return path.join(uploadRoot, "workspaces", workspaceId);
 }
 
 function sanitizeFilename(filename: string) {
@@ -226,16 +224,4 @@ function humanizeFilename(filename: string) {
     .replace(/\.[^.]+$/, "")
     .replace(/[-_]+/g, " ")
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
-}
-
-function getAssetType(extension: string) {
-  if (extension === ".json" || extension === ".lottie") {
-    return "lottie";
-  }
-
-  if (extension === ".webm" || extension === ".mp4" || extension === ".mov") {
-    return "video";
-  }
-
-  return "image";
 }
