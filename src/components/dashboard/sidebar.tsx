@@ -1,79 +1,17 @@
-import Link from "next/link";
 import {
-  Activity,
-  Blocks,
-  Box,
-  Cable,
-  Gift,
-  LayoutDashboard,
-  ListTree,
   LogOut,
-  MessageSquareText,
-  MonitorUp,
-  PanelBottom,
-  Palette,
-  Settings,
-  Sparkles,
-  Trophy,
-  Workflow
+  Sparkles
 } from "lucide-react";
 import { logoutAction } from "@/app/(auth)/actions";
+import { DashboardSidebarNav, type SidebarWorkspace } from "@/components/dashboard/sidebar-nav";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import type { AuthUser } from "@/lib/auth";
-
-type SidebarWorkspace = {
-  id: string;
-  name: string;
-  tiktokUsername: string | null;
-  overlayKey: string;
-};
 
 type DashboardSidebarProps = {
   user: AuthUser;
   workspaces: SidebarWorkspace[];
 };
-
-const navItems = [
-  {
-    href: "/dashboard",
-    label: "Overview",
-    icon: LayoutDashboard
-  },
-  {
-    href: "/dashboard/workspaces",
-    label: "Workspaces",
-    icon: Blocks
-  }
-];
-
-const overlaySubItems = [
-  {
-    hrefSuffix: "CHAT",
-    label: "Chat",
-    icon: MessageSquareText
-  },
-  {
-    hrefSuffix: "LEADERBOARD",
-    label: "Leaderboard",
-    icon: Trophy
-  },
-  {
-    hrefSuffix: "GIFT",
-    label: "Gift",
-    icon: Gift
-  },
-  {
-    hrefSuffix: "DOCK",
-    label: "Dock",
-    icon: PanelBottom
-  },
-  {
-    hrefSuffix: "CUSTOM",
-    label: "Custom",
-    icon: Box
-  }
-];
 
 export function DashboardSidebar({ user, workspaces }: DashboardSidebarProps) {
   return (
@@ -90,86 +28,7 @@ export function DashboardSidebar({ user, workspaces }: DashboardSidebarProps) {
         </div>
         <Separator />
 
-        <nav className="grid gap-1 p-3">
-          {navItems.map((item) => (
-            <Button key={item.href} asChild variant="ghost" className="justify-start">
-              <Link href={item.href}>
-                <item.icon />
-                {item.label}
-              </Link>
-            </Button>
-          ))}
-        </nav>
-
-        <div className="px-5 py-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          Active Projects
-        </div>
-        <div className="grid gap-1 px-3">
-          {workspaces.slice(0, 6).map((workspace) => (
-            <Button key={workspace.id} asChild variant="ghost" className="h-auto justify-start py-2">
-              <Link href={`/dashboard/workspaces/${workspace.id}`}>
-                <Activity />
-                <span className="min-w-0 flex-1 text-left">
-                  <span className="block truncate">{workspace.name}</span>
-                  <span className="block truncate text-xs font-normal text-muted-foreground">
-                    {workspace.tiktokUsername ? `@${workspace.tiktokUsername}` : "No username"}
-                  </span>
-                </span>
-              </Link>
-            </Button>
-          ))}
-        </div>
-
-        {workspaces[0] ? (
-          <div className="mt-4 grid gap-1 px-3">
-            <Button asChild variant="ghost" className="justify-start">
-              <Link href={`/dashboard/workspaces/${workspaces[0].id}/connection`}>
-                <Cable />
-                Live Connection
-              </Link>
-            </Button>
-            <Button asChild variant="ghost" className="justify-start">
-              <Link href={`/dashboard/workspaces/${workspaces[0].id}/rules`}>
-                <ListTree />
-                Rules
-              </Link>
-            </Button>
-            <Button asChild variant="ghost" className="justify-start">
-              <Link href={`/dashboard/workspaces/${workspaces[0].id}/automation-builder`}>
-                <Workflow />
-                Automation Builder
-              </Link>
-            </Button>
-            <Button asChild variant="ghost" className="justify-start">
-              <Link href={`/dashboard/workspaces/${workspaces[0].id}/overlays`}>
-                <MonitorUp />
-                Overlays
-              </Link>
-            </Button>
-            <div className="ml-6 grid gap-1 border-l pl-2">
-              {overlaySubItems.map((item) => (
-                <Button key={item.hrefSuffix} asChild variant="ghost" size="sm" className="h-8 justify-start px-2 text-xs text-muted-foreground">
-                  <Link href={`/dashboard/workspaces/${workspaces[0].id}/overlays?kind=${item.hrefSuffix}`}>
-                    <item.icon className="size-3.5" />
-                    {item.label}
-                  </Link>
-                </Button>
-              ))}
-            </div>
-            <Button asChild variant="ghost" className="justify-start">
-              <Link href={`/dashboard/workspaces/${workspaces[0].id}/overlay-design-builder`}>
-                <Palette />
-                Design Builder
-              </Link>
-            </Button>
-            <Button asChild variant="ghost" className="justify-start">
-              <Link href={`/dashboard/workspaces/${workspaces[0].id}/settings`}>
-                <Settings />
-                Settings
-              </Link>
-            </Button>
-          </div>
-        ) : null}
+        <DashboardSidebarNav workspaces={workspaces} />
 
         <div className="mt-auto p-3">
           <form action={logoutAction}>

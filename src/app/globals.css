@@ -165,6 +165,20 @@
       color 180ms ease;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
+
+  @keyframes route-progress {
+    0% {
+      transform: translateX(-110%);
+    }
+
+    55% {
+      transform: translateX(75%);
+    }
+
+    100% {
+      transform: translateX(220%);
+    }
+  }
 }
 
 @layer components {
