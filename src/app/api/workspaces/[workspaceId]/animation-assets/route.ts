@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import {
   allowedAnimationAssetExtensions,
+  createOverlayAssetFilename,
   defaultAnimationAssetRoot,
   getAnimationAssetType,
   getWorkspaceAnimationUploadDirectory,
@@ -46,7 +47,8 @@ export async function GET(_request: Request, context: RouteContext) {
       "workspace",
       "Workspace Upload",
       getWorkspaceAnimationUploadDirectory(auth.workspaceId),
-      `/media/animations/workspaces/${auth.workspaceId}`
+      "/api/assets",
+      `${auth.workspaceId}-`
     ))
   ];
 
@@ -83,7 +85,7 @@ export async function POST(request: Request, context: RouteContext) {
   const uploadDirectory = getWorkspaceAnimationUploadDirectory(auth.workspaceId);
   await mkdir(uploadDirectory, { recursive: true });
 
-  const filename = `${Date.now()}-${sanitizeFilename(file.name)}`;
+  const filename = createOverlayAssetFilename(file.name, auth.workspaceId);
   const filePath = path.join(uploadDirectory, filename);
   const bytes = Buffer.from(await file.arrayBuffer());
   await writeFile(filePath, bytes);
@@ -93,7 +95,7 @@ export async function POST(request: Request, context: RouteContext) {
     sourceLabel: "Workspace Upload",
     filename,
     directory: uploadDirectory,
-    urlPrefix: `/media/animations/workspaces/${auth.workspaceId}`
+    urlPrefix: "/api/assets"
   });
 
   return NextResponse.json({ asset });
@@ -149,13 +151,17 @@ async function readAssets(
   source: AnimationAssetSource,
   sourceLabel: string,
   directory: string,
-  urlPrefix: string
+  urlPrefix: string,
+  filenamePrefix?: string
 ) {
   try {
     const entries = await readdir(directory, { withFileTypes: true });
     const files = entries
       .filter(
-        (entry) => entry.isFile() && allowedAnimationAssetExtensions.has(path.extname(entry.name).toLowerCase())
+        (entry) =>
+          entry.isFile() &&
+          (!filenamePrefix || entry.name.startsWith(filenamePrefix)) &&
+          allowedAnimationAssetExtensions.has(path.extname(entry.name).toLowerCase())
       )
       .map((entry) => entry.name)
       .sort((a, b) => a.localeCompare(b));
@@ -202,20 +208,6 @@ async function toAsset({
     url: `${urlPrefix}/${encodeURIComponent(filename)}`,
     size: fileStat.size
   };
-}
-
-function sanitizeFilename(filename: string) {
-  const extension = path.extname(filename).toLowerCase();
-  const base = path.basename(filename, extension);
-  const safeBase =
-    base
-      .toLowerCase()
-      .trim()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 64) || "animation";
-
-  return `${safeBase}${extension}`;
 }
 
 function humanizeFilename(filename: string) {

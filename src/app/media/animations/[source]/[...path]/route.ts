@@ -3,10 +3,10 @@ import path from "node:path";
 import { NextResponse } from "next/server";
 import {
   allowedAnimationAssetExtensions,
-  animationAssetUploadRoot,
   defaultAnimationAssetRoot,
   getAnimationAssetContentType,
-  legacyAnimationAssetUploadRoot
+  legacyAnimationAssetUploadRoot,
+  overlayAssetUploadRoot
 } from "@/lib/animation-assets";
 
 export const runtime = "nodejs";
@@ -20,68 +20,76 @@ type RouteContext = {
 
 export async function GET(request: Request, context: RouteContext) {
   const { source, path: segments = [] } = await context.params;
-  const filePath = resolveAnimationFilePath(source, segments);
+  const filePaths = resolveAnimationFilePaths(source, segments);
 
-  if (!filePath) {
+  if (!filePaths.length) {
     return NextResponse.json({ error: "Animation asset not found" }, { status: 404 });
   }
 
-  try {
-    const fileStat = await stat(filePath);
+  for (const filePath of filePaths) {
+    try {
+      const fileStat = await stat(filePath);
 
-    if (!fileStat.isFile()) {
-      return NextResponse.json({ error: "Animation asset not found" }, { status: 404 });
-    }
-
-    const extension = path.extname(filePath).toLowerCase();
-    const contentType = getAnimationAssetContentType(extension);
-    const bytes = await readFile(filePath);
-    const range = request.headers.get("range");
-
-    if (range) {
-      const partial = createPartialResponse(bytes, range, contentType);
-
-      if (partial) {
-        return partial;
+      if (!fileStat.isFile()) {
+        continue;
       }
-    }
 
-    return new NextResponse(toArrayBuffer(bytes), {
-      headers: {
-        "Accept-Ranges": "bytes",
-        "Cache-Control": "public, max-age=31536000, immutable",
-        "Content-Length": String(bytes.byteLength),
-        "Content-Type": contentType
+      const extension = path.extname(filePath).toLowerCase();
+      const contentType = getAnimationAssetContentType(extension);
+      const bytes = await readFile(filePath);
+      const range = request.headers.get("range");
+
+      if (range) {
+        const partial = createPartialResponse(bytes, range, contentType);
+
+        if (partial) {
+          return partial;
+        }
       }
-    });
-  } catch {
-    return NextResponse.json({ error: "Animation asset not found" }, { status: 404 });
+
+      return new NextResponse(toArrayBuffer(bytes), {
+        headers: {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "public, max-age=31536000, immutable",
+          "Content-Length": String(bytes.byteLength),
+          "Content-Type": contentType
+        }
+      });
+    } catch {
+      continue;
+    }
   }
+
+  return NextResponse.json({ error: "Animation asset not found" }, { status: 404 });
 }
 
-function resolveAnimationFilePath(source: string, segments: string[]) {
+function resolveAnimationFilePaths(source: string, segments: string[]) {
   if (source === "workspaces") {
     const [workspaceId, filename] = segments;
 
     if (segments.length !== 2 || !isSafeWorkspaceId(workspaceId) || !isSafeFilename(filename)) {
-      return null;
+      return [];
     }
 
-    return path.join(animationAssetUploadRoot, "workspaces", workspaceId, filename);
+    return [
+      path.join(overlayAssetUploadRoot, filename),
+      path.join(defaultAnimationAssetRoot, "workspaces", workspaceId, filename),
+      path.join(process.cwd(), "storage", "uploads", "animations", "workspaces", workspaceId, filename)
+    ];
   }
 
   if (source === "default" || source === "legacy-default") {
     const [filename] = segments;
 
     if (segments.length !== 1 || !isSafeFilename(filename)) {
-      return null;
+      return [];
     }
 
     const root = source === "default" ? defaultAnimationAssetRoot : legacyAnimationAssetUploadRoot;
-    return path.join(root, "default", filename);
+    return [path.join(root, "default", filename)];
   }
 
-  return null;
+  return [];
 }
 
 function isSafeWorkspaceId(workspaceId: string | undefined) {

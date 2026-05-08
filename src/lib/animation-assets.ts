@@ -1,4 +1,5 @@
 import path from "node:path";
+import { randomUUID } from "node:crypto";
 
 export const allowedAnimationAssetExtensions = new Set([
   ".json",
@@ -18,14 +19,42 @@ export const maxAnimationUploadBytes = 25 * 1024 * 1024;
 
 export const defaultAnimationAssetRoot = path.join(process.cwd(), "public", "uploads", "animations");
 
-export const animationAssetUploadRoot = process.env.ANIMATION_UPLOAD_ROOT
-  ? path.resolve(process.env.ANIMATION_UPLOAD_ROOT)
-  : path.join(process.cwd(), "storage", "uploads", "animations");
+export const overlayAssetUploadRoot = path.join(process.cwd(), "storage", "uploads", "overlay-assets");
 
 export const legacyAnimationAssetUploadRoot = path.join(process.cwd(), "public", "upload", "animations");
 
 export function getWorkspaceAnimationUploadDirectory(workspaceId: string) {
-  return path.join(animationAssetUploadRoot, "workspaces", workspaceId);
+  void workspaceId;
+  return overlayAssetUploadRoot;
+}
+
+export function createOverlayAssetFilename(originalFilename: string, scope = "asset") {
+  const extension = path.extname(originalFilename).toLowerCase();
+  const base = path.basename(originalFilename, extension);
+  const safeBase =
+    base
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 48) || "upload";
+  const safeScope =
+    scope
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9_-]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 40) || "asset";
+
+  return `${safeScope}-${Date.now()}-${randomUUID().slice(0, 8)}-${safeBase}${extension}`;
+}
+
+export function isSafeOverlayAssetFilename(filename: string | undefined) {
+  if (!filename || filename !== path.basename(filename) || filename.includes("..")) {
+    return false;
+  }
+
+  return allowedAnimationAssetExtensions.has(path.extname(filename).toLowerCase());
 }
 
 export function getAnimationAssetType(extension: string) {

@@ -137,12 +137,9 @@ Set `NEXT_PUBLIC_WIDGET_BASE_URL` when deploying a dedicated widget domain:
 NEXT_PUBLIC_WIDGET_BASE_URL="https://widgets.yourdomain.com"
 ```
 
-Uploaded animation/static overlay files are served by `/media/animations/...`, not directly from `public`.
-Use a persistent writable folder in production so uploads survive rebuilds:
-
-```txt
-ANIMATION_UPLOAD_ROOT="/root/apps/toktoklivetools/storage/uploads/animations"
-```
+Uploaded animation/static overlay files are stored by the app in `storage/uploads/overlay-assets`
+and served through `/api/assets/[filename]`. They are not written to `public`, so new uploads do
+not require a rebuild.
 
 ## Builder Flow
 
