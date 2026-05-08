@@ -67,7 +67,7 @@ export type ChatUserRole =
   | "friend"
   | "topgifter";
 
-export type LeaderboardMetric = "gift" | "like" | "chat";
+export type LeaderboardMetric = "gift" | "like" | "view" | "comment" | "chat";
 
 export type LeaderboardPeriod = "realtime" | "7d" | "14d" | "30d" | "month";
 

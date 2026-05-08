@@ -88,6 +88,17 @@ export const moderatorStackTemplate: OverlayTemplate = {
 
 const leaderboardTemplates: OverlayTemplate[] = [
   createLeaderboardTemplate({
+    id: "leaderboard-default-clean",
+    name: "Default Clean",
+    description: "Leaderboard clean dengan card putih sederhana dan text hitam.",
+    cardType: "container",
+    canvasColor: "transparent",
+    from: "#ffffff",
+    to: "#f8fafc",
+    accent: "#111827",
+    text: "#111827"
+  }),
+  createLeaderboardTemplate({
     id: "leaderboard-neon-rank",
     name: "Neon Rank Board",
     description: "Leaderboard neon gelap dengan ranking besar dan score kontras.",
@@ -99,8 +110,19 @@ const leaderboardTemplates: OverlayTemplate[] = [
     text: "#ecfeff"
   }),
   createLeaderboardTemplate({
+    id: "leaderboard-cyberpunk",
+    name: "Cyberpunk",
+    description: "Leaderboard cyberpunk dengan glow magenta dan cyan.",
+    cardType: "gradient_card",
+    canvasColor: "#020617",
+    from: "#111827",
+    to: "#701a75",
+    accent: "#22d3ee",
+    text: "#fdf4ff"
+  }),
+  createLeaderboardTemplate({
     id: "leaderboard-gold-podium",
-    name: "Gold Podium List",
+    name: "Gold Podium",
     description: "List leader premium dengan aksen gold untuk top gifter.",
     cardType: "bubble_card",
     canvasColor: "#17120a",
@@ -111,7 +133,7 @@ const leaderboardTemplates: OverlayTemplate[] = [
   }),
   createLeaderboardTemplate({
     id: "leaderboard-glass-arena",
-    name: "Glass Arena",
+    name: "Liquid Glass",
     description: "Glass leaderboard bersih untuk overlay vertical modern.",
     cardType: "glass_card",
     canvasColor: "#020617",
@@ -592,7 +614,7 @@ function createLeaderboardTemplate({
       },
       layout: {
         mode: "list",
-        maxItems: 5,
+        maxItems: 10,
         gap: 10,
         direction: "vertical",
         reverse: false,
@@ -614,7 +636,7 @@ function createLeaderboardTemplate({
           height: 78,
           zIndex: 1,
           visible: true,
-          locked: true,
+          locked: false,
           props: { clipContent: true, padding: 14, layout: "free" },
           style: {
             background: { type: "gradient", color: from, from, to, angle: 135, opacity: 92 },
@@ -627,7 +649,7 @@ function createLeaderboardTemplate({
           children: [
             {
               id: `${id}_rank`,
-              type: "viewer_badge",
+              type: "leaderboard_rank",
               name: "Rank",
               x: 18,
               y: 16,
@@ -635,8 +657,8 @@ function createLeaderboardTemplate({
               height: 46,
               zIndex: 1,
               visible: true,
-              locked: true,
-              props: { text: "{{viewer.badge}}" },
+              locked: false,
+              props: { mode: "text", metric: "auto", textPrefix: "#", topCrownCount: 3 },
               style: { backgroundColor: accent, radius: 14, fontSize: 22, fontWeight: 900, color: canvasColor, align: "center", lineHeight: 1 }
             },
             {
@@ -649,7 +671,7 @@ function createLeaderboardTemplate({
               height: 30,
               zIndex: 2,
               visible: true,
-              locked: true,
+              locked: false,
               props: { text: "{{viewer.name}}" },
               style: { fontSize: 23, fontWeight: 900, color: text, align: "left", lineHeight: 1.05, textOverflow: "ellipsis" }
             },
@@ -663,7 +685,7 @@ function createLeaderboardTemplate({
               height: 22,
               zIndex: 3,
               visible: true,
-              locked: true,
+              locked: false,
               props: { text: "{{comment.text}}" },
               style: { fontSize: 15, fontWeight: 700, color: text, opacity: 80, align: "left", lineHeight: 1.1, textOverflow: "ellipsis" }
             },
@@ -671,15 +693,29 @@ function createLeaderboardTemplate({
               id: `${id}_score`,
               type: "gift_count",
               name: "Score",
-              x: 476,
+              x: 474,
               y: 14,
-              width: 176,
+              width: 132,
               height: 48,
               zIndex: 4,
               visible: true,
-              locked: true,
+              locked: false,
               props: { text: "{{gift.count}}" },
               style: { fontSize: 34, fontWeight: 1000, color: text, align: "right", lineHeight: 1, autoFitFontSize: true }
+            },
+            {
+              id: `${id}_metric_icon`,
+              type: "leaderboard_rank",
+              name: "Metric Icon",
+              x: 622,
+              y: 21,
+              width: 34,
+              height: 34,
+              zIndex: 5,
+              visible: true,
+              locked: false,
+              props: { mode: "metric_icon", metric: "auto", textPrefix: "#", topCrownCount: 3 },
+              style: { backgroundColor: "transparent", radius: 999, fontSize: 20, fontWeight: 900, color: accent, align: "center", lineHeight: 1 }
             }
           ]
         }

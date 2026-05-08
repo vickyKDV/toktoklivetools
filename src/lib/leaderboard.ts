@@ -117,6 +117,35 @@ export async function getOverlayLeaderboard(
     );
   }
 
+  if (metric === "view") {
+    const rows = await prisma.liveEvent.groupBy({
+      by: ["username", "displayName"],
+      where: {
+        ...baseWhere,
+        type: LiveEventType.MEMBER
+      },
+      _count: {
+        id: true
+      },
+      orderBy: {
+        _count: {
+          id: "desc"
+        }
+      },
+      take: limit
+    });
+
+    return withLatestAvatars(
+      workspace.id,
+      rows.map((row) => ({
+        username: row.username ?? "viewer",
+        displayName: row.displayName,
+        score: row._count.id,
+        events: row._count.id
+      }))
+    );
+  }
+
   const rows = await prisma.liveEvent.groupBy({
     by: ["username", "displayName"],
     where: {

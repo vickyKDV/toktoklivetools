@@ -93,11 +93,11 @@ function getEnabledEventTypes(schema: OverlayDesignSchema) {
       return ["LEADERBOARD_LIKE"];
     }
 
-    if (metric === "share") {
-      return ["LEADERBOARD_SHARE"];
+    if (metric === "view") {
+      return ["LEADERBOARD_VIEW"];
     }
 
-    if (metric === "chat") {
+    if (metric === "comment" || metric === "chat") {
       return ["LEADERBOARD_CHAT"];
     }
 

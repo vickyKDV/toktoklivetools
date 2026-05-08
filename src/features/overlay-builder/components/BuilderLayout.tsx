@@ -216,6 +216,7 @@ export function BuilderLayout({
   }, [designSchema.layout.maxItems, isListPreview, previewDataMode, previewItems, previewSampleItems]);
   const isGiftOverlay = overlayKind === "GIFT" || designSchema.kind === "GIFT" || designSchema.dataSource.type === "gift";
   const isLeaderboardOverlay = overlayKind === "LEADERBOARD" || designSchema.kind === "LEADERBOARD" || designSchema.dataSource.type === "leaderboard";
+  const editorRenderData = isLeaderboardOverlay ? previewSampleItems[0] ?? dummyOverlayData : dummyOverlayData;
   const listExitDurationMs = Math.max(designSchema.layout.animationDurationMs ?? 620, 720);
   const designOutputPath = designId ? `/overlay/${overlayKind.toLowerCase()}/${designId}` : "";
   const designOutputUrl = designOutputPath ? `${browserOrigin}${designOutputPath}` : "";
@@ -554,7 +555,7 @@ export function BuilderLayout({
     setDesignId(null);
     setOverlayKind(normalizeKind(schema.kind ?? overlayKind));
     setOverlayType(schema.kind === "CHAT" ? "CHAT_STYLE" : "CUSTOM_OVERLAY");
-    setSelectedComponentId(schema.kind === "LEADERBOARD" ? null : schema.components[0]?.id ?? null);
+    setSelectedComponentId(schema.components[0]?.id ?? null);
     setBuilderStarted(true);
     setView("editor");
   }
@@ -828,25 +829,23 @@ export function BuilderLayout({
       <div className="grid min-w-0 items-start gap-6 xl:grid-cols-[18rem_minmax(0,1fr)_24rem]">
         <aside className="grid gap-4 xl:sticky xl:top-4">
           <ComponentLibrary onAddComponent={addComponent} onLoadTemplate={loadTemplate} onBlankCanvas={() => startBlankCanvas(true)} overlayKind={overlayKind} />
-          {!isLeaderboardOverlay ? (
-            <LayerPanel
-              components={flatComponents}
-              selectedIds={selectedComponentId ? [selectedComponentId] : []}
-              onSelect={setSelectedComponentId}
-              onToggleVisible={(id) => {
-                const component = findComponent(designSchema.components, id);
-                const visible = Boolean(component?.visible && !component.hidden);
+          <LayerPanel
+            components={flatComponents}
+            selectedIds={selectedComponentId ? [selectedComponentId] : []}
+            onSelect={setSelectedComponentId}
+            onToggleVisible={(id) => {
+              const component = findComponent(designSchema.components, id);
+              const visible = Boolean(component?.visible && !component.hidden);
 
-                updateComponent(id, { visible: !visible, hidden: visible });
-              }}
-              onToggleLock={(id) => {
-                const component = findComponent(designSchema.components, id);
-                updateComponent(id, { locked: !component?.locked });
-              }}
-              onDelete={deleteComponent}
-              onReorder={reorderLayer}
-            />
-          ) : null}
+              updateComponent(id, { visible: !visible, hidden: visible });
+            }}
+            onToggleLock={(id) => {
+              const component = findComponent(designSchema.components, id);
+              updateComponent(id, { locked: !component?.locked });
+            }}
+            onDelete={deleteComponent}
+            onReorder={reorderLayer}
+          />
           <section className="grid gap-3 rounded-lg border bg-card p-4">
             <p className="text-sm font-semibold">Saved Designs</p>
             {savedDesigns.length ? (
@@ -963,18 +962,9 @@ export function BuilderLayout({
           </Card>
 
           {view === "editor" ? (
-            isLeaderboardOverlay ? (
-            <div className="min-h-[560px] overflow-auto rounded-lg border bg-zinc-950/5 p-8 shadow-inner">
-              <OverlaySceneRenderer
-                schema={designSchema}
-                items={previewSampleItems}
-                scale={zoom}
-              />
-            </div>
-            ) : (
             <CanvasEditor
               designSchema={designSchema}
-              data={dummyOverlayData}
+              data={editorRenderData}
               selectedComponentId={selectedComponentId}
               zoom={zoom}
               previewMode={false}
@@ -996,7 +986,6 @@ export function BuilderLayout({
               onAddComment={() => addComponent("comment")}
               onChooseTemplate={() => loadTemplate(overlayTemplates[0].id)}
             />
-            )
           ) : null}
 
           {view === "json" ? (
@@ -1028,7 +1017,7 @@ export function BuilderLayout({
             <CardContent className="p-5">
               <PropertyInspector
                 designSchema={designSchema}
-                selectedComponent={isLeaderboardOverlay ? null : selectedComponent}
+                selectedComponent={selectedComponent}
                 onUpdateDesign={updateDesign}
                 onUpdateCanvas={updateCanvas}
                 onUpdateComponent={updateComponent}
@@ -1119,7 +1108,7 @@ function getDefaultLayoutForKind(kind: OverlayKind, current: OverlayDesignSchema
   }
 
   if (kind === "LEADERBOARD") {
-    return { ...current, mode: "list", maxItems: Math.min(50, Math.max(1, current.maxItems || 5)), reverse: false, align: "start" };
+    return { ...current, mode: "list", maxItems: Math.min(50, Math.max(3, current.maxItems || 10)), reverse: false, align: "start" };
   }
 
   return { ...current, mode: "single", maxItems: 1 };
@@ -1139,11 +1128,11 @@ function getEnabledEventTypes(schema: OverlayDesignSchema) {
       return ["LEADERBOARD_LIKE"];
     }
 
-    if (metric === "share") {
-      return ["LEADERBOARD_SHARE"];
+    if (metric === "view") {
+      return ["LEADERBOARD_VIEW"];
     }
 
-    if (metric === "chat") {
+    if (metric === "comment" || metric === "chat") {
       return ["LEADERBOARD_CHAT"];
     }
 

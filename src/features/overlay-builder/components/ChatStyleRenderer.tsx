@@ -258,6 +258,17 @@ export function getSampleChatRenderData(count: number, enabledTypes: string[] = 
       };
     }
 
+    if (type === "VIEW") {
+      const score = isLeaderboardSample ? 64000 - sequence * 3100 : 0;
+
+      return {
+        meta: { id: `sample-view-${sequence}`, instanceId: `sample-view-${sequence}` },
+        viewer: { name: `View Viewer ${sequence}`, username: `view_${sequence}`, avatar: "", badge: isLeaderboardSample ? `#${sequence}` : "" },
+        comment: { text: isLeaderboardSample ? `${score.toLocaleString("id-ID")} views` : "viewed the LIVE", createdAt: `12.${String(30 + sequence).padStart(2, "0")}` },
+        gift: { name: isLeaderboardSample ? "view" : "", count: isLeaderboardSample ? score : "", image: "" }
+      };
+    }
+
     if (type === "JOIN") {
       return {
         meta: { id: `sample-join-${sequence}`, instanceId: `sample-join-${sequence}` },
@@ -301,7 +312,7 @@ export function getSampleChatRenderData(count: number, enabledTypes: string[] = 
         text: isLeaderboardSample ? `${(320 - sequence * 9).toLocaleString("id-ID")} comments` : base.comment?.text,
         createdAt: `12.${String(30 + sequence).padStart(2, "0")}`
       },
-      gift: isLeaderboardSample ? { name: "chat", count: 320 - sequence * 9, image: "" } : base.gift
+      gift: isLeaderboardSample ? { name: "comment", count: 320 - sequence * 9, image: "" } : base.gift
     };
   });
 

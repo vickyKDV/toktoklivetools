@@ -273,11 +273,11 @@ function getEnabledEventTypes(schema: OverlayDesignSchema) {
       return ["LEADERBOARD_LIKE"];
     }
 
-    if (metric === "share") {
-      return ["LEADERBOARD_SHARE"];
+    if (metric === "view") {
+      return ["LEADERBOARD_VIEW"];
     }
 
-    if (metric === "chat") {
+    if (metric === "comment" || metric === "chat") {
       return ["LEADERBOARD_CHAT"];
     }
 
@@ -416,7 +416,7 @@ function updateLeaderboardItems(current: OverlayRenderData[], event: OverlayEven
         badge: `#${index + 1}`
       }
     }));
-  const limit = Math.min(50, Math.max(1, maxItems));
+  const limit = Math.min(50, Math.max(3, maxItems));
 
   return sorted.slice(0, limit);
 }
@@ -459,11 +459,11 @@ function eventMatchesLeaderboardMetric(event: OverlayEventPayload, metric: strin
     return type === "LIKE";
   }
 
-  if (metric === "share") {
-    return type === "SHARE";
+  if (metric === "view") {
+    return type === "VIEW" || type === "JOIN";
   }
 
-  if (metric === "chat") {
+  if (metric === "comment" || metric === "chat") {
     return type === "CHAT" && Boolean(event.comment);
   }
 
@@ -472,6 +472,10 @@ function eventMatchesLeaderboardMetric(event: OverlayEventPayload, metric: strin
 
 function getLeaderboardMetric(schema: OverlayDesignSchema) {
   const metric = schema.dataSource.filters?.metric;
+
+  if (metric === "chat") {
+    return "comment";
+  }
 
   return typeof metric === "string" ? metric : "gift";
 }
@@ -485,6 +489,10 @@ function getLeaderboardEventScore(event: OverlayEventPayload, metric: string) {
     return Number(event.likeCount) > 0 ? Number(event.likeCount) : 1;
   }
 
+  if (metric === "view") {
+    return Number(event.viewerCount) > 0 ? Number(event.viewerCount) : 1;
+  }
+
   return 1;
 }
 
@@ -493,11 +501,11 @@ function formatLeaderboardMetric(score: number, metric: string) {
     return `${score.toLocaleString("id-ID")} likes`;
   }
 
-  if (metric === "share") {
-    return `${score.toLocaleString("id-ID")} shares`;
+  if (metric === "view") {
+    return `${score.toLocaleString("id-ID")} views`;
   }
 
-  if (metric === "chat") {
+  if (metric === "comment" || metric === "chat") {
     return `${score.toLocaleString("id-ID")} comments`;
   }
 

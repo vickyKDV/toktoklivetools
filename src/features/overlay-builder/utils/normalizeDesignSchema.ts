@@ -67,9 +67,29 @@ function hasChatComponent(components: unknown[]): boolean {
 }
 
 function normalizeComponentOrder(schema: OverlayDesignSchema): OverlayDesignSchema {
+  const layout = schema.kind === "LEADERBOARD"
+    ? {
+      ...schema.layout,
+      mode: "list" as const,
+      maxItems: Math.min(50, Math.max(3, Number.isFinite(Number(schema.layout.maxItems)) ? Number(schema.layout.maxItems) : 10))
+    }
+    : schema.layout;
+  const dataSource = schema.kind === "LEADERBOARD"
+    ? {
+      ...schema.dataSource,
+      type: "leaderboard" as const,
+      filters: {
+        ...schema.dataSource.filters,
+        metric: normalizeLeaderboardMetric(schema.dataSource.filters?.metric)
+      }
+    }
+    : schema.dataSource;
+
   return {
     ...fallbackSchemaByKind(schema.kind),
     ...schema,
+    layout,
+    dataSource,
     version: 2,
     components: normalizeComponents(schema.components)
   };
@@ -195,6 +215,18 @@ function fallbackSchemaByKind(kind: OverlayDesignSchema["kind"]): Pick<OverlayDe
     dataSource: { type: "manual", filters: {} },
     layout: { mode: "single", maxItems: 1, gap: 12, direction: "vertical", reverse: false, align: "start", listStyle: "stacked_card", enterAnimation: "fade", exitAnimation: "fade", autoCloseMs: 0, animationDurationMs: 620 }
   };
+}
+
+function normalizeLeaderboardMetric(value: unknown) {
+  if (value === "chat") {
+    return "comment";
+  }
+
+  if (value === "gift" || value === "like" || value === "view" || value === "comment") {
+    return value;
+  }
+
+  return "gift";
 }
 
 function normalizeLegacyInput(value: LegacyDesign): LegacyDesign {

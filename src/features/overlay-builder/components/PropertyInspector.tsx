@@ -282,7 +282,8 @@ function EventSourceFields({
 }) {
   const dataSource = designSchema.dataSource;
   const enabledTypes = getEnabledEventTypes(designSchema);
-  const metric = typeof dataSource.filters?.metric === "string" ? dataSource.filters.metric : "gift";
+  const rawMetric = typeof dataSource.filters?.metric === "string" ? dataSource.filters.metric : "gift";
+  const metric = rawMetric === "chat" ? "comment" : rawMetric;
   const updateDataSource = (patch: Partial<OverlayDesignSchema["dataSource"]>) => onUpdateDesign({
     dataSource: {
       ...dataSource,
@@ -374,10 +375,10 @@ function LayoutFields({
           ) : null}
           <NumberField
             label={isLeaderboard ? "Max Leaders" : "Max Items"}
-            value={layout.maxItems}
-            min={1}
+            value={isLeaderboard ? clampLeaderboardMax(layout.maxItems) : layout.maxItems}
+            min={isLeaderboard ? 3 : 1}
             max={isLeaderboard ? 50 : 100}
-            onChange={(maxItems) => onUpdateDesign({ layout: { ...layout, mode: isLeaderboard ? "list" : layout.mode, maxItems } })}
+            onChange={(maxItems) => onUpdateDesign({ layout: { ...layout, mode: isLeaderboard ? "list" : layout.mode, maxItems: isLeaderboard ? clampLeaderboardMax(maxItems) : maxItems } })}
           />
           <NumberField label="Gap" value={layout.gap} min={-240} max={240} onChange={(gap) => onUpdateDesign({ layout: { ...layout, gap } })} />
           {layout.mode === "list" && !isLeaderboard ? (
@@ -1064,10 +1065,10 @@ const listStyleOptions = [
 ];
 
 const leaderboardMetricOptions = [
-  { label: "Gift Total", value: "gift" },
-  { label: "Like Total", value: "like" },
-  { label: "Share Total", value: "share" },
-  { label: "Comment Count", value: "chat" }
+  { label: "Gifts", value: "gift" },
+  { label: "Likes", value: "like" },
+  { label: "Views", value: "view" },
+  { label: "Comments", value: "comment" }
 ];
 
 const effectAnimationOptions = [
@@ -1101,8 +1102,26 @@ function getEnabledEventTypes(schema: OverlayDesignSchema) {
   }
 
   if (schema.dataSource.type === "leaderboard") {
-    return ["GIFT", "LIKE", "SHARE"];
+    const metric = schema.dataSource.filters?.metric;
+
+    if (metric === "like") {
+      return ["LIKE"];
+    }
+
+    if (metric === "view") {
+      return ["VIEW"];
+    }
+
+    if (metric === "comment" || metric === "chat") {
+      return ["CHAT"];
+    }
+
+    return ["GIFT"];
   }
 
   return ["CHAT"];
+}
+
+function clampLeaderboardMax(value: number) {
+  return Math.min(50, Math.max(3, Number.isFinite(Number(value)) ? Number(value) : 10));
 }

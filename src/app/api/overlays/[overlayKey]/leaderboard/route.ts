@@ -8,7 +8,7 @@ type RouteContext = {
   }>;
 };
 
-const metrics: LeaderboardMetric[] = ["gift", "like", "chat"];
+const metrics: LeaderboardMetric[] = ["gift", "like", "view", "comment", "chat"];
 const periods: LeaderboardPeriod[] = ["realtime", "7d", "14d", "30d", "month"];
 
 export async function GET(request: Request, context: RouteContext) {
@@ -23,7 +23,7 @@ export async function GET(request: Request, context: RouteContext) {
   const period = periods.includes(periodParam as LeaderboardPeriod)
     ? (periodParam as LeaderboardPeriod)
     : "realtime";
-  const limit = Number.isFinite(limitParam) ? Math.min(Math.max(limitParam, 3), 20) : 10;
+  const limit = Number.isFinite(limitParam) ? Math.min(Math.max(limitParam, 3), 50) : 10;
   const entries = await getOverlayLeaderboard(overlayKey, metric, period, limit);
 
   return NextResponse.json({

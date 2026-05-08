@@ -1,4 +1,5 @@
 import { type CSSProperties, createElement, type ReactNode } from "react";
+import { Crown, Eye, Gift, Heart, MessageCircle } from "lucide-react";
 import type {
   OverlayComponentSchema,
   OverlayComponentType,
@@ -49,6 +50,45 @@ export const componentRegistry: Record<OverlayComponentType, ComponentRegistryIt
   viewer_badge: {
     ...textItem("viewer_badge", "Badge", "{{viewer.badge}}", 150, 30, 13, 900),
     defaultStyle: { radius: 8, opacity: 100, fontSize: 13, fontWeight: 900, color: "#ffffff", align: "center", backgroundColor: "#dc2626" }
+  },
+  leaderboard_rank: {
+    type: "leaderboard_rank",
+    label: "Rank / Icon",
+    defaultSize: { width: 58, height: 52 },
+    defaultProps: {
+      mode: "text",
+      metric: "auto",
+      textPrefix: "#",
+      topCrownCount: 3
+    },
+    defaultStyle: {
+      radius: 14,
+      opacity: 100,
+      fontSize: 22,
+      fontWeight: 900,
+      color: "#020617",
+      align: "center",
+      backgroundColor: "#60a5fa"
+    },
+    render: renderLeaderboardRank,
+    settings: [
+      { key: "props.mode", label: "Mode", type: "select", options: [
+        { label: "#1, #2, #3", value: "text" },
+        { label: "Number only", value: "number" },
+        { label: "Crown top ranks", value: "crown" },
+        { label: "Metric icon", value: "metric_icon" }
+      ] },
+      { key: "props.metric", label: "Metric Icon", type: "select", options: [
+        { label: "Auto", value: "auto" },
+        { label: "Gift", value: "gift" },
+        { label: "Like / Love", value: "like" },
+        { label: "View", value: "view" },
+        { label: "Comment", value: "comment" }
+      ] },
+      { key: "props.textPrefix", label: "Text Prefix", type: "text" },
+      { key: "props.topCrownCount", label: "Crown Top Count", type: "number", min: 1, max: 10, step: 1 },
+      ...textSettings()
+    ]
   },
   comment: {
     ...textItem("comment", "Komentar", "{{comment.text}}", 440, 82, 24, 700),
@@ -254,6 +294,108 @@ function renderGiftText(component: OverlayComponentSchema, data: OverlayRenderDa
     },
     text
   );
+}
+
+function renderLeaderboardRank(component: OverlayComponentSchema, data: OverlayRenderData) {
+  const rank = getLeaderboardRank(data);
+  const mode = typeof component.props.mode === "string" ? component.props.mode : "text";
+  const metric = getLeaderboardMetricForRank(component, data);
+  const topCrownCount = Number.isFinite(Number(component.props.topCrownCount))
+    ? Math.max(1, Math.min(10, Number(component.props.topCrownCount)))
+    : 3;
+  const textPrefix = typeof component.props.textPrefix === "string" ? component.props.textPrefix : "#";
+  const commonStyle = {
+    display: "grid",
+    width: component.width,
+    height: component.height,
+    placeItems: "center",
+    fontSize: component.style.fontSize ?? 22,
+    fontWeight: component.style.fontWeight ?? 900,
+    lineHeight: component.style.lineHeight ?? 1
+  } satisfies CSSProperties;
+
+  if (mode === "metric_icon") {
+    const Icon = getLeaderboardMetricIcon(metric);
+
+    return createElement(
+      "div",
+      { style: commonStyle },
+      createElement(Icon, {
+        "aria-hidden": true,
+        style: {
+          width: Math.max(14, Math.min(component.width, component.height) * 0.58),
+          height: Math.max(14, Math.min(component.width, component.height) * 0.58)
+        } satisfies CSSProperties
+      })
+    );
+  }
+
+  if (mode === "crown" && rank <= topCrownCount) {
+    return createElement(
+      "div",
+      { style: commonStyle },
+      createElement(Crown, {
+        "aria-hidden": true,
+        style: {
+          width: Math.max(18, Math.min(component.width, component.height) * 0.62),
+          height: Math.max(18, Math.min(component.width, component.height) * 0.62)
+        } satisfies CSSProperties
+      })
+    );
+  }
+
+  return createElement(
+    "div",
+    { style: commonStyle },
+    mode === "number" ? String(rank) : `${textPrefix}${rank}`
+  );
+}
+
+function getLeaderboardRank(data: OverlayRenderData) {
+  const raw = data.viewer?.badge ?? "1";
+  const parsed = Number(String(raw).replace(/[^\d]/g, ""));
+
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+}
+
+function getLeaderboardMetricForRank(component: OverlayComponentSchema, data: OverlayRenderData) {
+  const propMetric = typeof component.props.metric === "string" ? component.props.metric : "auto";
+
+  if (propMetric !== "auto") {
+    return propMetric;
+  }
+
+  const dataMetric = data.gift?.name;
+
+  if (dataMetric === "like" || dataMetric === "likes") {
+    return "like";
+  }
+
+  if (dataMetric === "view" || dataMetric === "views") {
+    return "view";
+  }
+
+  if (dataMetric === "comment" || dataMetric === "comments" || dataMetric === "chat") {
+    return "comment";
+  }
+
+  return "gift";
+}
+
+function getLeaderboardMetricIcon(metric: string) {
+  if (metric === "like") {
+    return Heart;
+  }
+
+  if (metric === "view") {
+    return Eye;
+  }
+
+  if (metric === "comment") {
+    return MessageCircle;
+  }
+
+  return Gift;
 }
 
 function renderProfilePhoto(component: OverlayComponentSchema, data: OverlayRenderData) {

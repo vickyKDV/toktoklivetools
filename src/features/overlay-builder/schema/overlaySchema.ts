@@ -11,6 +11,7 @@ export const overlayComponentTypes = [
   "viewer_name",
   "viewer_username",
   "viewer_badge",
+  "leaderboard_rank",
   "comment",
   "created_at",
   "gift_text",
