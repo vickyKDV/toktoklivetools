@@ -4,8 +4,18 @@ import "@xyflow/react/dist/style.css";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "TikTok Live Automation",
-  description: "Realtime TikTok LIVE automation platform for overlays, alerts, and rules."
+  title: "Liplo",
+  description: "Flow of Live Interaction",
+  icons: {
+    icon: "/favicon.ico",
+    shortcut: "/favicon.ico",
+    apple: "/brand/liplo_logo.png"
+  },
+  openGraph: {
+    title: "Liplo",
+    description: "Flow of Live Interaction",
+    images: ["/brand/liplo_logo.png"]
+  }
 };
 
 export default function RootLayout({

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Zap } from "lucide-react";
+import Image from "next/image";
 import { loginAction } from "@/app/(auth)/actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,12 +20,12 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
     <main className="flex min-h-screen items-center justify-center px-4 py-10">
       <div className="w-full max-w-md space-y-6">
         <div className="flex items-center gap-3">
-          <div className="flex size-11 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <Zap className="size-5" />
+          <div className="flex size-11 items-center justify-center overflow-hidden rounded-lg bg-zinc-950">
+            <Image src="/brand/liplo_logo.png" alt="Liplo" width={40} height={40} className="object-contain" />
           </div>
           <div>
-            <h1 className="text-xl font-semibold">TikTok Live Automation</h1>
-            <p className="text-sm text-muted-foreground">Realtime alerts, rules, and OBS overlays.</p>
+            <h1 className="text-xl font-semibold">Liplo</h1>
+            <p className="text-sm text-muted-foreground">Flow of Live Interaction</p>
           </div>
         </div>
 

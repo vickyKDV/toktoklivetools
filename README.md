@@ -1,4 +1,6 @@
-# TikTok Live Automation Platform
+# Liplo
+
+Flow of Live Interaction.
 
 Staging MVP for TikTok LIVE automation, realtime event storage, JSON overlays, and OBS browser sources.
 

@@ -53,7 +53,7 @@ pnpm start
 Contoh PM2:
 
 ```bash
-pm2 start "pnpm start" --name tiktok-live-automation
+pm2 start "pnpm start" --name liplo
 pm2 save
 ```
 
@@ -61,7 +61,7 @@ Jika proses lama masih menahan port:
 
 ```bash
 pm2 list
-pm2 restart tiktok-live-automation
+pm2 restart liplo
 ```
 
 ## Caddy Reverse Proxy
