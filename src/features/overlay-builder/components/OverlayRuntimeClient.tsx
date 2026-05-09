@@ -21,6 +21,7 @@ import type { OverlayEventPayload } from "@/types/live";
 type OverlayRuntimeClientProps = {
   schema: OverlayDesignSchema;
   overlayKey: string;
+  initialGoalMetrics?: OverlayRenderData["goal"];
   preview?: boolean;
   debug?: boolean;
 };
@@ -51,11 +52,19 @@ const emptyGoalMetrics: GoalMetrics = {
   custom: 0
 };
 
-export function OverlayRuntimeClient({ schema, overlayKey, preview = false, debug = false }: OverlayRuntimeClientProps) {
+const goalMetricKeys = ["likes", "gifts", "viewers", "comments", "shares", "custom"] as const;
+
+export function OverlayRuntimeClient({
+  schema,
+  overlayKey,
+  initialGoalMetrics,
+  preview = false,
+  debug = false
+}: OverlayRuntimeClientProps) {
   const [singleItem, setSingleItem] = useState<SingleRuntimeItem | null>(null);
   const [queuedSingleData, setQueuedSingleData] = useState<OverlayRenderData | null>(null);
   const [items, setItems] = useState<OverlayRenderData[]>([]);
-  const [goalMetrics, setGoalMetrics] = useState<GoalMetrics>(() => createInitialGoalMetrics(schema));
+  const [goalMetrics, setGoalMetrics] = useState<GoalMetrics>(() => createInitialGoalMetrics(schema, initialGoalMetrics));
   const layout = schema.layout;
   const isList = layout.mode === "list" || schema.kind === "LEADERBOARD" || schema.kind === "DOCK";
   const isStaticOverlay = schema.kind === "STATIC" || schema.dataSource.type === "static";
@@ -86,8 +95,8 @@ export function OverlayRuntimeClient({ schema, overlayKey, preview = false, debu
   }, []);
 
   useEffect(() => {
-    setGoalMetrics(createInitialGoalMetrics(schema));
-  }, [schema]);
+    setGoalMetrics(createInitialGoalMetrics(schema, initialGoalMetrics));
+  }, [initialGoalMetrics, schema]);
 
   useEffect(() => {
     if (preview || isStaticOverlay) {
@@ -275,8 +284,11 @@ function acceptsFocusDock(schema: OverlayDesignSchema) {
   return schema.kind === "CUSTOM" && schema.layout.mode === "single" && schema.dataSource.type === "manual";
 }
 
-function createInitialGoalMetrics(schema: OverlayDesignSchema): GoalMetrics {
-  return schema.components.reduce<GoalMetrics>((metrics, component) => {
+function createInitialGoalMetrics(
+  schema: OverlayDesignSchema,
+  initialGoalMetrics?: OverlayRenderData["goal"]
+): GoalMetrics {
+  const schemaMetrics = schema.components.reduce<GoalMetrics>((metrics, component) => {
     if (component.type !== "goal_progress_bar" && component.type !== "goal_progress_ring") {
       return metrics;
     }
@@ -289,6 +301,15 @@ function createInitialGoalMetrics(schema: OverlayDesignSchema): GoalMetrics {
       [metricKey]: Math.max(metrics[metricKey], currentValue)
     };
   }, { ...emptyGoalMetrics });
+
+  if (!initialGoalMetrics) {
+    return schemaMetrics;
+  }
+
+  return goalMetricKeys.reduce<GoalMetrics>((metrics, key) => ({
+    ...metrics,
+    [key]: Math.max(metrics[key], toPositiveNumber(initialGoalMetrics[key], 0))
+  }), schemaMetrics);
 }
 
 function updateGoalMetrics(current: GoalMetrics, event: OverlayEventPayload): GoalMetrics {

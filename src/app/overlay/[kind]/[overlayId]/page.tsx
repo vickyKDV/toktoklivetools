@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { OverlayRuntimeClient } from "@/features/overlay-builder/components/OverlayRuntimeClient";
+import { getInitialGoalOverlayMetrics } from "@/features/overlay-builder/actions/getGoalOverlayMetrics";
 import { getPublishedOverlay } from "@/features/overlay-builder/actions/getOverlayDesign";
 
 export const dynamic = "force-dynamic";
@@ -39,6 +40,9 @@ export default async function OverlayRuntimePage({ params, searchParams }: Overl
   if (overlay.kind !== expectedKind) {
     notFound();
   }
+  const initialGoalMetrics = overlay.kind === "GOAL"
+    ? await getInitialGoalOverlayMetrics(overlay.workspaceId)
+    : undefined;
 
   return (
     <main
@@ -54,6 +58,7 @@ export default async function OverlayRuntimePage({ params, searchParams }: Overl
       <OverlayRuntimeClient
         schema={overlay.schema}
         overlayKey={overlay.overlayKey}
+        initialGoalMetrics={initialGoalMetrics}
         preview={query.preview === "1"}
         debug={query.debug === "1"}
       />
