@@ -359,6 +359,157 @@ const chatBubbleTemplates: OverlayTemplate[] = [
   })
 ];
 
+const goalTemplates: OverlayTemplate[] = [
+  {
+    id: "goal-target-board",
+    name: "Goal Target Board",
+    description: "Canvas goal multi target untuk like, gift, viewer, comment, dan share.",
+    schema: {
+      version: 2,
+      kind: "GOAL",
+      name: "Goal Target Board",
+      canvas: {
+        width: 800,
+        height: 400,
+        background: { type: "transparent", color: "transparent", opacity: 0 },
+        radius: 0,
+        stroke: { enabled: false, color: "#ffffff", width: 0 },
+        shadow: { enabled: false, color: "#000000", blur: 0, x: 0, y: 0 },
+        animation: { type: "none", enabled: false, color: "#22d3ee", color2: "#f43f5e", durationMs: 2400, intensity: 70 }
+      },
+      dataSource: {
+        type: "goal",
+        filters: {}
+      },
+      layout: {
+        mode: "single",
+        maxItems: 1,
+        gap: 0,
+        direction: "vertical",
+        reverse: false,
+        align: "start",
+        listStyle: "default",
+        enterAnimation: "fade",
+        exitAnimation: "fade",
+        autoCloseMs: 0,
+        animationDurationMs: 620
+      },
+      components: [
+        {
+          id: "goal_like_bar",
+          type: "goal_progress_bar",
+          name: "Like Goal",
+          x: 54,
+          y: 42,
+          width: 520,
+          height: 78,
+          zIndex: 1,
+          visible: true,
+          locked: false,
+          props: { metricType: "likes", label: "Like Goal", currentValue: 6500, targetValue: 10000, icon: "heart" },
+          style: {
+            radius: 20,
+            fontSize: 18,
+            fontWeight: 900,
+            color: "#ffffff",
+            backgroundColor: "#0f172a",
+            border: { enabled: true, color: "#ec4899", width: 2 },
+            shadow: { enabled: true, color: "#ec4899", opacity: 24, blur: 22, x: 0, y: 8 }
+          }
+        },
+        {
+          id: "goal_gift_ring",
+          type: "goal_progress_ring",
+          name: "Gift Goal Ring",
+          x: 604,
+          y: 42,
+          width: 138,
+          height: 138,
+          zIndex: 2,
+          visible: true,
+          locked: false,
+          props: { metricType: "gifts", label: "Gift", currentValue: 42, targetValue: 100, icon: "gift" },
+          style: {
+            radius: 999,
+            fontSize: 17,
+            fontWeight: 900,
+            color: "#ffffff",
+            backgroundColor: "#111827",
+            border: { enabled: true, color: "#fbbf24", width: 4 },
+            shadow: { enabled: true, color: "#f59e0b", opacity: 32, blur: 24, x: 0, y: 8 }
+          }
+        },
+        {
+          id: "goal_viewer_bar",
+          type: "goal_progress_bar",
+          name: "Viewer Goal",
+          x: 54,
+          y: 150,
+          width: 520,
+          height: 78,
+          zIndex: 3,
+          visible: true,
+          locked: false,
+          props: { metricType: "viewers", label: "Viewer Goal", currentValue: 720, targetValue: 1000, icon: "eye" },
+          style: {
+            radius: 20,
+            fontSize: 18,
+            fontWeight: 900,
+            color: "#ffffff",
+            backgroundColor: "#0b1220",
+            border: { enabled: true, color: "#22d3ee", width: 2 },
+            shadow: { enabled: true, color: "#22d3ee", opacity: 24, blur: 22, x: 0, y: 8 }
+          }
+        },
+        {
+          id: "goal_comment_bar",
+          type: "goal_progress_bar",
+          name: "Comment Goal",
+          x: 54,
+          y: 258,
+          width: 330,
+          height: 72,
+          zIndex: 4,
+          visible: true,
+          locked: false,
+          props: { metricType: "comments", label: "Comment Goal", currentValue: 84, targetValue: 150, icon: "comment" },
+          style: {
+            radius: 18,
+            fontSize: 16,
+            fontWeight: 900,
+            color: "#ffffff",
+            backgroundColor: "#111827",
+            border: { enabled: true, color: "#a78bfa", width: 2 },
+            shadow: { enabled: true, color: "#8b5cf6", opacity: 20, blur: 18, x: 0, y: 8 }
+          }
+        },
+        {
+          id: "goal_share_bar",
+          type: "goal_progress_bar",
+          name: "Share Goal",
+          x: 410,
+          y: 258,
+          width: 332,
+          height: 72,
+          zIndex: 5,
+          visible: true,
+          locked: false,
+          props: { metricType: "shares", label: "Share Goal", currentValue: 32, targetValue: 80, icon: "target" },
+          style: {
+            radius: 18,
+            fontSize: 16,
+            fontWeight: 900,
+            color: "#ffffff",
+            backgroundColor: "#111827",
+            border: { enabled: true, color: "#34d399", width: 2 },
+            shadow: { enabled: true, color: "#10b981", opacity: 20, blur: 18, x: 0, y: 8 }
+          }
+        }
+      ]
+    }
+  }
+];
+
 const staticTemplates: OverlayTemplate[] = [
   {
     id: "static-media-switch",
@@ -431,6 +582,7 @@ const staticTemplates: OverlayTemplate[] = [
 export const overlayTemplates: OverlayTemplate[] = [
   ...leaderboardTemplates,
   ...chatBubbleTemplates,
+  ...goalTemplates,
   ...staticTemplates
 ];
 

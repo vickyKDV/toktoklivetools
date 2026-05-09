@@ -21,7 +21,8 @@ const kindMap = {
   leaderboard: "LEADERBOARD",
   dock: "DOCK",
   custom: "CUSTOM",
-  static: "STATIC"
+  static: "STATIC",
+  goal: "GOAL"
 } as const;
 
 export default async function OverlayRuntimePage({ params, searchParams }: OverlayRuntimePageProps) {

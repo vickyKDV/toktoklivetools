@@ -16,6 +16,7 @@ import {
   PanelBottom,
   Palette,
   Settings,
+  Target,
   Trophy,
   Workflow
 } from "lucide-react";
@@ -73,6 +74,11 @@ const overlaySubItems = [
     hrefSuffix: "STATIC",
     label: "Static",
     icon: Images
+  },
+  {
+    hrefSuffix: "GOAL",
+    label: "Goal",
+    icon: Target
   },
   {
     hrefSuffix: "CUSTOM",

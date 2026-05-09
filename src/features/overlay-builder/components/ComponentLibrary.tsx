@@ -1,6 +1,6 @@
 "use client";
 
-import { FilePlus2, Files, Hash, ImageIcon, LayoutTemplate, MessageSquareText, Plus, Square, Type, User } from "lucide-react";
+import { CircleGauge, FilePlus2, Files, Hash, ImageIcon, LayoutTemplate, MessageSquareText, Plus, Square, Target, Type, User } from "lucide-react";
 import type { ReactNode } from "react";
 import { componentLibrary } from "@/features/overlay-builder/registry/componentRegistry";
 import { overlayTemplates } from "@/features/overlay-builder/registry/templateRegistry";
@@ -31,6 +31,8 @@ const iconMap: Partial<Record<OverlayComponentType, ReactNode>> = {
   gift_name: <Type className="size-4" />,
   gift_count: <Type className="size-4" />,
   gift_image: <ImageIcon className="size-4" />,
+  goal_progress_bar: <Target className="size-4" />,
+  goal_progress_ring: <CircleGauge className="size-4" />,
   media_switch: <Files className="size-4" />,
   running_text: <Type className="size-4" />
 };
@@ -38,16 +40,21 @@ const iconMap: Partial<Record<OverlayComponentType, ReactNode>> = {
 export function ComponentLibrary({ onAddComponent, onLoadTemplate, onBlankCanvas, overlayKind }: ComponentLibraryProps) {
   const isLeaderboard = overlayKind === "LEADERBOARD";
   const isStatic = overlayKind === "STATIC";
+  const isGoal = overlayKind === "GOAL";
   const components = componentLibrary.filter((component) => {
     if (isLeaderboard) {
       return component.type === "leaderboard_rank";
+    }
+
+    if (isGoal) {
+      return ["goal_progress_bar", "goal_progress_ring", "raw_card", "viewer_name", "comment", "running_text"].includes(component.type);
     }
 
     if (isStatic) {
       return ["media_switch", "raw_card", "viewer_name", "comment", "running_text"].includes(component.type);
     }
 
-    return component.type !== "leaderboard_rank";
+    return component.type !== "leaderboard_rank" && component.type !== "goal_progress_bar" && component.type !== "goal_progress_ring";
   });
   const templates = overlayTemplates.filter((template) => {
     const kind = getTemplateKind(template.schema);
@@ -60,7 +67,11 @@ export function ComponentLibrary({ onAddComponent, onLoadTemplate, onBlankCanvas
       return kind === "STATIC";
     }
 
-    return kind !== "LEADERBOARD" && kind !== "STATIC";
+    if (isGoal) {
+      return kind === "GOAL";
+    }
+
+    return kind !== "LEADERBOARD" && kind !== "STATIC" && kind !== "GOAL";
   });
 
   return (

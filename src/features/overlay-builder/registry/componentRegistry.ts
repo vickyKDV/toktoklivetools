@@ -1,5 +1,5 @@
 import { type CSSProperties, createElement, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Crown, Eye, Gift, Heart, MessageCircle } from "lucide-react";
+import { Crown, Eye, Gift, Heart, MessageCircle, Target } from "lucide-react";
 import type {
   OverlayComponentSchema,
   OverlayComponentType,
@@ -117,6 +117,54 @@ export const componentRegistry: Record<OverlayComponentType, ComponentRegistryIt
     render: renderImage,
     settings: baseImageSettings()
   },
+  goal_progress_bar: {
+    type: "goal_progress_bar",
+    label: "Goal Progress Bar",
+    defaultSize: { width: 620, height: 82 },
+    defaultProps: {
+      metricType: "likes",
+      label: "Like Goal",
+      currentValue: 650,
+      targetValue: 1000,
+      icon: "heart"
+    },
+    defaultStyle: {
+      radius: 18,
+      opacity: 100,
+      fontSize: 18,
+      fontWeight: 900,
+      color: "#ffffff",
+      backgroundColor: "#101827",
+      border: { enabled: true, color: "#22d3ee", width: 2 },
+      shadow: { enabled: true, color: "#22d3ee", opacity: 26, blur: 22, x: 0, y: 8 }
+    },
+    render: renderGoalProgressBar,
+    settings: goalSettings()
+  },
+  goal_progress_ring: {
+    type: "goal_progress_ring",
+    label: "Goal Progress Ring",
+    defaultSize: { width: 140, height: 140 },
+    defaultProps: {
+      metricType: "gifts",
+      label: "Gift Goal",
+      currentValue: 42,
+      targetValue: 100,
+      icon: "gift"
+    },
+    defaultStyle: {
+      radius: 999,
+      opacity: 100,
+      fontSize: 16,
+      fontWeight: 900,
+      color: "#ffffff",
+      backgroundColor: "#111827",
+      border: { enabled: true, color: "#fbbf24", width: 4 },
+      shadow: { enabled: true, color: "#f59e0b", opacity: 30, blur: 24, x: 0, y: 8 }
+    },
+    render: renderGoalProgressRing,
+    settings: goalSettings()
+  },
   media_switch: {
     type: "media_switch",
     label: "Media Switch",
@@ -213,6 +261,36 @@ function textSettings(): ComponentSetting[] {
       { label: "Hidden", value: "hidden" }
     ] },
     { key: "style.radius", label: "Radius", type: "number", min: 0, max: 999, step: 1 },
+    { key: "style.opacity", label: "Opacity", type: "number", min: 0, max: 100, step: 1 }
+  ];
+}
+
+function goalSettings(): ComponentSetting[] {
+  return [
+    { key: "props.metricType", label: "Metric", type: "select", options: [
+      { label: "Likes", value: "likes" },
+      { label: "Gifts", value: "gifts" },
+      { label: "Viewers", value: "viewers" },
+      { label: "Comments", value: "comments" },
+      { label: "Shares", value: "shares" },
+      { label: "Orders / Custom", value: "custom" }
+    ] },
+    { key: "props.label", label: "Label", type: "text" },
+    { key: "props.currentValue", label: "Current", type: "number", min: 0, max: 999999999, step: 1 },
+    { key: "props.targetValue", label: "Target", type: "number", min: 1, max: 999999999, step: 1 },
+    { key: "props.icon", label: "Icon", type: "select", options: [
+      { label: "Auto", value: "auto" },
+      { label: "Target", value: "target" },
+      { label: "Heart", value: "heart" },
+      { label: "Gift", value: "gift" },
+      { label: "Eye", value: "eye" },
+      { label: "Comment", value: "comment" }
+    ] },
+    { key: "style.backgroundColor", label: "Background", type: "color" },
+    { key: "style.color", label: "Text Color", type: "color" },
+    { key: "style.border.color", label: "Accent Color", type: "color" },
+    { key: "style.radius", label: "Radius", type: "number", min: 0, max: 999, step: 1 },
+    { key: "style.fontSize", label: "Font Size", type: "number", min: 8, max: 96, step: 1 },
     { key: "style.opacity", label: "Opacity", type: "number", min: 0, max: 100, step: 1 }
   ];
 }
@@ -578,6 +656,190 @@ function renderGiftText(component: OverlayComponentSchema, data: OverlayRenderDa
     },
     text
   );
+}
+
+function renderGoalProgressBar(component: OverlayComponentSchema, data: OverlayRenderData) {
+  const goal = getGoalValues(component, data);
+  const Icon = getGoalIcon(goal.icon, goal.metricType);
+  const accent = component.style.border?.color ?? "#22d3ee";
+  const background = component.style.backgroundColor ?? "#101827";
+  const textColor = component.style.color ?? "#ffffff";
+  const radius = component.style.radius ?? 18;
+
+  return createElement(
+    "div",
+    {
+      style: {
+        display: "grid",
+        gridTemplateColumns: "44px minmax(0, 1fr)",
+        alignItems: "center",
+        gap: 14,
+        width: component.width,
+        height: component.height,
+        padding: 14,
+        boxSizing: "border-box",
+        borderRadius: radius,
+        background,
+        color: textColor,
+        overflow: "hidden"
+      } satisfies CSSProperties
+    },
+    createElement(
+      "div",
+      {
+        style: {
+          display: "grid",
+          width: 44,
+          height: 44,
+          placeItems: "center",
+          borderRadius: 999,
+          background: `${accent}22`,
+          color: accent,
+          border: `1px solid ${accent}`
+        } satisfies CSSProperties
+      },
+      createElement(Icon, { "aria-hidden": true, style: { width: 22, height: 22 } satisfies CSSProperties })
+    ),
+    createElement(
+      "div",
+      {
+        style: {
+          display: "grid",
+          gap: 8,
+          minWidth: 0
+        } satisfies CSSProperties
+      },
+      createElement(
+        "div",
+        {
+          style: {
+            display: "flex",
+            alignItems: "baseline",
+            justifyContent: "space-between",
+            gap: 12,
+            minWidth: 0,
+            fontSize: component.style.fontSize ?? 18,
+            fontWeight: component.style.fontWeight ?? 900,
+            lineHeight: 1.05
+          } satisfies CSSProperties
+        },
+        createElement("span", { style: { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } satisfies CSSProperties }, goal.label),
+        createElement("span", { style: { color: accent, whiteSpace: "nowrap" } satisfies CSSProperties }, `${goal.currentValue.toLocaleString("id-ID")} / ${goal.targetValue.toLocaleString("id-ID")}`)
+      ),
+      createElement(
+        "div",
+        {
+          style: {
+            width: "100%",
+            height: 12,
+            borderRadius: 999,
+            background: "rgba(255,255,255,.14)",
+            overflow: "hidden"
+          } satisfies CSSProperties
+        },
+        createElement("div", {
+          style: {
+            width: `${goal.progressPercent}%`,
+            height: "100%",
+            borderRadius: 999,
+            background: `linear-gradient(90deg, ${accent}, #ffffff)`,
+            boxShadow: `0 0 18px ${accent}`
+          } satisfies CSSProperties
+        })
+      )
+    )
+  );
+}
+
+function renderGoalProgressRing(component: OverlayComponentSchema, data: OverlayRenderData) {
+  const goal = getGoalValues(component, data);
+  const Icon = getGoalIcon(goal.icon, goal.metricType);
+  const accent = component.style.border?.color ?? "#fbbf24";
+  const background = component.style.backgroundColor ?? "#111827";
+  const textColor = component.style.color ?? "#ffffff";
+  const size = Math.min(component.width, component.height);
+  const ringWidth = Math.max(8, Math.round(size * 0.12));
+
+  return createElement(
+    "div",
+    {
+      style: {
+        position: "relative",
+        display: "grid",
+        width: component.width,
+        height: component.height,
+        placeItems: "center",
+        borderRadius: component.style.radius ?? 999,
+        background: `conic-gradient(${accent} ${goal.progressPercent * 3.6}deg, rgba(255,255,255,.14) 0deg)`,
+        color: textColor,
+        overflow: "hidden"
+      } satisfies CSSProperties
+    },
+    createElement(
+      "div",
+      {
+        style: {
+          display: "grid",
+          width: Math.max(1, component.width - ringWidth * 2),
+          height: Math.max(1, component.height - ringWidth * 2),
+          placeItems: "center",
+          borderRadius: "inherit",
+          background,
+          padding: 10,
+          boxSizing: "border-box",
+          textAlign: "center"
+        } satisfies CSSProperties
+      },
+      createElement(Icon, { "aria-hidden": true, style: { width: Math.max(18, size * 0.18), height: Math.max(18, size * 0.18), color: accent } satisfies CSSProperties }),
+      createElement("strong", { style: { fontSize: component.style.fontSize ?? 18, lineHeight: 1 } satisfies CSSProperties }, `${Math.round(goal.progressPercent)}%`),
+      createElement("span", { style: { maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: Math.max(10, (component.style.fontSize ?? 16) * 0.72), opacity: 0.82 } satisfies CSSProperties }, goal.label)
+    )
+  );
+}
+
+function getGoalValues(component: OverlayComponentSchema, data: OverlayRenderData) {
+  const metricType = typeof component.props.metricType === "string" ? component.props.metricType : "custom";
+  const metricKey = getGoalMetricKey(metricType);
+  const label = typeof component.props.label === "string" && component.props.label.trim()
+    ? component.props.label
+    : getDefaultGoalLabel(metricType);
+  const runtimeValue = data.goal?.[metricKey];
+  const currentValue = runtimeValue == null
+    ? clampNumber(component.props.currentValue, 0, 999999999, 0)
+    : clampNumber(runtimeValue, 0, 999999999, 0);
+  const targetValue = clampNumber(component.props.targetValue, 1, 999999999, 100);
+  const progressPercent = Math.max(0, Math.min(100, Math.round((currentValue / targetValue) * 1000) / 10));
+  const icon = typeof component.props.icon === "string" ? component.props.icon : "auto";
+
+  return { metricType, label, currentValue, targetValue, progressPercent, icon };
+}
+
+function getGoalMetricKey(metricType: string): keyof NonNullable<OverlayRenderData["goal"]> {
+  if (metricType === "like" || metricType === "likes" || metricType === "heart") return "likes";
+  if (metricType === "gift" || metricType === "gifts") return "gifts";
+  if (metricType === "viewer" || metricType === "viewers" || metricType === "view" || metricType === "views") return "viewers";
+  if (metricType === "comment" || metricType === "comments" || metricType === "chat") return "comments";
+  if (metricType === "share" || metricType === "shares") return "shares";
+  return "custom";
+}
+
+function getDefaultGoalLabel(metricType: string) {
+  if (metricType === "likes") return "Like Goal";
+  if (metricType === "gifts") return "Gift Goal";
+  if (metricType === "viewers") return "Viewer Goal";
+  if (metricType === "comments") return "Comment Goal";
+  if (metricType === "shares") return "Share Goal";
+  return "Custom Goal";
+}
+
+function getGoalIcon(icon: string, metricType: string) {
+  const resolved = icon === "auto" ? metricType : icon;
+
+  if (resolved === "likes" || resolved === "heart") return Heart;
+  if (resolved === "gifts" || resolved === "gift") return Gift;
+  if (resolved === "viewers" || resolved === "views" || resolved === "eye") return Eye;
+  if (resolved === "comments" || resolved === "comment") return MessageCircle;
+  return Target;
 }
 
 function renderLeaderboardRank(component: OverlayComponentSchema, data: OverlayRenderData) {

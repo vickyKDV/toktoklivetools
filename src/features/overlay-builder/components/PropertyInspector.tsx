@@ -501,6 +501,7 @@ function EventSourceFields({
           { label: "Chat Events", value: "chat" },
           { label: "Gift Events", value: "gift" },
           { label: "Leaderboard Events", value: "leaderboard" },
+          { label: "Goal / Target", value: "goal" },
           { label: "Dock", value: "dock" }
         ]}
         onChange={(type) => updateDataSource({ type: type as OverlayDesignSchema["dataSource"]["type"] })}
@@ -514,7 +515,7 @@ function EventSourceFields({
           onChange={(nextMetric) => updateDataSource({ type: "leaderboard", filters: { metric: nextMetric } })}
         />
       ) : null}
-      {designSchema.kind !== "LEADERBOARD" ? (
+      {designSchema.kind !== "LEADERBOARD" && designSchema.kind !== "GOAL" ? (
       <div className="grid grid-cols-2 gap-3">
         {eventTypeOptions.map((option) => (
           <ToggleField

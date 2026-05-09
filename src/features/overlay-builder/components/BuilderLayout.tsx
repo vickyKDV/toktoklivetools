@@ -70,7 +70,7 @@ type SaveResponse = {
 type BuilderView = "editor" | "json" | "preview";
 type PreviewDataMode = "sample" | "test" | "live";
 type OverlayBuilderType = "CUSTOM_OVERLAY" | "CHAT_STYLE";
-type OverlayKind = "CHAT" | "GIFT" | "LEADERBOARD" | "DOCK" | "CUSTOM" | "STATIC";
+type OverlayKind = "CHAT" | "GIFT" | "LEADERBOARD" | "DOCK" | "CUSTOM" | "STATIC" | "GOAL";
 type PopularGiftSample = {
   id: string;
   name: string;
@@ -216,6 +216,7 @@ export function BuilderLayout({
   }, [designSchema.layout.maxItems, isListPreview, previewDataMode, previewItems, previewSampleItems]);
   const isGiftOverlay = overlayKind === "GIFT" || designSchema.kind === "GIFT" || designSchema.dataSource.type === "gift";
   const isLeaderboardOverlay = overlayKind === "LEADERBOARD" || designSchema.kind === "LEADERBOARD" || designSchema.dataSource.type === "leaderboard";
+  const isGoalOverlay = overlayKind === "GOAL" || designSchema.kind === "GOAL" || designSchema.dataSource.type === "goal";
   const editorRenderData = isLeaderboardOverlay ? previewSampleItems[0] ?? dummyOverlayData : dummyOverlayData;
   const listExitDurationMs = Math.max(designSchema.layout.animationDurationMs ?? 620, 720);
   const designOutputPath = designId ? `/overlay/${overlayKind.toLowerCase()}/${designId}` : "";
@@ -519,7 +520,7 @@ export function BuilderLayout({
   }
 
   function switchOverlayKind(kind: OverlayKind) {
-    if (kind === "LEADERBOARD" || kind === "STATIC") {
+    if (kind === "LEADERBOARD" || kind === "STATIC" || kind === "GOAL") {
       const firstTemplate = overlayTemplates.find((template) => getTemplateKind(template.schema) === kind);
 
       if (firstTemplate) {
@@ -770,7 +771,7 @@ export function BuilderLayout({
               </Button>
             </div>
             <div className="flex flex-wrap items-center gap-4">
-              {!isLeaderboardOverlay ? (
+              {!isLeaderboardOverlay && !isGoalOverlay ? (
               <Button type="button" variant="outline" onClick={() => startBlankCanvas(true)}>
                 <FilePlus2 />
                 Blank Canvas
@@ -787,10 +788,11 @@ export function BuilderLayout({
                 <option value="CHAT">Chat</option>
                 <option value="GIFT">Gift</option>
                 <option value="LEADERBOARD">Leaderboard</option>
+                <option value="GOAL">Goal</option>
                 <option value="STATIC">Static</option>
                 <option value="CUSTOM">Custom</option>
               </select>
-              {!isLeaderboardOverlay ? (
+              {!isLeaderboardOverlay && !isGoalOverlay ? (
               <Button type="button" variant="outline" onClick={clearCanvas}>
                 <Trash2 />
                 Clear Canvas
@@ -1064,7 +1066,7 @@ async function readSaveResponse(response: Response): Promise<SaveResponse> {
 }
 
 function normalizeKind(value: string | undefined): OverlayKind {
-  if (value === "CHAT" || value === "GIFT" || value === "LEADERBOARD" || value === "DOCK" || value === "CUSTOM" || value === "STATIC") {
+  if (value === "CHAT" || value === "GIFT" || value === "LEADERBOARD" || value === "DOCK" || value === "CUSTOM" || value === "STATIC" || value === "GOAL") {
     return value;
   }
 
@@ -1122,6 +1124,10 @@ function getDefaultDataSourceForKind(kind: OverlayKind, current: OverlayDesignSc
     return { type: "static", filters: current.type === "static" ? current.filters : {} };
   }
 
+  if (kind === "GOAL") {
+    return { type: "goal", filters: current.type === "goal" ? current.filters : {} };
+  }
+
   return { type: "manual", filters: current.type === "manual" ? current.filters : {} };
 }
 
@@ -1135,6 +1141,10 @@ function getDefaultLayoutForKind(kind: OverlayKind, current: OverlayDesignSchema
   }
 
   if (kind === "STATIC") {
+    return { ...current, mode: "single", maxItems: 1, gap: 0, reverse: false, align: "start" };
+  }
+
+  if (kind === "GOAL") {
     return { ...current, mode: "single", maxItems: 1, gap: 0, reverse: false, align: "start" };
   }
 

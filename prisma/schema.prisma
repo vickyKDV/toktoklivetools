@@ -48,6 +48,7 @@ enum OverlayKind {
   DOCK
   CUSTOM
   STATIC
+  GOAL
 }
 
 model User {

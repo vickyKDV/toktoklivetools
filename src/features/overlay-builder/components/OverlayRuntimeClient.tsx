@@ -33,13 +33,33 @@ type SingleRuntimeItem = {
   instanceId: string;
 };
 
+type GoalMetrics = {
+  likes: number;
+  gifts: number;
+  viewers: number;
+  comments: number;
+  shares: number;
+  custom: number;
+};
+
+const emptyGoalMetrics: GoalMetrics = {
+  likes: 0,
+  gifts: 0,
+  viewers: 0,
+  comments: 0,
+  shares: 0,
+  custom: 0
+};
+
 export function OverlayRuntimeClient({ schema, overlayKey, preview = false, debug = false }: OverlayRuntimeClientProps) {
   const [singleItem, setSingleItem] = useState<SingleRuntimeItem | null>(null);
   const [queuedSingleData, setQueuedSingleData] = useState<OverlayRenderData | null>(null);
   const [items, setItems] = useState<OverlayRenderData[]>([]);
+  const [goalMetrics, setGoalMetrics] = useState<GoalMetrics>(() => createInitialGoalMetrics(schema));
   const layout = schema.layout;
   const isList = layout.mode === "list" || schema.kind === "LEADERBOARD" || schema.kind === "DOCK";
   const isStaticOverlay = schema.kind === "STATIC" || schema.dataSource.type === "static";
+  const isGoalOverlay = schema.kind === "GOAL" || schema.dataSource.type === "goal";
   const animationDurationMs = layout.animationDurationMs ?? 620;
   const listExitDurationMs = Math.max(animationDurationMs, 720);
   const autoCloseMs = layout.autoCloseMs ?? 0;
@@ -66,6 +86,10 @@ export function OverlayRuntimeClient({ schema, overlayKey, preview = false, debu
   }, []);
 
   useEffect(() => {
+    setGoalMetrics(createInitialGoalMetrics(schema));
+  }, [schema]);
+
+  useEffect(() => {
     if (preview || isStaticOverlay) {
       return;
     }
@@ -74,6 +98,11 @@ export function OverlayRuntimeClient({ schema, overlayKey, preview = false, debu
     socket.emit("overlay:join", overlayKey);
     socket.on("connect", () => socket.emit("overlay:join", overlayKey));
     socket.on("overlay:live-event", (event: OverlayEventPayload) => {
+      if (isGoalOverlay) {
+        setGoalMetrics((current) => updateGoalMetrics(current, event));
+        return;
+      }
+
       if (!liveEventMatchesSchema(event, schema)) {
         return;
       }
@@ -120,7 +149,7 @@ export function OverlayRuntimeClient({ schema, overlayKey, preview = false, debu
     return () => {
       socket.disconnect();
     };
-  }, [debug, isList, isStaticOverlay, layout.maxItems, layout.reverse, overlayKey, preview, schema, showSingleItem]);
+  }, [debug, isGoalOverlay, isList, isStaticOverlay, layout.maxItems, layout.reverse, overlayKey, preview, schema, showSingleItem]);
 
   useEffect(() => {
     const hasExitingItems = items.some((item) => item.meta?.exiting);
@@ -171,12 +200,18 @@ export function OverlayRuntimeClient({ schema, overlayKey, preview = false, debu
     );
   }
 
-  if (isStaticOverlay) {
+  if (isStaticOverlay || isGoalOverlay) {
     const staticData = getSampleChatRenderData(1, ["CHAT"])[0];
+    const runtimeData = isGoalOverlay
+      ? {
+        ...staticData,
+        goal: goalMetrics
+      }
+      : staticData;
 
     return (
       <OverlayViewport schema={schema} debug={debug}>
-        <OverlaySceneRenderer schema={schema} data={staticData} debug={debug} />
+        <OverlaySceneRenderer schema={schema} data={runtimeData} debug={debug} />
       </OverlayViewport>
     );
   }
@@ -240,6 +275,94 @@ function acceptsFocusDock(schema: OverlayDesignSchema) {
   return schema.kind === "CUSTOM" && schema.layout.mode === "single" && schema.dataSource.type === "manual";
 }
 
+function createInitialGoalMetrics(schema: OverlayDesignSchema): GoalMetrics {
+  return schema.components.reduce<GoalMetrics>((metrics, component) => {
+    if (component.type !== "goal_progress_bar" && component.type !== "goal_progress_ring") {
+      return metrics;
+    }
+
+    const metricKey = getGoalMetricKey(component.props.metricType);
+    const currentValue = toPositiveNumber(component.props.currentValue, 0);
+
+    return {
+      ...metrics,
+      [metricKey]: Math.max(metrics[metricKey], currentValue)
+    };
+  }, { ...emptyGoalMetrics });
+}
+
+function updateGoalMetrics(current: GoalMetrics, event: OverlayEventPayload): GoalMetrics {
+  const type = normalizeEventType(event);
+  const next = { ...current };
+
+  if (type === "CHAT" && event.comment) {
+    next.comments += 1;
+    return next;
+  }
+
+  if (type === "GIFT") {
+    next.gifts += getEventAmount(event.giftCount);
+    return next;
+  }
+
+  if (type === "LIKE") {
+    next.likes += getEventAmount(event.likeCount);
+    return next;
+  }
+
+  if (type === "SHARE") {
+    next.shares += getEventAmount(event.shareCount);
+    return next;
+  }
+
+  if (type === "VIEWER_COUNT" || type === "VIEW") {
+    const viewerCount = toFiniteNumber(event.viewerCount);
+
+    if (viewerCount != null && viewerCount >= 0) {
+      next.viewers = viewerCount;
+    }
+
+    return next;
+  }
+
+  if (type === "JOIN") {
+    next.viewers += 1;
+  }
+
+  return next;
+}
+
+function getGoalMetricKey(value: unknown): keyof GoalMetrics {
+  if (value === "like" || value === "likes" || value === "heart") return "likes";
+  if (value === "gift" || value === "gifts") return "gifts";
+  if (value === "viewer" || value === "viewers" || value === "view" || value === "views") return "viewers";
+  if (value === "comment" || value === "comments" || value === "chat") return "comments";
+  if (value === "share" || value === "shares") return "shares";
+  return "custom";
+}
+
+function getEventAmount(value: number | null | undefined) {
+  const amount = Number(value);
+
+  return Number.isFinite(amount) && amount > 0 ? amount : 1;
+}
+
+function toPositiveNumber(value: unknown, fallback: number) {
+  const number = Number(value);
+
+  if (!Number.isFinite(number) || number < 0) {
+    return fallback;
+  }
+
+  return number;
+}
+
+function toFiniteNumber(value: unknown) {
+  const number = Number(value);
+
+  return Number.isFinite(number) ? number : null;
+}
+
 function liveEventMatchesSchema(event: OverlayEventPayload, schema: OverlayDesignSchema) {
   const sourceType = schema.dataSource.type;
 
@@ -261,6 +384,10 @@ function liveEventMatchesSchema(event: OverlayEventPayload, schema: OverlayDesig
 
   if (sourceType === "dock") {
     return false;
+  }
+
+  if (sourceType === "goal") {
+    return true;
   }
 
   return true;

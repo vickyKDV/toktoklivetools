@@ -121,7 +121,7 @@ function resolveKind(input: SaveOverlayDesignInput): OverlayKind {
     ? (input.schema as { kind?: unknown }).kind
     : null;
 
-  if (value === "CHAT" || value === "GIFT" || value === "LEADERBOARD" || value === "DOCK" || value === "CUSTOM" || value === "STATIC") {
+  if (value === "CHAT" || value === "GIFT" || value === "LEADERBOARD" || value === "DOCK" || value === "CUSTOM" || value === "STATIC" || value === "GOAL") {
     return value;
   }
 

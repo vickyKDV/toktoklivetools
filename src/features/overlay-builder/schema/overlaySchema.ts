@@ -18,11 +18,13 @@ export const overlayComponentTypes = [
   "gift_name",
   "gift_count",
   "gift_image",
+  "goal_progress_bar",
+  "goal_progress_ring",
   "media_switch",
   "running_text"
 ] as const;
 
-export const overlayKinds = ["CHAT", "GIFT", "LEADERBOARD", "DOCK", "CUSTOM", "STATIC"] as const;
+export const overlayKinds = ["CHAT", "GIFT", "LEADERBOARD", "DOCK", "CUSTOM", "STATIC", "GOAL"] as const;
 export type OverlayKind = (typeof overlayKinds)[number];
 export const overlayLayoutModes = ["single", "list", "ticker", "dock", "grid"] as const;
 export type OverlayLayoutMode = (typeof overlayLayoutModes)[number];
@@ -148,7 +150,7 @@ export const overlayDesignSchema = z.object({
     animation: overlayAnimationEffectSchema.default({ type: "none", enabled: false, color: "#22d3ee", color2: "#f43f5e", durationMs: 2400, intensity: 70 })
   }),
   dataSource: z.object({
-    type: z.enum(["chat", "gift", "leaderboard", "dock", "manual", "static"]).default("manual"),
+    type: z.enum(["chat", "gift", "leaderboard", "dock", "manual", "static", "goal"]).default("manual"),
     filters: z.record(z.unknown()).default({})
   }).default({ type: "manual", filters: {} }),
   layout: z.object({
@@ -201,6 +203,14 @@ export type OverlayRenderData = {
     count?: number | string | null;
     image?: string | null;
   };
+  goal?: {
+    likes?: number | null;
+    gifts?: number | null;
+    viewers?: number | null;
+    comments?: number | null;
+    shares?: number | null;
+    custom?: number | null;
+  };
 };
 
 export const dummyOverlayData: OverlayRenderData = {
@@ -218,6 +228,14 @@ export const dummyOverlayData: OverlayRenderData = {
     name: "Rose",
     count: 3,
     image: ""
+  },
+  goal: {
+    likes: 650,
+    gifts: 42,
+    viewers: 720,
+    comments: 84,
+    shares: 32,
+    custom: 0
   }
 };
 
