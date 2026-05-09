@@ -1,10 +1,10 @@
 import "server-only";
 
 import { Prisma } from "@prisma/client";
-import { runAutomationFlows } from "@/lib/automation/engine";
-import { prisma } from "@/lib/prisma";
-import { emitDashboardEvent, emitOverlayEvent, emitOverlayLiveEvent } from "@/lib/realtime/server";
-import { evaluateRule, getRuleActions } from "@/lib/rules/engine";
+import { runAutomationFlows } from "@/server/automation/engine";
+import { prisma } from "@/server/db/prisma";
+import { emitDashboardEvent, emitOverlayEvent, emitOverlayLiveEvent } from "@/server/realtime/socket-server";
+import { evaluateRule, getRuleActions } from "@/core/rules/engine";
 import { mapTikTokEvent, socialEventName } from "@/lib/tiktok/map-event";
 import type { OverlayEventPayload } from "@/types/live";
 

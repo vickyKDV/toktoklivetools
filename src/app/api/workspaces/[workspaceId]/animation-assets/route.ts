@@ -1,7 +1,7 @@
 import { mkdir, readdir, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser } from "@/server/auth/session";
 import {
   allowedAnimationAssetExtensions,
   createOverlayAssetFilename,
@@ -11,7 +11,7 @@ import {
   legacyAnimationAssetUploadRoot,
   maxAnimationUploadBytes
 } from "@/lib/animation-assets";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/server/db/prisma";
 
 export const runtime = "nodejs";
 

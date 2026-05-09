@@ -6,7 +6,7 @@ import { logoutAction } from "@/app/(auth)/actions";
 import { DashboardSidebarNav, type SidebarWorkspace } from "@/components/dashboard/sidebar-nav";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import type { AuthUser } from "@/lib/auth";
+import type { AuthUser } from "@/core/auth/types";
 
 type DashboardSidebarProps = {
   user: AuthUser;

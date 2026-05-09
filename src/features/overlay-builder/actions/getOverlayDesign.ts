@@ -1,59 +1,42 @@
 import "server-only";
 
 import { notFound } from "next/navigation";
-import { prisma } from "@/lib/prisma";
-import { mapOverlay } from "@/features/overlay-builder/actions/saveOverlayDesign";
+import {
+  getOverlayDesignById,
+  getOverlayDesignForUser,
+  getPublishedOverlayById
+} from "@/server/overlays/service";
 
 export async function getOverlayDesign(overlayId: string) {
-  const overlay = await prisma.overlay.findUnique({
-    where: { id: overlayId },
-    include: {
-      workspace: {
-        select: {
-          id: true,
-          name: true,
-          overlayKey: true
-        }
-      }
-    }
-  });
+  const overlay = await getOverlayDesignById(overlayId);
 
   if (!overlay) {
     notFound();
   }
 
-  return {
-    ...mapOverlay(overlay),
-    workspaceId: overlay.workspaceId,
-    workspaceName: overlay.workspace.name,
-    overlayKey: overlay.workspace.overlayKey
-  };
+  return overlay;
+}
+
+export async function getWorkspaceOverlayDesign(input: {
+  userId: string;
+  workspaceId: string;
+  overlayId: string;
+}) {
+  const overlay = await getOverlayDesignForUser(input);
+
+  if (!overlay) {
+    notFound();
+  }
+
+  return overlay;
 }
 
 export async function getPublishedOverlay(overlayId: string) {
-  const overlay = await prisma.overlay.findUnique({
-    where: { id: overlayId },
-    include: {
-      workspace: {
-        select: {
-          id: true,
-          name: true,
-          overlayKey: true
-        }
-      }
-    }
-  });
+  const overlay = await getPublishedOverlayById(overlayId);
 
   if (!overlay) {
     notFound();
   }
 
-  const mapped = mapOverlay(overlay);
-
-  return {
-    ...mapped,
-    schema: mapped.publishedSchema ?? mapped.schema,
-    workspaceName: overlay.workspace.name,
-    overlayKey: overlay.workspace.overlayKey
-  };
+  return overlay;
 }

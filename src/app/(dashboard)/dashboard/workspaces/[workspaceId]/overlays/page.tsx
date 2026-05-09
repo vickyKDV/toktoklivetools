@@ -6,9 +6,9 @@ import { CopyButton } from "@/components/ui/copy-button";
 import { Input } from "@/components/ui/input";
 import { listBuilderOverlays } from "@/features/overlay-builder/actions/listBuilderOverlays";
 import { OverlayThumbnail } from "@/features/overlay-builder/components/OverlayThumbnail";
-import { requireUser } from "@/lib/auth";
+import { requireUser } from "@/server/auth/session";
 import { getWidgetBaseUrl } from "@/lib/utils";
-import { getWorkspaceForUser } from "@/lib/workspaces";
+import { getWorkspaceForUser } from "@/server/workspaces/service";
 
 type OverlaysPageProps = {
   params: Promise<{

@@ -8,9 +8,9 @@ import type {
   OverlayComponentType,
   OverlayDesignSchema,
   OverlayRenderData
-} from "@/features/overlay-builder/schema/overlaySchema";
-import { isContainerType } from "@/features/overlay-builder/utils/componentTree";
-import { flattenComponents } from "@/features/overlay-builder/utils/componentTree";
+} from "@/core/overlay/schema";
+import { isContainerType } from "@/core/overlay/componentTree";
+import { flattenComponents } from "@/core/overlay/componentTree";
 import {
   getDragLayout,
   getPointerDelta,
@@ -18,7 +18,7 @@ import {
   sanitizeInteractionLayout,
   type InteractionLayout,
   type ResizeHandle
-} from "@/features/overlay-builder/utils/interactionMath";
+} from "@/core/overlay/interactionMath";
 
 type CanvasEditorProps = {
   designSchema: OverlayDesignSchema;

@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
-import { getWorkspaceForUser } from "@/lib/workspaces";
-import { listBuilderOverlays } from "@/features/overlay-builder/actions/listBuilderOverlays";
+import { getCurrentUser } from "@/server/auth/session";
+import { listWorkspaceOverlaysForUser } from "@/server/overlays/service";
 
 type RouteContext = {
   params: Promise<{
@@ -17,8 +16,7 @@ export async function GET(_request: Request, context: RouteContext) {
   }
 
   const { workspaceId } = await context.params;
-  const workspace = await getWorkspaceForUser(user.id, workspaceId);
-  const overlays = await listBuilderOverlays(workspace.id);
+  const overlays = await listWorkspaceOverlaysForUser(user.id, workspaceId);
 
   return NextResponse.json({
     ok: true,

@@ -1,5 +1,5 @@
 import { OverlaySceneRenderer } from "@/features/overlay-builder/components/OverlaySceneRenderer";
-import { dummyOverlayData } from "@/features/overlay-builder/schema/overlaySchema";
+import { dummyOverlayData } from "@/core/overlay/schema";
 import { getOverlayDesign } from "@/features/overlay-builder/actions/getOverlayDesign";
 
 type OverlayPreviewPageProps = {

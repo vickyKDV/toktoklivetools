@@ -2,11 +2,11 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { AutomationBuilder } from "@/components/automation/automation-builder";
 import { Button } from "@/components/ui/button";
-import { parseAutomationEdges, parseAutomationNodes } from "@/lib/automation/flow";
-import { requireUser } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { parseAutomationEdges, parseAutomationNodes } from "@/core/automation/flow";
+import { requireUser } from "@/server/auth/session";
+import { prisma } from "@/server/db/prisma";
 import { getWidgetBaseUrl } from "@/lib/utils";
-import { getWorkspaceForUser } from "@/lib/workspaces";
+import { getWorkspaceForUser } from "@/server/workspaces/service";
 import type { AutomationExecutionRecord, AutomationFlowRecord } from "@/types/automation";
 
 type AutomationBuilderPageProps = {

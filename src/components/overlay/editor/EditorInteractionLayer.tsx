@@ -3,7 +3,7 @@
 import { EditorMoveable } from "@/components/overlay/editor/EditorMoveable";
 import { EditorSelecto } from "@/components/overlay/editor/EditorSelecto";
 import { FloatingNodeToolbar } from "@/components/overlay/editor/FloatingNodeToolbar";
-import type { OverlayComponentSchema, OverlayDesignSchema } from "@/features/overlay-builder/schema/overlaySchema";
+import type { OverlayComponentSchema, OverlayDesignSchema } from "@/core/overlay/schema";
 
 type EditorInteractionLayerProps = {
   canvasElement: HTMLElement | null;

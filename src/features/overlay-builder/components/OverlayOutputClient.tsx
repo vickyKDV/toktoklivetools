@@ -9,7 +9,7 @@ import {
   dummyOverlayData,
   type OverlayDesignSchema,
   type OverlayRenderData
-} from "@/features/overlay-builder/schema/overlaySchema";
+} from "@/core/overlay/schema";
 import type { OverlayEventPayload } from "@/types/live";
 
 let outputItemSequence = 0;

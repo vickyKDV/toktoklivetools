@@ -2,8 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { requireUser } from "@/lib/auth";
-import { getUserWorkspaces } from "@/lib/workspaces";
+import { requireUser } from "@/server/auth/session";
+import { getUserWorkspaces } from "@/server/workspaces/service";
 
 export default async function AutomationBuilderEntryPage() {
   const user = await requireUser();

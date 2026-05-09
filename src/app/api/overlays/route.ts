@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import type { OverlayKind } from "@prisma/client";
-import { getCurrentUser } from "@/lib/auth";
-import { getWorkspaceForUser } from "@/lib/workspaces";
-import { listBuilderOverlays } from "@/features/overlay-builder/actions/listBuilderOverlays";
-import { saveOverlayDesign } from "@/features/overlay-builder/actions/saveOverlayDesign";
+import { getCurrentUser } from "@/server/auth/session";
+import {
+  listWorkspaceOverlays,
+  listWorkspaceOverlaysForUser,
+  saveOverlayDesign
+} from "@/server/overlays/service";
 
 export async function GET(request: Request) {
   const user = await getCurrentUser();
@@ -19,8 +21,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ ok: false, message: "workspaceId wajib diisi." }, { status: 400 });
   }
 
-  const workspace = await getWorkspaceForUser(user.id, workspaceId);
-  const overlays = await listBuilderOverlays(workspace.id);
+  const overlays = await listWorkspaceOverlaysForUser(user.id, workspaceId);
 
   return NextResponse.json({ ok: true, overlays });
 }
@@ -57,7 +58,7 @@ export async function POST(request: Request) {
     kind: body.kind,
     overlayType: body.overlayType ?? body.type ?? "CUSTOM_OVERLAY"
   });
-  const overlays = await listBuilderOverlays(body.workspaceId);
+  const overlays = await listWorkspaceOverlays(overlay.workspaceId);
 
   return NextResponse.json({
     ok: true,

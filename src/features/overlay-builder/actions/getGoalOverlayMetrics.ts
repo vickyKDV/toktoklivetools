@@ -1,8 +1,8 @@
 import "server-only";
 
 import { LiveEventType } from "@prisma/client";
-import { prisma } from "@/lib/prisma";
-import type { OverlayRenderData } from "@/features/overlay-builder/schema/overlaySchema";
+import { prisma } from "@/server/db/prisma";
+import type { OverlayRenderData } from "@/core/overlay/schema";
 
 export type GoalOverlayMetrics = NonNullable<OverlayRenderData["goal"]>;
 

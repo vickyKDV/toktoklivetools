@@ -1,7 +1,7 @@
 import { DashboardHeader } from "@/components/dashboard/header";
 import { DashboardSidebar } from "@/components/dashboard/sidebar";
-import { requireUser } from "@/lib/auth";
-import { getUserWorkspaces } from "@/lib/workspaces";
+import { requireUser } from "@/server/auth/session";
+import { getUserWorkspaces } from "@/server/workspaces/service";
 
 export const dynamic = "force-dynamic";
 

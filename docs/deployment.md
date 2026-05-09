@@ -40,21 +40,20 @@ pnpm db:seed
 
 ## Run App
 
-Script yang tersedia:
+Script utama:
 
 ```bash
 pnpm start
-pnpm start:ws
 ```
 
-`pnpm start` menjalankan Next.js di port `7050`.
+`pnpm start` menjalankan `server.ts`, yaitu runtime gabungan HTTP + Next.js + Socket.IO + TikTok connection manager di port `7050` secara default. Event TikTok, dock, overlay, dan automation berada di runtime yang sama.
 
-`pnpm start:ws` menjalankan `server.ts`, yaitu runtime gabungan HTTP + Socket.IO + TikTok connection manager. Untuk production realtime overlay, pakai proses `start:ws` agar event TikTok, dock, overlay, dan automation berada di runtime yang sama.
+`pnpm start:ws` masih tersedia sebagai alias kompatibilitas, tetapi jangan jalankan bersamaan dengan `pnpm start` karena memakai server dan port yang sama.
 
 Contoh PM2:
 
 ```bash
-pm2 start "pnpm start:ws" --name tiktok-live-automation
+pm2 start "pnpm start" --name tiktok-live-automation
 pm2 save
 ```
 
@@ -134,7 +133,7 @@ Dashboard connect TikTok
 
 Jika dock/overlay tidak realtime:
 
-1. Pastikan runtime `start:ws` sedang hidup.
+1. Pastikan runtime `pnpm start` sedang hidup.
 2. Pastikan `NEXT_PUBLIC_SOCKET_URL` mengarah ke domain production.
 3. Pastikan workspace sudah connect ke live.
 4. Cek browser Network untuk `/socket.io`.

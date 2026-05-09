@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { getSampleChatRenderData } from "@/features/overlay-builder/components/ChatStyleRenderer";
 import { OverlaySceneRenderer } from "@/features/overlay-builder/components/OverlaySceneRenderer";
-import { dummyOverlayData, type OverlayDesignSchema } from "@/features/overlay-builder/schema/overlaySchema";
-import { getRuntimeCanvasSize } from "@/features/overlay-builder/utils/runtimeCanvas";
+import { dummyOverlayData, type OverlayDesignSchema } from "@/core/overlay/schema";
+import { getRuntimeCanvasSize } from "@/core/overlay/runtimeCanvas";
 
 type OverlayThumbnailProps = {
   schema: OverlayDesignSchema;

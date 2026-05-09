@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import type { OverlayKind } from "@prisma/client";
-import { getCurrentUser } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
-import { getWorkspaceForUser } from "@/lib/workspaces";
-import { listBuilderOverlays } from "@/features/overlay-builder/actions/listBuilderOverlays";
-import { saveOverlayDesign } from "@/features/overlay-builder/actions/saveOverlayDesign";
+import { getCurrentUser } from "@/server/auth/session";
+import {
+  deleteOverlayForUser,
+  listWorkspaceOverlays,
+  updateOverlayForUser
+} from "@/server/overlays/service";
 
 type OverlayRouteProps = {
   params: Promise<{
@@ -31,34 +32,21 @@ export async function PATCH(request: Request, { params }: OverlayRouteProps) {
     overlayType?: "CUSTOM_OVERLAY" | "CHAT_STYLE";
     type?: "CUSTOM_OVERLAY" | "CHAT_STYLE";
   };
-  const existing = await prisma.overlay.findUnique({
-    where: { id: overlayKey },
-    select: {
-      id: true,
-      workspaceId: true,
-      name: true,
-      kind: true,
-      draftSchema: true
-    }
+  const overlay = await updateOverlayForUser({
+    overlayId: overlayKey,
+    userId: user.id,
+    name: body.name,
+    schema: body.schema,
+    publish: body.publish === true,
+    kind: body.kind,
+    overlayType: body.overlayType ?? body.type
   });
 
-  if (!existing) {
+  if (!overlay) {
     return NextResponse.json({ ok: false, message: "Overlay tidak ditemukan." }, { status: 404 });
   }
 
-  const workspace = await getWorkspaceForUser(user.id, existing.workspaceId);
-  const overlay = await saveOverlayDesign({
-    id: existing.id,
-    userId: user.id,
-    workspaceId: workspace.id,
-    name: body.name ?? existing.name,
-    schema: body.schema ?? existing.draftSchema,
-    makeActive: body.makeActive ?? body.isActive ?? false,
-    publish: body.publish === true,
-    kind: body.kind ?? existing.kind,
-    overlayType: body.overlayType ?? body.type ?? (existing.kind === "CHAT" ? "CHAT_STYLE" : "CUSTOM_OVERLAY")
-  });
-  const overlays = await listBuilderOverlays(workspace.id);
+  const overlays = await listWorkspaceOverlays(overlay.workspaceId);
 
   return NextResponse.json({
     ok: true,
@@ -78,23 +66,11 @@ export async function DELETE(_request: Request, { params }: OverlayRouteProps) {
   }
 
   const { overlayKey } = await params;
-  const existing = await prisma.overlay.findUnique({
-    where: { id: overlayKey },
-    select: {
-      id: true,
-      workspaceId: true,
-      kind: true
-    }
-  });
+  const deleted = await deleteOverlayForUser({ overlayId: overlayKey, userId: user.id });
 
-  if (!existing) {
+  if (!deleted) {
     return NextResponse.json({ ok: false, message: "Overlay tidak ditemukan." }, { status: 404 });
   }
-
-  await getWorkspaceForUser(user.id, existing.workspaceId);
-  await prisma.overlay.delete({
-    where: { id: existing.id }
-  });
 
   return NextResponse.json({ ok: true, message: "Overlay berhasil dihapus" });
 }

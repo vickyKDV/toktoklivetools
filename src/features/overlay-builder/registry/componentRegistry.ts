@@ -4,13 +4,13 @@ import type {
   OverlayComponentSchema,
   OverlayComponentType,
   OverlayRenderData
-} from "@/features/overlay-builder/schema/overlaySchema";
-import { resolveBindings } from "@/features/overlay-builder/utils/resolveBindings";
+} from "@/core/overlay/schema";
+import { resolveBindings } from "@/core/overlay/resolveBindings";
 import {
   getAutoFitFontSize,
   getResolvedComponentText,
   getRuntimeComponentHeight
-} from "@/features/overlay-builder/utils/runtimeLayout";
+} from "@/core/overlay/runtimeLayout";
 
 export type ComponentSetting =
   | { key: string; label: string; type: "text" }
@@ -506,6 +506,11 @@ function LottieSwitchMedia({
   onComplete?: () => void;
 }) {
   const elementRef = useRef<HTMLElement | null>(null);
+  const completedRef = useRef(false);
+
+  useEffect(() => {
+    completedRef.current = false;
+  }, [item.url]);
 
   useEffect(() => {
     const element = elementRef.current;
@@ -514,7 +519,14 @@ function LottieSwitchMedia({
       return;
     }
 
-    const handleComplete = () => onComplete();
+    const handleComplete = () => {
+      if (completedRef.current) {
+        return;
+      }
+
+      completedRef.current = true;
+      onComplete();
+    };
     const completeEvents = ["complete", "finish", "ended", "dotlottie-complete", "dotlottie:complete"];
 
     completeEvents.forEach((eventName) => {
@@ -527,6 +539,43 @@ function LottieSwitchMedia({
       });
     };
   }, [item.url, onComplete]);
+
+  useEffect(() => {
+    if (!onComplete || loop) {
+      return;
+    }
+
+    const complete = onComplete;
+    let cancelled = false;
+    let timer: number | undefined;
+
+    async function armJsonDurationFallback() {
+      const durationMs = await getLottieJsonDurationMs(item.url);
+
+      if (cancelled || !durationMs) {
+        return;
+      }
+
+      timer = window.setTimeout(() => {
+        if (completedRef.current) {
+          return;
+        }
+
+        completedRef.current = true;
+        complete();
+      }, durationMs);
+    }
+
+    void armJsonDurationFallback();
+
+    return () => {
+      cancelled = true;
+
+      if (timer) {
+        window.clearTimeout(timer);
+      }
+    };
+  }, [item.url, loop, onComplete]);
 
   return createElement("dotlottie-wc", {
     ref: (node: HTMLElement | null) => {
@@ -541,6 +590,44 @@ function LottieSwitchMedia({
       height: "100%"
     } satisfies CSSProperties
   });
+}
+
+const lottieDurationCache = new Map<string, number | null>();
+
+async function getLottieJsonDurationMs(url: string) {
+  if (!/\.json(?:$|[?#])/i.test(url)) {
+    return null;
+  }
+
+  if (lottieDurationCache.has(url)) {
+    return lottieDurationCache.get(url) ?? null;
+  }
+
+  try {
+    const response = await fetch(url, { cache: "force-cache" });
+
+    if (!response.ok) {
+      lottieDurationCache.set(url, null);
+      return null;
+    }
+
+    const payload = await response.json() as { fr?: unknown; ip?: unknown; op?: unknown };
+    const frameRate = Number(payload.fr);
+    const inPoint = Number(payload.ip ?? 0);
+    const outPoint = Number(payload.op);
+
+    if (!Number.isFinite(frameRate) || frameRate <= 0 || !Number.isFinite(outPoint)) {
+      lottieDurationCache.set(url, null);
+      return null;
+    }
+
+    const durationMs = Math.max(120, Math.round(((outPoint - (Number.isFinite(inPoint) ? inPoint : 0)) / frameRate) * 1000));
+    lottieDurationCache.set(url, durationMs);
+    return durationMs;
+  } catch {
+    lottieDurationCache.set(url, null);
+    return null;
+  }
 }
 
 function normalizeMediaItems(rawItems: unknown, rawSrc: unknown): MediaSwitchItem[] {

@@ -14,8 +14,8 @@ import {
   type OverlayComponentSchema,
   type OverlayDesignSchema,
   type OverlayRenderData
-} from "@/features/overlay-builder/schema/overlaySchema";
-import { getRuntimeCanvasSize } from "@/features/overlay-builder/utils/runtimeCanvas";
+} from "@/core/overlay/schema";
+import { getRuntimeCanvasSize } from "@/core/overlay/runtimeCanvas";
 
 type SceneInput = OverlaySceneSchema | OverlayDesignSchema | unknown;
 

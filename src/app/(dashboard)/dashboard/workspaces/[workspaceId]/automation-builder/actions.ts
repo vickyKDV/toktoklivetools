@@ -3,10 +3,10 @@
 import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { parseAutomationEdges, parseAutomationNodes, sanitizeAutomationEdges, sanitizeAutomationNodes } from "@/lib/automation/flow";
-import { requireUser } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
-import { getWorkspaceForUser } from "@/lib/workspaces";
+import { parseAutomationEdges, parseAutomationNodes, sanitizeAutomationEdges, sanitizeAutomationNodes } from "@/core/automation/flow";
+import { requireUser } from "@/server/auth/session";
+import { prisma } from "@/server/db/prisma";
+import { getWorkspaceForUser } from "@/server/workspaces/service";
 import type { SaveAutomationFlowInput } from "@/types/automation";
 
 const saveFlowSchema = z.object({

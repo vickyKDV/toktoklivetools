@@ -2,7 +2,7 @@
 
 import { Copy, Lock, RotateCcw, SendToBack, Trash2, Unlock } from "lucide-react";
 import type { ReactNode } from "react";
-import type { OverlayComponentSchema } from "@/features/overlay-builder/schema/overlaySchema";
+import type { OverlayComponentSchema } from "@/core/overlay/schema";
 
 type FloatingNodeToolbarProps = {
   selectedNodes: OverlayComponentSchema[];

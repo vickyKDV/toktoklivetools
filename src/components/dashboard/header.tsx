@@ -1,6 +1,6 @@
 import { Palette } from "lucide-react";
 import { AppThemeSelect } from "@/components/theme/app-theme-provider";
-import type { AuthUser } from "@/lib/auth";
+import type { AuthUser } from "@/core/auth/types";
 
 type DashboardHeaderProps = {
   user: AuthUser;

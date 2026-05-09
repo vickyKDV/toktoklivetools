@@ -11,8 +11,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SubmitButton } from "@/components/ui/submit-button";
-import { requireUser } from "@/lib/auth";
-import { getWorkspaceForUser } from "@/lib/workspaces";
+import { requireUser } from "@/server/auth/session";
+import { getWorkspaceForUser } from "@/server/workspaces/service";
 
 type RulesPageProps = {
   params: Promise<{

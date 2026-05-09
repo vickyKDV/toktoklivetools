@@ -3,8 +3,8 @@
 import { Copy, Eye, EyeOff, Lock, Trash2, Unlock, Upload } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { componentRegistry, type ComponentSetting } from "@/features/overlay-builder/registry/componentRegistry";
-import type { OverlayComponentSchema, OverlayDesignSchema } from "@/features/overlay-builder/schema/overlaySchema";
-import { isContainerType } from "@/features/overlay-builder/utils/componentTree";
+import type { OverlayComponentSchema, OverlayDesignSchema } from "@/core/overlay/schema";
+import { isContainerType } from "@/core/overlay/componentTree";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -588,12 +588,12 @@ function LayoutFields({
               onChange={(direction) => onUpdateDesign({ layout: { ...layout, direction: direction as OverlayDesignSchema["layout"]["direction"] } })}
             />
           ) : null}
-          {layout.mode === "list" && !isLeaderboard ? (
+          {layout.mode === "list" ? (
             <SelectField
               label="List Style"
               value={layout.listStyle ?? "stacked_card"}
               options={listStyleOptions}
-              onChange={(listStyle) => onUpdateDesign({ layout: { ...layout, listStyle: listStyle as OverlayDesignSchema["layout"]["listStyle"] } })}
+              onChange={(listStyle) => onUpdateDesign({ layout: { ...layout, mode: isLeaderboard ? "list" : layout.mode, listStyle: listStyle as OverlayDesignSchema["layout"]["listStyle"] } })}
             />
           ) : null}
           <SelectField

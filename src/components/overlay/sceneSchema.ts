@@ -12,8 +12,8 @@ import {
   overlayStrokeSchema,
   type OverlayComponentSchema,
   type OverlayDesignSchema
-} from "@/features/overlay-builder/schema/overlaySchema";
-import { normalizeDesignSchema } from "@/features/overlay-builder/utils/normalizeDesignSchema";
+} from "@/core/overlay/schema";
+import { normalizeDesignSchema } from "@/core/overlay/normalizeDesignSchema";
 
 export const SCENE_BASE_CANVAS = {
   width: 1080,

@@ -4,9 +4,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { RealtimeEventFeed } from "@/components/dashboard/realtime-event-feed";
-import { requireUser } from "@/lib/auth";
+import { requireUser } from "@/server/auth/session";
 import { formatDateTime } from "@/lib/utils";
-import { getWorkspaceEventsForUser, getWorkspaceForUser } from "@/lib/workspaces";
+import { getWorkspaceEventsForUser, getWorkspaceForUser } from "@/server/workspaces/service";
 
 type EventsPageProps = {
   params: Promise<{

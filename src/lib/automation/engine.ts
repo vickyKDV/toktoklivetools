@@ -1,9 +1,9 @@
 import "server-only";
 
 import { Prisma, type LiveEvent, type LiveEventType } from "@prisma/client";
-import { prisma } from "@/lib/prisma";
-import { emitOverlayEvent } from "@/lib/realtime/server";
-import { parseAutomationEdges, parseAutomationNodes } from "@/lib/automation/flow";
+import { prisma } from "@/server/db/prisma";
+import { emitOverlayEvent } from "@/server/realtime/socket-server";
+import { parseAutomationEdges, parseAutomationNodes } from "@/core/automation/flow";
 import type {
   AutomationFlowEdge,
   AutomationFlowNode,

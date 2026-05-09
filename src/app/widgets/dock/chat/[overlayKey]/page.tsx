@@ -1,7 +1,7 @@
 import { LiveEventType } from "@prisma/client";
 import { notFound } from "next/navigation";
 import { ChatDockClient } from "@/components/overlay/chat-dock-client";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/server/db/prisma";
 import type { ChatUserRole, OverlayEventPayload } from "@/types/live";
 
 export const dynamic = "force-dynamic";

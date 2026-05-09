@@ -1,5 +1,5 @@
 import type { OverlayCustomDesign, OverlayDesignElement, OverlayDesignElementKey } from "@/types/live";
-import type { OverlayDesignSchema } from "@/features/overlay-builder/schema/overlaySchema";
+import type { OverlayDesignSchema } from "@/core/overlay/schema";
 
 export type OverlayDesignMode = "chat" | "focus";
 

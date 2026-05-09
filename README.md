@@ -19,18 +19,18 @@ Staging MVP for TikTok LIVE automation, realtime event storage, JSON overlays, a
 pnpm install
 cp .env.example .env
 pnpm prisma:migrate
-pnpm dev:ws
+pnpm dev
 ```
 
 Edit `DATABASE_URL` in `.env` before running migrations.
 
-Use `pnpm dev:ws` instead of `pnpm dev` when testing realtime overlay events locally. It starts Next.js and Socket.IO in the same Node process.
+`pnpm dev` starts the combined runtime: Next.js dashboard/API/overlay pages, Socket.IO, and the TikTok live connector. Do not run `pnpm dev:ws` alongside `pnpm dev`; it is only a compatibility alias for the same combined server and will conflict on the port if started separately.
 
 ## Production Realtime
 
-For production/cloud deployment, keep the HTTP app and realtime runtime as independently restartable processes when possible:
+For production/cloud deployment, run the same combined runtime behind your reverse proxy:
 
-- Run the Socket.IO/TikTok process with `pnpm dev:ws` locally or the equivalent `server.ts` entrypoint in production.
+- Run `pnpm start` after `pnpm build`. It boots `server.ts`, which serves Next.js and attaches Socket.IO/TikTok runtime to the same HTTP server.
 - Point browsers/widgets to that realtime endpoint with `NEXT_PUBLIC_SOCKET_URL`.
 - Use `TIKTOK_RECONNECT_MAX_ATTEMPTS=0` for unlimited reconnect attempts, or set a positive number to stop after that many retries.
 - Use `TIKTOK_RECONNECT_MAX_DELAY_MS` to cap the reconnect backoff delay.

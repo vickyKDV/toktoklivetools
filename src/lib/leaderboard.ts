@@ -1,7 +1,7 @@
 import "server-only";
 
 import { LiveEventType, Prisma } from "@prisma/client";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/server/db/prisma";
 import type { LeaderboardEntry, LeaderboardMetric, LeaderboardPeriod } from "@/types/live";
 
 export function getPeriodStart(period: LeaderboardPeriod) {

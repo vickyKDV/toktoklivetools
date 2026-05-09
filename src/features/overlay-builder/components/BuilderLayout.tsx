@@ -18,7 +18,7 @@ import { OverlaySceneRenderer } from "@/features/overlay-builder/components/Over
 import { eventToRenderData } from "@/features/overlay-builder/components/OverlayRuntimeClient";
 import { componentRegistry } from "@/features/overlay-builder/registry/componentRegistry";
 import { overlayTemplates } from "@/features/overlay-builder/registry/templateRegistry";
-import { normalizeDesignSchema } from "@/features/overlay-builder/utils/normalizeDesignSchema";
+import { normalizeDesignSchema } from "@/core/overlay/normalizeDesignSchema";
 import {
   blankOverlayDesignSchema,
   dummyOverlayData,
@@ -26,7 +26,7 @@ import {
   type OverlayComponentType,
   type OverlayDesignSchema,
   type OverlayRenderData
-} from "@/features/overlay-builder/schema/overlaySchema";
+} from "@/core/overlay/schema";
 import { createDefaultComponent } from "@/features/overlay-builder/utils/createDefaultComponent";
 import type { OverlayEventPayload } from "@/types/live";
 import {
@@ -38,7 +38,7 @@ import {
   moveComponentToParent,
   removeComponentFromTree,
   updateComponentInTree
-} from "@/features/overlay-builder/utils/componentTree";
+} from "@/core/overlay/componentTree";
 
 export type BuilderSavedDesign = {
   id: string;

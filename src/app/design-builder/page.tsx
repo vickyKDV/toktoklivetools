@@ -6,9 +6,9 @@ import { BuilderLayout, type BuilderSavedDesign } from "@/features/overlay-build
 import { getOverlayDesign } from "@/features/overlay-builder/actions/getOverlayDesign";
 import { listBuilderOverlays } from "@/features/overlay-builder/actions/listBuilderOverlays";
 import { moderatorStackTemplate } from "@/features/overlay-builder/registry/templateRegistry";
-import { normalizeDesignSchema } from "@/features/overlay-builder/utils/normalizeDesignSchema";
-import { requireUser } from "@/lib/auth";
-import { getUserWorkspaces } from "@/lib/workspaces";
+import { normalizeDesignSchema } from "@/core/overlay/normalizeDesignSchema";
+import { requireUser } from "@/server/auth/session";
+import { getUserWorkspaces } from "@/server/workspaces/service";
 
 type DesignBuilderPageProps = {
   searchParams?: Promise<{

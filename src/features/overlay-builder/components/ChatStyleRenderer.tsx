@@ -4,12 +4,13 @@ import { useEffect, type CSSProperties } from "react";
 import { OverlayRenderer } from "@/features/overlay-builder/components/OverlayRenderer";
 import {
   dummyOverlayData,
+  type OverlayComponentSchema,
   type OverlayListStyle,
   type OverlayDesignSchema,
   type OverlayRenderData
-} from "@/features/overlay-builder/schema/overlaySchema";
-import { getRuntimeCanvasSize } from "@/features/overlay-builder/utils/runtimeCanvas";
-import { getRuntimeComponentBounds } from "@/features/overlay-builder/utils/runtimeLayout";
+} from "@/core/overlay/schema";
+import { getRuntimeCanvasSize } from "@/core/overlay/runtimeCanvas";
+import { getRuntimeComponentBounds } from "@/core/overlay/runtimeLayout";
 
 type ChatStyleRendererProps = {
   designJson: OverlayDesignSchema;
@@ -33,20 +34,30 @@ export function ChatStyleRenderer({
   height
 }: ChatStyleRendererProps) {
   const runtimeCanvas = getRuntimeCanvasSize(designJson);
+  const isLeaderboard = designJson.kind === "LEADERBOARD" || designJson.dataSource.type === "leaderboard";
   const isHorizontal = designJson.layout.direction === "horizontal";
   const listAlign = align ?? (alignRight ? "end" : designJson.layout.align ?? "start");
-  const itemBounds = items.map((item) => getRuntimeComponentBounds(designJson.components, item, runtimeCanvas.width, runtimeCanvas.height));
-  const bounds = itemBounds[0] ?? getRuntimeComponentBounds(designJson.components, dummyOverlayData, runtimeCanvas.width, runtimeCanvas.height);
+  const templateBounds = getRuntimeComponentBounds(designJson.components, dummyOverlayData, runtimeCanvas.width, runtimeCanvas.height);
+  const measuredItemBounds = items.map((item) => getRuntimeComponentBounds(designJson.components, item, runtimeCanvas.width, runtimeCanvas.height));
+  const itemBounds = isLeaderboard
+    ? measuredItemBounds.map((item) => ({
+      ...item,
+      left: templateBounds.left,
+      width: templateBounds.width
+    }))
+    : measuredItemBounds;
+  const bounds = isLeaderboard ? templateBounds : itemBounds[0] ?? templateBounds;
   const viewportWidth = runtimeCanvas.width;
   const viewportHeight = typeof height === "number" ? Math.max(height, runtimeCanvas.height) : runtimeCanvas.height;
-  const renderedItemWidth = Math.max(bounds.width, ...itemBounds.map((item) => item.width));
+  const renderedItemWidth = isLeaderboard ? bounds.width : Math.max(bounds.width, ...itemBounds.map((item) => item.width));
   const renderedItemHeight = Math.max(bounds.height, ...itemBounds.map((item) => item.height));
   const enterAnimation = getOverlayAnimationName(designJson.layout.enterAnimation, "in");
   const exitAnimation = getOverlayAnimationName(designJson.layout.exitAnimation, "out");
   const animationDurationMs = designJson.layout.animationDurationMs ?? 620;
   const listStyle = designJson.layout.listStyle ?? "default";
   const renderGap = getListRenderGap(listStyle, gap);
-  const listWidth = Math.max(renderedItemWidth, viewportWidth - bounds.left);
+  const listLeft = isLeaderboard && !isHorizontal ? 0 : bounds.left;
+  const listWidth = isLeaderboard && !isHorizontal ? viewportWidth : Math.max(renderedItemWidth, viewportWidth - bounds.left);
   const listHeight = Math.max(renderedItemHeight, viewportHeight - bounds.top);
   const smoothDurationMs = Math.max(animationDurationMs, 720);
 
@@ -98,7 +109,7 @@ export function ChatStyleRenderer({
       <div
         style={{
           position: "absolute",
-          left: bounds.left,
+          left: listLeft,
           top: bounds.top,
           width: listWidth,
           height: listHeight,
@@ -125,6 +136,9 @@ export function ChatStyleRenderer({
             const visualStyle = getListVisualStyle(listStyle, index, designJson.layout.maxItems, listAlign === "end", isHorizontal);
             const itemWidth = !isHorizontal && listAlign === "stretch" ? listWidth : renderedItemWidth;
             const itemHeight = isHorizontal && listAlign === "stretch" ? listHeight : currentRenderedItemHeight;
+            const itemDesignJson = isLeaderboard && !isHorizontal && listAlign === "stretch"
+              ? getLeaderboardStretchedDesign(designJson, itemWidth - renderedItemWidth)
+              : designJson;
             const crossAxisOffset = getCrossAxisOffset(listAlign, isHorizontal ? listHeight : listWidth, isHorizontal ? itemHeight : itemWidth);
             const targetX = isHorizontal
               ? designJson.layout.reverse
@@ -184,7 +198,7 @@ export function ChatStyleRenderer({
                       transformOrigin: "top left"
                     }}
                   >
-                    <OverlayRenderer designJson={designJson} data={item} debug={debug} />
+                    <OverlayRenderer designJson={itemDesignJson} data={item} debug={debug} />
                   </div>
                 </div>
               </div>
@@ -321,6 +335,54 @@ export function getSampleChatRenderData(count: number, enabledTypes: string[] = 
 
 function getNormalItemY(bounds: Array<{ height: number }>, index: number, gap: number) {
   return bounds.slice(0, index).reduce((top, item) => top + item.height + gap, 0);
+}
+
+const leaderboardStretchContainerTypes = new Set<OverlayComponentSchema["type"]>([
+  "container",
+  "bubble_card",
+  "glass_card",
+  "gradient_card",
+  "raw_card",
+  "speech_bubble_card"
+]);
+
+function getLeaderboardStretchedDesign(designJson: OverlayDesignSchema, widthDelta: number): OverlayDesignSchema {
+  if (Math.abs(widthDelta) < 1) {
+    return designJson;
+  }
+
+  return {
+    ...designJson,
+    components: stretchLeaderboardComponents(designJson.components, widthDelta)
+  };
+}
+
+function stretchLeaderboardComponents(components: OverlayComponentSchema[], widthDelta: number) {
+  return components.map((component) => {
+    if (!component.visible || !leaderboardStretchContainerTypes.has(component.type)) {
+      return component;
+    }
+
+    const nextWidth = Math.max(1, component.width + widthDelta);
+    const appliedDelta = nextWidth - component.width;
+
+    return {
+      ...component,
+      width: nextWidth,
+      children: component.children?.map((child) => moveRightSideChild(child, component.width, appliedDelta))
+    };
+  });
+}
+
+function moveRightSideChild(component: OverlayComponentSchema, originalParentWidth: number, widthDelta: number): OverlayComponentSchema {
+  const componentCenter = component.x + component.width / 2;
+  const shouldMoveWithRightEdge = componentCenter >= originalParentWidth * 0.58;
+
+  return {
+    ...component,
+    x: shouldMoveWithRightEdge ? component.x + widthDelta : component.x,
+    children: component.children?.map((child) => moveRightSideChild(child, component.width, widthDelta))
+  };
 }
 
 function getNormalItemX(bounds: Array<{ width: number }>, index: number, gap: number) {

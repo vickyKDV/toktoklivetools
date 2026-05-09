@@ -3,10 +3,10 @@ import { Cable, ClipboardList, ListTree, MonitorUp, Palette, Settings, Workflow 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { requireUser } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { requireUser } from "@/server/auth/session";
+import { prisma } from "@/server/db/prisma";
 import { formatDateTime } from "@/lib/utils";
-import { getWorkspaceForUser } from "@/lib/workspaces";
+import { getWorkspaceForUser } from "@/server/workspaces/service";
 
 type WorkspacePageProps = {
   params: Promise<{

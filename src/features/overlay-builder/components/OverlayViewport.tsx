@@ -2,7 +2,7 @@
 
 import { SceneViewport } from "@/components/overlay/SceneViewport";
 import { migrateOverlayDesignToScene } from "@/components/overlay/sceneSchema";
-import type { OverlayDesignSchema } from "@/features/overlay-builder/schema/overlaySchema";
+import type { OverlayDesignSchema } from "@/core/overlay/schema";
 import type { ReactNode } from "react";
 
 type OverlayViewportProps = {

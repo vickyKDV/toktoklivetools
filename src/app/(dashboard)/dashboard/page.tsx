@@ -3,8 +3,8 @@ import { ArrowRight, Blocks, Cable, ListTree, MonitorUp, Radio } from "lucide-re
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { requireUser } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { requireUser } from "@/server/auth/session";
+import { prisma } from "@/server/db/prisma";
 
 export default async function DashboardPage() {
   const user = await requireUser();

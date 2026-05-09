@@ -15,7 +15,7 @@ import Moveable, {
   type OnRotateStart
 } from "react-moveable";
 import { useEffect, useRef } from "react";
-import type { OverlayComponentSchema, OverlayDesignSchema } from "@/features/overlay-builder/schema/overlaySchema";
+import type { OverlayComponentSchema, OverlayDesignSchema } from "@/core/overlay/schema";
 
 type EditorMoveableProps = {
   canvasElement: HTMLElement | null;

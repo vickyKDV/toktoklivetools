@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
-import { startTikTokConnection } from "@/lib/tiktok/connection-manager";
-import { getWorkspaceForUser } from "@/lib/workspaces";
+import { getCurrentUser } from "@/server/auth/session";
+import { startTikTokConnection } from "@/server/tiktok/connection-manager";
+import { getWorkspaceForUser } from "@/server/workspaces/service";
 
 type RouteContext = {
   params: Promise<{

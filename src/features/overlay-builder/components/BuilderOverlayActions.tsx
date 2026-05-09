@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { Copy, Power, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import type { OverlayDesignSchema } from "@/features/overlay-builder/schema/overlaySchema";
+import type { OverlayDesignSchema } from "@/core/overlay/schema";
 
 type BuilderOverlayActionsProps = {
   overlayId: string;

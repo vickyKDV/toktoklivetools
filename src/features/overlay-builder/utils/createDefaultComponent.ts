@@ -1,5 +1,5 @@
 import { componentRegistry } from "@/features/overlay-builder/registry/componentRegistry";
-import type { OverlayComponentSchema, OverlayComponentType } from "@/features/overlay-builder/schema/overlaySchema";
+import type { OverlayComponentSchema, OverlayComponentType } from "@/core/overlay/schema";
 
 export function createDefaultComponent(type: OverlayComponentType, x = 24, y = 24, index = 1): OverlayComponentSchema {
   const registryItem = componentRegistry[type];

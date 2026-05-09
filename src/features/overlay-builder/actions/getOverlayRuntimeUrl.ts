@@ -1,7 +1,7 @@
 import "server-only";
 
 import type { OverlayKind } from "@prisma/client";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/server/db/prisma";
 
 export async function getOverlayRuntimeUrlForWorkspaceKey(overlayKey: string, kind: OverlayKind) {
   const workspace = await prisma.workspace.findUnique({

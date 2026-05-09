@@ -1,8 +1,8 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { createSession, destroySession, hashPassword, verifyPassword } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { createSession, destroySession, hashPassword, verifyPassword } from "@/server/auth/session";
+import { prisma } from "@/server/db/prisma";
 import { loginSchema, registerSchema } from "@/lib/validation";
 import { slugify } from "@/lib/utils";
 

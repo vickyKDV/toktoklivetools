@@ -347,7 +347,7 @@ Behavior:
 ## Commands
 
 ```bash
-pnpm dev:ws
+pnpm dev
 pnpm prisma migrate status
 pnpm typecheck
 pnpm lint

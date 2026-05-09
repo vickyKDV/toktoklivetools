@@ -3,9 +3,9 @@ import { Blocks, CalendarClock, Plus, Radio } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { requireUser } from "@/lib/auth";
+import { requireUser } from "@/server/auth/session";
 import { formatDateTime } from "@/lib/utils";
-import { getUserWorkspaces } from "@/lib/workspaces";
+import { getUserWorkspaces } from "@/server/workspaces/service";
 
 export default async function WorkspacesPage() {
   const user = await requireUser();

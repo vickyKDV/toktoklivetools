@@ -1,11 +1,10 @@
-import { notFound } from "next/navigation";
 import { BuilderLayout, type BuilderSavedDesign } from "@/features/overlay-builder/components/BuilderLayout";
-import { getOverlayDesign } from "@/features/overlay-builder/actions/getOverlayDesign";
+import { getWorkspaceOverlayDesign } from "@/features/overlay-builder/actions/getOverlayDesign";
 import { listBuilderOverlays } from "@/features/overlay-builder/actions/listBuilderOverlays";
 import { moderatorStackTemplate } from "@/features/overlay-builder/registry/templateRegistry";
-import { normalizeDesignSchema } from "@/features/overlay-builder/utils/normalizeDesignSchema";
-import { requireUser } from "@/lib/auth";
-import { getWorkspaceForUser } from "@/lib/workspaces";
+import { normalizeDesignSchema } from "@/core/overlay/normalizeDesignSchema";
+import { requireUser } from "@/server/auth/session";
+import { getWorkspaceForUser } from "@/server/workspaces/service";
 
 type OverlayDesignBuilderPageProps = {
   params: Promise<{
@@ -22,10 +21,9 @@ export default async function OverlayDesignBuilderPage({ params, searchParams }:
   const query = searchParams ? await searchParams : {};
   const workspace = await getWorkspaceForUser(user.id, workspaceId);
   const mappedDesigns: BuilderSavedDesign[] = await listBuilderOverlays(workspace.id);
-  const selected = query.overlayId ? await getOverlayDesign(query.overlayId) : null;
-  if (selected && selected.workspaceId !== workspace.id) {
-    notFound();
-  }
+  const selected = query.overlayId
+    ? await getWorkspaceOverlayDesign({ userId: user.id, workspaceId: workspace.id, overlayId: query.overlayId })
+    : null;
   const active = mappedDesigns[0] ?? null;
 
   return (

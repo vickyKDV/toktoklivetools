@@ -14,8 +14,8 @@ import { OverlayViewport } from "@/features/overlay-builder/components/OverlayVi
 import {
   type OverlayDesignSchema,
   type OverlayRenderData
-} from "@/features/overlay-builder/schema/overlaySchema";
-import { getRuntimeComponentBounds } from "@/features/overlay-builder/utils/runtimeLayout";
+} from "@/core/overlay/schema";
+import { getRuntimeComponentBounds } from "@/core/overlay/runtimeLayout";
 import type { OverlayEventPayload } from "@/types/live";
 
 type OverlayRuntimeClientProps = {

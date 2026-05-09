@@ -4,7 +4,7 @@ import { CircleGauge, FilePlus2, Files, Hash, ImageIcon, LayoutTemplate, Message
 import type { ReactNode } from "react";
 import { componentLibrary } from "@/features/overlay-builder/registry/componentRegistry";
 import { overlayTemplates } from "@/features/overlay-builder/registry/templateRegistry";
-import type { OverlayComponentType } from "@/features/overlay-builder/schema/overlaySchema";
+import type { OverlayComponentType } from "@/core/overlay/schema";
 
 type ComponentLibraryProps = {
   onAddComponent: (type: OverlayComponentType) => void;

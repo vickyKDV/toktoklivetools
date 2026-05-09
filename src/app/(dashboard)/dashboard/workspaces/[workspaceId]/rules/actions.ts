@@ -4,9 +4,9 @@ import { LiveEventType, RuleOperator } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { requireUser } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
-import { getWorkspaceForUser } from "@/lib/workspaces";
+import { requireUser } from "@/server/auth/session";
+import { prisma } from "@/server/db/prisma";
+import { getWorkspaceForUser } from "@/server/workspaces/service";
 
 const ruleSchema = z.object({
   workspaceId: z.string().min(1),

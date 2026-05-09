@@ -10,9 +10,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SubmitButton } from "@/components/ui/submit-button";
-import { requireUser } from "@/lib/auth";
+import { requireUser } from "@/server/auth/session";
 import { formatDateTime } from "@/lib/utils";
-import { getWorkspaceForUser } from "@/lib/workspaces";
+import { getWorkspaceForUser } from "@/server/workspaces/service";
 
 type ConnectionPageProps = {
   params: Promise<{

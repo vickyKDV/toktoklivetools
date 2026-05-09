@@ -1,4 +1,4 @@
-import type { OverlayComponentSchema } from "@/features/overlay-builder/schema/overlaySchema";
+import type { OverlayComponentSchema } from "@/core/overlay/schema";
 
 export type OverlayEditorState = {
   selectedNodeIds: string[];

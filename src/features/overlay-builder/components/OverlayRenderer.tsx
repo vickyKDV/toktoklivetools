@@ -6,8 +6,8 @@ import type {
   OverlayComponentSchema,
   OverlayDesignSchema,
   OverlayRenderData
-} from "@/features/overlay-builder/schema/overlaySchema";
-import { getRuntimeComponentHeight } from "@/features/overlay-builder/utils/runtimeLayout";
+} from "@/core/overlay/schema";
+import { getRuntimeComponentHeight } from "@/core/overlay/runtimeLayout";
 
 type OverlayRendererProps = {
   designJson: OverlayDesignSchema;

@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
-import { listBuilderOverlays } from "@/features/overlay-builder/actions/listBuilderOverlays";
-import { saveOverlayDesign } from "@/features/overlay-builder/actions/saveOverlayDesign";
+import { getCurrentUser } from "@/server/auth/session";
+import { listWorkspaceOverlays, saveOverlayDesign } from "@/server/overlays/service";
 
 export async function POST(request: Request) {
   const user = await getCurrentUser();
@@ -30,7 +29,7 @@ export async function POST(request: Request) {
     schema: body.schema,
     makeActive: body.makeActive === true
   });
-  const designs = await listBuilderOverlays(body.workspaceId);
+  const designs = await listWorkspaceOverlays(design.workspaceId);
 
   return NextResponse.json({
     ok: true,

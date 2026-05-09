@@ -3,10 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { requireUser } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
-import { startTikTokConnection, stopTikTokConnection } from "@/lib/tiktok/connection-manager";
-import { getWorkspaceForUser } from "@/lib/workspaces";
+import { requireUser } from "@/server/auth/session";
+import { prisma } from "@/server/db/prisma";
+import { startTikTokConnection, stopTikTokConnection } from "@/server/tiktok/connection-manager";
+import { getWorkspaceForUser } from "@/server/workspaces/service";
 
 const connectionFormSchema = z.object({
   workspaceId: z.string().min(1),

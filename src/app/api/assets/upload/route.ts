@@ -8,7 +8,7 @@ import {
   maxAnimationUploadBytes,
   overlayAssetUploadRoot
 } from "@/lib/animation-assets";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser } from "@/server/auth/session";
 
 export const runtime = "nodejs";
 
