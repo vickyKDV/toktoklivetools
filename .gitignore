@@ -11,3 +11,4 @@ tsconfig.tsbuildinfo
 prisma/migrations/dev.db
 storage/uploads/*
 !storage/uploads/.gitkeep
+storage/desktop/*

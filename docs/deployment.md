@@ -38,7 +38,7 @@ Seed hanya dipakai jika perlu data awal:
 pnpm db:seed
 ```
 
-## Run App
+## Run App: Combined Mode
 
 Script utama:
 
@@ -64,17 +64,49 @@ pm2 list
 pm2 restart liplo
 ```
 
+## Run App: Split Web + Realtime Mode
+
+Untuk production/cloud yang ingin memisahkan proses web dan realtime:
+
+```bash
+pm2 start "pnpm start:web" --name liplo-web
+pm2 start "pnpm start:realtime" --name liplo-realtime
+pm2 save
+```
+
+Env tambahan untuk proses web:
+
+```txt
+REALTIME_CONTROL_URL="http://127.0.0.1:7051"
+REALTIME_CONTROL_TOKEN="change-me"
+```
+
+Env tambahan untuk proses realtime:
+
+```txt
+REALTIME_PORT="7051"
+REALTIME_CONTROL_TOKEN="change-me"
+```
+
+Detail audit ada di [Production Runtime Audit](PRODUCTION_RUNTIME_AUDIT.md).
+
 ## Caddy Reverse Proxy
 
 Contoh Caddyfile:
 
 ```caddyfile
 toktok.example.com {
-  reverse_proxy 127.0.0.1:7050
+  handle /socket.io/* {
+    reverse_proxy 127.0.0.1:7051
+  }
+
+  handle {
+    reverse_proxy 127.0.0.1:7050
+  }
 }
 ```
 
-Socket.IO berjalan di origin yang sama. Tidak perlu path khusus selama reverse proxy meneruskan websocket dan HTTP upgrade standar.
+Untuk combined mode, `reverse_proxy 127.0.0.1:7050` saja cukup. Untuk split mode, route `/socket.io/*` ke realtime process.
 
 ## Runtime Upload Storage
 

@@ -1,5 +1,3 @@
-import "server-only";
-
 import { Prisma } from "@prisma/client";
 import { runAutomationFlows } from "@/server/automation/engine";
 import { prisma } from "@/server/db/prisma";

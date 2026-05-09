@@ -1,5 +1,3 @@
-import "server-only";
-
 import { Prisma, type LiveEvent, type LiveEventType } from "@prisma/client";
 import { prisma } from "@/server/db/prisma";
 import { emitOverlayEvent } from "@/server/realtime/socket-server";
