@@ -4,6 +4,7 @@ import "@xyflow/react/dist/style.css";
 import "./globals.css";
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_WIDGET_BASE_URL || "http://localhost:7050"),
   title: "Liplo",
   description: "Flow of Live Interaction",
   icons: {
