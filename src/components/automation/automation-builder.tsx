@@ -1551,7 +1551,10 @@ function AnimationAssetField({
                 className={`group overflow-hidden rounded-lg border bg-card text-left transition-colors hover:border-primary ${asset.url === value ? "border-primary ring-2 ring-primary/30" : ""}`}
                 title={asset.label}
               >
-                <div className="grid aspect-video place-items-center overflow-hidden bg-zinc-950/90">
+                <div
+                  className="grid aspect-video place-items-center overflow-hidden"
+                  style={transparentPreviewBackgroundStyle}
+                >
                   <AnimationAssetPreview asset={asset} />
                 </div>
                 <div className="grid gap-0.5 p-2">
@@ -1628,13 +1631,22 @@ function AnimationAssetPreview({ asset }: { asset: AnimationAsset }) {
   }
 
   return (
-    <span
-      aria-hidden="true"
-      className="block h-full w-full bg-contain bg-center bg-no-repeat"
-      style={{ backgroundImage: `url("${asset.url}")` }}
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={asset.url}
+      alt=""
+      className="h-full w-full object-contain"
     />
   );
 }
+
+const transparentPreviewBackgroundStyle = {
+  backgroundColor: "transparent",
+  backgroundImage:
+    "linear-gradient(45deg, rgba(148, 163, 184, .22) 25%, transparent 25%), linear-gradient(-45deg, rgba(148, 163, 184, .22) 25%, transparent 25%), linear-gradient(45deg, transparent 75%, rgba(148, 163, 184, .22) 75%), linear-gradient(-45deg, transparent 75%, rgba(148, 163, 184, .22) 75%)",
+  backgroundPosition: "0 0, 0 8px, 8px -8px, -8px 0",
+  backgroundSize: "16px 16px"
+} satisfies React.CSSProperties;
 
 function ConfettiSettings({
   data,

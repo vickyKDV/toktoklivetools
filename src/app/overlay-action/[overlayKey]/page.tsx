@@ -16,5 +16,21 @@ export default async function ActionOverlayPage({ params, searchParams }: Action
   const { overlayKey } = await params;
   const query = searchParams ? await searchParams : {};
 
-  return <ActionOverlayClient overlayKey={overlayKey} flowId={query.flowId} position={query.position ?? "center"} />;
+  return (
+    <>
+      <ActionOverlayClient overlayKey={overlayKey} flowId={query.flowId} position={query.position ?? "center"} />
+      <style dangerouslySetInnerHTML={{ __html: `
+        html,
+        body,
+        #__next {
+          margin: 0;
+          padding: 0;
+          width: 100%;
+          height: 100%;
+          background: transparent;
+          overflow: hidden;
+        }
+      ` }} />
+    </>
+  );
 }
