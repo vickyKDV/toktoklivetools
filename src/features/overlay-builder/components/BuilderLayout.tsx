@@ -217,7 +217,11 @@ export function BuilderLayout({
   const isGiftOverlay = overlayKind === "GIFT" || designSchema.kind === "GIFT" || designSchema.dataSource.type === "gift";
   const isLeaderboardOverlay = overlayKind === "LEADERBOARD" || designSchema.kind === "LEADERBOARD" || designSchema.dataSource.type === "leaderboard";
   const isGoalOverlay = overlayKind === "GOAL" || designSchema.kind === "GOAL" || designSchema.dataSource.type === "goal";
-  const editorRenderData = isLeaderboardOverlay ? previewSampleItems[0] ?? dummyOverlayData : dummyOverlayData;
+  const editorRenderData = isLeaderboardOverlay
+    ? previewSampleItems[0] ?? dummyOverlayData
+    : isGoalOverlay
+      ? { ...dummyOverlayData, goal: undefined }
+      : dummyOverlayData;
   const listExitDurationMs = Math.max(designSchema.layout.animationDurationMs ?? 620, 720);
   const designOutputPath = designId ? `/overlay/${overlayKind.toLowerCase()}/${designId}` : "";
   const designOutputUrl = designOutputPath ? `${browserOrigin}${designOutputPath}` : "";

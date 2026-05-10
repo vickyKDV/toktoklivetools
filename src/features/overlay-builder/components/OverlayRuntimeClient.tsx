@@ -308,7 +308,9 @@ function createInitialGoalMetrics(
 
   return goalMetricKeys.reduce<GoalMetrics>((metrics, key) => ({
     ...metrics,
-    [key]: Math.max(metrics[key], toPositiveNumber(initialGoalMetrics[key], 0))
+    [key]: initialGoalMetrics[key] == null
+      ? metrics[key]
+      : toPositiveNumber(initialGoalMetrics[key], 0)
   }), schemaMetrics);
 }
 
