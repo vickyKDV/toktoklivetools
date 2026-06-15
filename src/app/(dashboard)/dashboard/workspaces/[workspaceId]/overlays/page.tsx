@@ -9,6 +9,7 @@ import { listBuilderOverlays } from "@/features/overlay-builder/actions/listBuil
 import { OverlayThumbnail } from "@/features/overlay-builder/components/OverlayThumbnail";
 import { requireUser } from "@/server/auth/session";
 import { getWidgetBaseUrl } from "@/lib/utils";
+import { getWorkspaceOverlayKindCounts } from "@/server/overlays/service";
 import { getWorkspaceMetaForUser } from "@/server/workspaces/service";
 
 type OverlaysPageProps = {
@@ -31,17 +32,22 @@ const overlayKindTabs = [
 ] as const;
 
 export default async function OverlaysPage({ params, searchParams }: OverlaysPageProps) {
-  const user = await requireUser();
-  const { workspaceId } = await params;
-  const query = await searchParams;
-  const workspace = await getWorkspaceMetaForUser(user.id, workspaceId);
+  const resolvedSearchParams = searchParams ?? Promise.resolve({} as { kind?: string });
+  const [user, { workspaceId }, query] = await Promise.all([
+    requireUser(),
+    params,
+    resolvedSearchParams
+  ]);
   const widgetBaseUrl = getWidgetBaseUrl();
-  const overlays = await listBuilderOverlays(workspace.id);
   const requestedKind = overlayKindTabs.find((tab) => tab.kind === query?.kind)?.kind;
-  const firstAvailableKind = overlayKindTabs.find((tab) => overlays.some((overlay) => overlay.kind === tab.kind))?.kind ?? "CHAT";
-  const selectedKind = requestedKind ?? firstAvailableKind;
+  const selectedKind = requestedKind ?? "CHAT";
+  const [workspace, kindCounts, selectedOverlays] = await Promise.all([
+    getWorkspaceMetaForUser(user.id, workspaceId),
+    getWorkspaceOverlayKindCounts(workspaceId),
+    listBuilderOverlays(workspaceId, selectedKind)
+  ]);
+  const countByKind = new Map(kindCounts.map((item) => [item.kind, item.count]));
   const selectedTab = overlayKindTabs.find((tab) => tab.kind === selectedKind) ?? overlayKindTabs[0];
-  const selectedOverlays = overlays.filter((overlay) => overlay.kind === selectedKind);
   const dockUrl = `${widgetBaseUrl}/widgets/dock/chat/${workspace.overlayKey}`;
   const isDockView = selectedKind === "DOCK";
 
@@ -86,7 +92,7 @@ export default async function OverlaysPage({ params, searchParams }: OverlaysPag
                 <div>
                   <p className="text-base font-semibold">{selectedTab.label} Overlays</p>
                   <p className="text-xs text-muted-foreground">
-                    {selectedOverlays.length} overlay dalam type {selectedKind}.
+                    {countByKind.get(selectedKind) ?? 0} overlay dalam type {selectedKind}.
                   </p>
                 </div>
                 {isDockView ? null : (

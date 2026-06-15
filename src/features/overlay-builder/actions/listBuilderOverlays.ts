@@ -1,7 +1,8 @@
 import "server-only";
 
-import { listWorkspaceOverlays } from "@/server/overlays/service";
+import type { OverlayKind } from "@prisma/client";
+import { listWorkspaceOverlays, listWorkspaceOverlaysByKind } from "@/server/overlays/service";
 
-export async function listBuilderOverlays(workspaceId: string) {
-  return listWorkspaceOverlays(workspaceId);
+export async function listBuilderOverlays(workspaceId: string, kind?: OverlayKind) {
+  return kind ? listWorkspaceOverlaysByKind(workspaceId, kind) : listWorkspaceOverlays(workspaceId);
 }

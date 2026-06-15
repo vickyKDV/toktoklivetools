@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   Activity,
   Blocks,
@@ -21,7 +21,7 @@ import {
   Workflow
 } from "lucide-react";
 import type { ComponentType, MouseEvent } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -88,6 +88,7 @@ const overlaySubItems = [
 ];
 
 export function DashboardSidebarNav({ workspaces }: DashboardSidebarNavProps) {
+  const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const searchString = searchParams.toString();
@@ -98,6 +99,60 @@ export function DashboardSidebarNav({ workspaces }: DashboardSidebarNavProps) {
     () => workspaces.find((item) => item.id === activeWorkspaceId) ?? workspaces[0] ?? null,
     [activeWorkspaceId, workspaces]
   );
+  const prefetchedHrefs = useRef(new Set<string>());
+  const prefetchHrefs = useMemo(() => {
+    const hrefs = [
+      ...navItems.map((item) => item.href),
+      ...workspaces.slice(0, 6).map((item) => `/dashboard/workspaces/${item.id}`)
+    ];
+
+    if (workspace) {
+      hrefs.push(
+        `/dashboard/workspaces/${workspace.id}/connection`,
+        `/dashboard/workspaces/${workspace.id}/rules`,
+        `/dashboard/workspaces/${workspace.id}/automation-builder`,
+        `/dashboard/workspaces/${workspace.id}/overlays`,
+        `/dashboard/workspaces/${workspace.id}/overlay-design-builder`,
+        `/dashboard/workspaces/${workspace.id}/settings`,
+        ...overlaySubItems.map((item) => `/dashboard/workspaces/${workspace.id}/overlays?kind=${item.hrefSuffix}`)
+      );
+    }
+
+    return Array.from(new Set(hrefs));
+  }, [workspace, workspaces]);
+
+  const prefetchHref = useMemo(() => {
+    return (href: string) => {
+      if (prefetchedHrefs.current.has(href)) {
+        return;
+      }
+
+      prefetchedHrefs.current.add(href);
+      router.prefetch(href);
+    };
+  }, [router]);
+
+  useEffect(() => {
+    const run = () => {
+      for (const href of prefetchHrefs) {
+        prefetchHref(href);
+      }
+    };
+    const windowWithIdleCallback = window as Window & {
+      requestIdleCallback?: (callback: IdleRequestCallback, options?: IdleRequestOptions) => number;
+      cancelIdleCallback?: (handle: number) => void;
+    };
+
+    if (windowWithIdleCallback.requestIdleCallback) {
+      const handle = windowWithIdleCallback.requestIdleCallback(run, { timeout: 1200 });
+
+      return () => windowWithIdleCallback.cancelIdleCallback?.(handle);
+    }
+
+    const timeout = window.setTimeout(run, 300);
+
+    return () => window.clearTimeout(timeout);
+  }, [prefetchHref, prefetchHrefs]);
 
   useEffect(() => {
     setPendingHref(null);
@@ -124,6 +179,7 @@ export function DashboardSidebarNav({ workspaces }: DashboardSidebarNavProps) {
     }
 
     setPendingHref(href);
+    prefetchHref(href);
   }
 
   return (
@@ -144,6 +200,7 @@ export function DashboardSidebarNav({ workspaces }: DashboardSidebarNavProps) {
             active={isActiveRoute(currentUrl, item.href)}
             pending={pendingHref === item.href}
             onNavigate={handleNavigate}
+            onPrefetch={prefetchHref}
           />
         ))}
       </nav>
@@ -162,7 +219,7 @@ export function DashboardSidebarNav({ workspaces }: DashboardSidebarNavProps) {
               variant="ghost"
               className={getNavClassName(isActiveRoute(currentUrl, href), pendingHref === href, "h-auto justify-start py-2")}
             >
-              <Link href={href} onClick={(event) => handleNavigate(href, event)}>
+              <Link href={href} prefetch onClick={(event) => handleNavigate(href, event)} onPointerEnter={() => prefetchHref(href)}>
                 <Activity className={cn((isActiveRoute(currentUrl, href) || pendingHref === href) && "text-primary")} />
                 <span className="min-w-0 flex-1 text-left">
                   <span className="block truncate">{item.name}</span>
@@ -188,6 +245,7 @@ export function DashboardSidebarNav({ workspaces }: DashboardSidebarNavProps) {
             active={isActiveRoute(currentUrl, `/dashboard/workspaces/${workspace.id}/connection`)}
             pending={pendingHref === `/dashboard/workspaces/${workspace.id}/connection`}
             onNavigate={handleNavigate}
+            onPrefetch={prefetchHref}
           />
           <SidebarLink
             href={`/dashboard/workspaces/${workspace.id}/rules`}
@@ -196,6 +254,7 @@ export function DashboardSidebarNav({ workspaces }: DashboardSidebarNavProps) {
             active={isActiveRoute(currentUrl, `/dashboard/workspaces/${workspace.id}/rules`)}
             pending={pendingHref === `/dashboard/workspaces/${workspace.id}/rules`}
             onNavigate={handleNavigate}
+            onPrefetch={prefetchHref}
           />
           <SidebarLink
             href={`/dashboard/workspaces/${workspace.id}/automation-builder`}
@@ -204,6 +263,7 @@ export function DashboardSidebarNav({ workspaces }: DashboardSidebarNavProps) {
             active={isActiveRoute(currentUrl, `/dashboard/workspaces/${workspace.id}/automation-builder`)}
             pending={pendingHref === `/dashboard/workspaces/${workspace.id}/automation-builder`}
             onNavigate={handleNavigate}
+            onPrefetch={prefetchHref}
           />
           <SidebarLink
             href={`/dashboard/workspaces/${workspace.id}/overlays`}
@@ -212,6 +272,7 @@ export function DashboardSidebarNav({ workspaces }: DashboardSidebarNavProps) {
             active={isActiveRoute(currentUrl, `/dashboard/workspaces/${workspace.id}/overlays`)}
             pending={pendingHref === `/dashboard/workspaces/${workspace.id}/overlays`}
             onNavigate={handleNavigate}
+            onPrefetch={prefetchHref}
           />
           <div className="ml-6 grid gap-1 border-l pl-2">
             {overlaySubItems.map((item) => {
@@ -226,6 +287,7 @@ export function DashboardSidebarNav({ workspaces }: DashboardSidebarNavProps) {
                   active={isActiveRoute(currentUrl, href)}
                   pending={pendingHref === href}
                   onNavigate={handleNavigate}
+                  onPrefetch={prefetchHref}
                   size="sm"
                 />
               );
@@ -238,6 +300,7 @@ export function DashboardSidebarNav({ workspaces }: DashboardSidebarNavProps) {
             active={isActiveRoute(currentUrl, `/dashboard/workspaces/${workspace.id}/overlay-design-builder`)}
             pending={pendingHref === `/dashboard/workspaces/${workspace.id}/overlay-design-builder`}
             onNavigate={handleNavigate}
+            onPrefetch={prefetchHref}
           />
           <SidebarLink
             href={`/dashboard/workspaces/${workspace.id}/settings`}
@@ -246,6 +309,7 @@ export function DashboardSidebarNav({ workspaces }: DashboardSidebarNavProps) {
             active={isActiveRoute(currentUrl, `/dashboard/workspaces/${workspace.id}/settings`)}
             pending={pendingHref === `/dashboard/workspaces/${workspace.id}/settings`}
             onNavigate={handleNavigate}
+            onPrefetch={prefetchHref}
           />
         </div>
       ) : null}
@@ -260,6 +324,7 @@ function SidebarLink({
   active,
   pending,
   onNavigate,
+  onPrefetch,
   size = "default"
 }: {
   href: string;
@@ -268,6 +333,7 @@ function SidebarLink({
   active: boolean;
   pending: boolean;
   onNavigate: (href: string, event?: MouseEvent<HTMLAnchorElement>) => void;
+  onPrefetch: (href: string) => void;
   size?: "default" | "sm";
 }) {
   return (
@@ -277,7 +343,7 @@ function SidebarLink({
       size={size === "sm" ? "sm" : "default"}
       className={getNavClassName(active, pending, size === "sm" ? "h-8 justify-start px-2 text-xs" : "justify-start")}
     >
-      <Link href={href} onClick={(event) => onNavigate(href, event)}>
+      <Link href={href} prefetch onClick={(event) => onNavigate(href, event)} onPointerEnter={() => onPrefetch(href)}>
         <Icon className={cn(size === "sm" && "size-3.5", (active || pending) && "text-primary")} />
         {label}
         {pending ? <span className="ml-auto size-1.5 rounded-full bg-primary" /> : null}

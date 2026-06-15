@@ -47,6 +47,37 @@ export async function listWorkspaceOverlays(workspaceId: string) {
   return overlays.map(mapOverlay);
 }
 
+export async function listWorkspaceOverlaysByKind(workspaceId: string, kind: OverlayKind) {
+  const overlays = await prisma.overlay.findMany({
+    where: {
+      workspaceId,
+      kind
+    },
+    orderBy: {
+      updatedAt: "desc"
+    }
+  });
+
+  return overlays.map(mapOverlay);
+}
+
+export async function getWorkspaceOverlayKindCounts(workspaceId: string) {
+  const rows = await prisma.overlay.groupBy({
+    by: ["kind"],
+    where: {
+      workspaceId
+    },
+    _count: {
+      _all: true
+    }
+  });
+
+  return rows.map((row) => ({
+    kind: row.kind,
+    count: row._count._all
+  }));
+}
+
 export async function getOverlayDesignForUser(input: {
   userId: string;
   workspaceId: string;
