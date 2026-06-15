@@ -12,3 +12,9 @@ prisma/migrations/dev.db
 storage/uploads/*
 !storage/uploads/.gitkeep
 storage/desktop/*
+src-tauri/binaries/liplo-runtime*
+src-tauri/target
+src-tauri/runtime-sidecar/target
+src-tauri/resources/liplo-runtime/web/
+src-tauri/resources/liplo-runtime/realtime/
+src-tauri/resources/liplo-runtime/node/

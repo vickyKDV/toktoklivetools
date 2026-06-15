@@ -41,6 +41,49 @@ For production/cloud deployment, run the same combined runtime behind your rever
 
 The client socket uses automatic reconnect with websocket plus polling fallback. The TikTok connection manager also closes cleanly on manual stop or stream end, and retries transient disconnects with backoff.
 
+## Desktop Runtime
+
+Liplo Desktop is prepared for Windows + macOS through Tauri in desktop cloud-backed mode. The packaged app starts a local `liplo-runtime` sidecar, then uses local URLs for OBS:
+
+```txt
+App/runtime: http://127.0.0.1:7050
+Realtime: http://127.0.0.1:7051
+OBS overlay URL: http://127.0.0.1:7050/overlay/...
+OBS websocket: ws://127.0.0.1:4455
+```
+
+Build helpers:
+
+```bash
+pnpm desktop:prepare
+pnpm desktop:verify-release-sidecars
+pnpm desktop:dev
+pnpm build:desktop
+pnpm desktop:build
+pnpm desktop:build:mac
+pnpm desktop:build:mac:arm64
+pnpm desktop:build:mac:x64
+pnpm desktop:build:windows
+```
+
+`pnpm desktop:build*` builds the local runtime bundle before Tauri packaging. The bundle contains the Next standalone web server, realtime/TikTok runtime entrypoint, and a bundled Node runtime under `src-tauri/resources/liplo-runtime`.
+
+Release CI must replace the placeholder sidecars with target-triple binaries:
+
+```txt
+src-tauri/binaries/liplo-runtime-aarch64-apple-darwin
+src-tauri/binaries/liplo-runtime-x86_64-apple-darwin
+src-tauri/binaries/liplo-runtime-x86_64-pc-windows-msvc.exe
+```
+
+`pnpm desktop:prepare` builds the real host-platform `liplo-runtime` sidecar for local validation and leaves placeholders only for targets that were not built on the current machine. Verify the selected release target with `pnpm desktop:verify-release-sidecars -- --target=<target-triple>`, or verify every target in release CI with `pnpm desktop:verify-release-sidecars -- --all`.
+
+Desktop packages must not ship production `DATABASE_URL` or direct-connect to production MySQL. Full offline SQLite remains future work.
+
+Desktop Settings is available from Workspace Settings when the app runs inside Tauri. It manages local runtime config, sidecar health, OBS websocket testing, local overlay URL copy/update, and hotkeys.
+
+Desktop distribution is direct download only for now: macOS `.app` for internal validation, macOS signed/notarized `.dmg` or zipped `.app` for public download, and Windows `.msi` or `.exe` installer. Apple App Store and Microsoft Store distribution are not part of the current release path.
+
 ## Overlay Runtime
 
 Overlays are now standalone JSON resources. There is no active/inactive global selector. Every overlay has its own OBS URL:
@@ -184,6 +227,9 @@ pnpm db:seed
 - [Overlay Runtime dan Builder](docs/overlay-runtime.md)
 - [Automation Builder dan Rules](docs/automation-builder.md)
 - [Production / Cloud Deployment](docs/deployment.md)
+- [Desktop Tauri Runtime](docs/DESKTOP_TAURI_RUNTIME.md)
+- [Desktop Adapter Plan](docs/DESKTOP_ADAPTER_PLAN.md)
+- [Desktop Updater Metadata](docs/DESKTOP_UPDATER_METADATA.md)
 - [Coordinate System](docs/COORDINATE_SYSTEM.md)
 - [Coordinate Audit](docs/COORDINATE_AUDIT.md)
 - [Resize Debug Report](docs/RESIZE_DEBUG_REPORT.md)

@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SubmitButton } from "@/components/ui/submit-button";
+import { DesktopSettingsPanel } from "@/features/desktop/DesktopSettingsPanel";
 import { requireUser } from "@/server/auth/session";
 import { getWorkspaceForUser } from "@/server/workspaces/service";
 
@@ -89,6 +90,8 @@ export default async function WorkspaceSettingsPage({
           </form>
         </CardContent>
       </Card>
+
+      <DesktopSettingsPanel workspaceId={workspace.id} />
     </div>
   );
 }

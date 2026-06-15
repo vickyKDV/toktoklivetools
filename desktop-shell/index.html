@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Liplo - Flow of Live Interaction</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+          "Segoe UI", sans-serif;
+        background: #080a12;
+        color: #f8fafc;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        min-height: 100vh;
+        margin: 0;
+        display: grid;
+        place-items: center;
+        background:
+          radial-gradient(circle at 20% 20%, rgba(59, 130, 246, 0.18), transparent 32rem),
+          radial-gradient(circle at 80% 30%, rgba(217, 70, 239, 0.18), transparent 30rem),
+          #080a12;
+      }
+
+      main {
+        width: min(92vw, 560px);
+        padding: 32px;
+        border: 1px solid rgba(148, 163, 184, 0.2);
+        border-radius: 20px;
+        background: rgba(15, 23, 42, 0.74);
+        box-shadow: 0 30px 90px rgba(0, 0, 0, 0.36);
+        backdrop-filter: blur(20px);
+      }
+
+      img {
+        width: 72px;
+        height: 72px;
+        object-fit: contain;
+        display: block;
+      }
+
+      h1 {
+        margin: 20px 0 4px;
+        font-size: 36px;
+        line-height: 1;
+        letter-spacing: 0;
+      }
+
+      p {
+        margin: 0;
+        color: #cbd5e1;
+        font-size: 15px;
+        line-height: 1.6;
+      }
+
+      .status {
+        margin-top: 24px;
+        min-height: 48px;
+        padding: 14px 16px;
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        border-radius: 12px;
+        background: rgba(2, 6, 23, 0.54);
+        color: #e2e8f0;
+      }
+
+      .bar {
+        position: relative;
+        height: 4px;
+        margin-top: 18px;
+        overflow: hidden;
+        border-radius: 999px;
+        background: rgba(148, 163, 184, 0.18);
+      }
+
+      .bar::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        width: 42%;
+        border-radius: inherit;
+        background: linear-gradient(90deg, #ec4899, #8b5cf6, #38bdf8);
+        animation: loading 1.2s ease-in-out infinite;
+      }
+
+      @keyframes loading {
+        0% {
+          transform: translateX(-110%);
+        }
+
+        100% {
+          transform: translateX(250%);
+        }
+      }
+
+      code {
+        color: #67e8f9;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      }
+
+      .actions {
+        display: none;
+        gap: 10px;
+        margin-top: 18px;
+        flex-wrap: wrap;
+      }
+
+      .actions button {
+        border: 1px solid rgba(148, 163, 184, 0.28);
+        border-radius: 10px;
+        background: rgba(15, 23, 42, 0.88);
+        color: #f8fafc;
+        cursor: pointer;
+        padding: 10px 12px;
+      }
+
+      .actions button:hover {
+        background: rgba(30, 41, 59, 0.92);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <img src="./icon.png" alt="Liplo" />
+      <h1>Liplo</h1>
+      <p>Flow of Live Interaction</p>
+      <div id="status" class="status">Starting local Liplo runtime...</div>
+      <div class="bar" aria-hidden="true"></div>
+      <div id="actions" class="actions">
+        <button id="retry" type="button">Retry start runtime</button>
+        <button id="copy" type="button">Copy diagnostics</button>
+      </div>
+    </main>
+
+    <script>
+      const statusEl = document.getElementById("status");
+      const actionsEl = document.getElementById("actions");
+      const retryEl = document.getElementById("retry");
+      const copyEl = document.getElementById("copy");
+      const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+      let lastDiagnostics = null;
+
+      function setStatus(message) {
+        statusEl.textContent = message;
+      }
+
+      async function waitForServer(label, url, invoke, healthCommand) {
+        for (let attempt = 1; attempt <= 60; attempt += 1) {
+          try {
+            const health = await invoke(healthCommand);
+            if (health?.reachable === true) {
+              return true;
+            }
+          } catch {
+            try {
+              const response = await fetch(url, { cache: "no-store" });
+              if (response.ok) {
+                return true;
+              }
+            } catch {
+              // The diagnostics payload below carries the actionable error.
+            }
+          }
+
+          if (attempt % 6 === 0) {
+            lastDiagnostics = await collectDiagnostics(invoke);
+          }
+
+          setStatus(`Waiting for ${label} at ${url} (${attempt}/60)...`);
+          await sleep(500);
+        }
+
+        return false;
+      }
+
+      async function collectDiagnostics(invoke) {
+        try {
+          const config = await invoke("liplo_read_config");
+          const desktopHealth = await invoke("check_desktop_health");
+          return {
+            appMode: "desktop",
+            dataMode: "cloud",
+            runtimeMode: "desktop-cloud",
+            web: desktopHealth?.web,
+            realtime: desktopHealth?.realtime,
+            sidecar: desktopHealth?.sidecars,
+            config: {
+              web: config?.web,
+              realtime: config?.realtime,
+              obs: {
+                websocketUrl: config?.obs?.websocketUrl,
+                defaultBrowserSourceName: config?.obs?.defaultBrowserSourceName
+              }
+            }
+          };
+        } catch (error) {
+          return {
+            error: error && error.message ? error.message : String(error)
+          };
+        }
+      }
+
+      async function showDiagnostics(invoke, message) {
+        lastDiagnostics = await collectDiagnostics(invoke);
+        setStatus(`${message}\n\n${JSON.stringify(lastDiagnostics, null, 2)}`);
+        statusEl.style.whiteSpace = "pre-wrap";
+        actionsEl.style.display = "flex";
+      }
+
+      async function boot() {
+        const tauri = window.__TAURI__;
+        const invoke = tauri && tauri.core && tauri.core.invoke;
+
+        if (!invoke) {
+          setStatus("Tauri bridge is not available. Run this shell through the Liplo desktop app.");
+          return;
+        }
+
+        await startRuntime(invoke);
+      }
+
+      async function startRuntime(invoke) {
+        const config = await invoke("liplo_read_config");
+        const baseUrl = config?.web?.baseUrl || "http://127.0.0.1:7050";
+        const webHealthUrl = `${baseUrl.replace(/\/$/, "")}/api/health`;
+        const realtimeHealthUrl = `${(config?.realtime?.socketUrl || "http://127.0.0.1:7051").replace(/\/$/, "")}/health`;
+
+        actionsEl.style.display = "none";
+        statusEl.style.whiteSpace = "normal";
+        setStatus("Starting Liplo local runtime...");
+        await invoke("start_sidecars");
+
+        const webReady = await waitForServer(
+          "Liplo web runtime",
+          webHealthUrl,
+          invoke,
+          "check_web_health"
+        );
+        const realtimeReady = await waitForServer(
+          "Liplo realtime runtime",
+          realtimeHealthUrl,
+          invoke,
+          "check_realtime_health"
+        );
+        if (!webReady || !realtimeReady) {
+          await showDiagnostics(invoke, "Liplo runtime did not become healthy.");
+          return;
+        }
+
+        setStatus("Opening Liplo...");
+        window.location.replace(baseUrl);
+      }
+
+      retryEl.addEventListener("click", () => {
+        boot().catch((error) => {
+          console.error(error);
+          setStatus(`Desktop bootstrap failed: ${error && error.message ? error.message : String(error)}`);
+        });
+      });
+
+      copyEl.addEventListener("click", async () => {
+        await navigator.clipboard.writeText(JSON.stringify(lastDiagnostics, null, 2));
+        copyEl.textContent = "Copied";
+        setTimeout(() => {
+          copyEl.textContent = "Copy diagnostics";
+        }, 1200);
+      });
+
+      boot().catch((error) => {
+        console.error(error);
+        setStatus(`Desktop bootstrap failed: ${error && error.message ? error.message : String(error)}`);
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,8 @@
+[package]
+name = "liplo-runtime"
+version = "0.1.0"
+edition = "2021"
+description = "Liplo packaged desktop runtime supervisor"
+
+[dependencies]
+serde_json = "1"

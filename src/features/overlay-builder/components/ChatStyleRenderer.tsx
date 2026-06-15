@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, type CSSProperties } from "react";
+import { useEffect, useMemo, type CSSProperties } from "react";
 import { OverlayRenderer } from "@/features/overlay-builder/components/OverlayRenderer";
 import {
   dummyOverlayData,
@@ -33,20 +33,32 @@ export function ChatStyleRenderer({
   alignRight = false,
   height
 }: ChatStyleRendererProps) {
-  const runtimeCanvas = getRuntimeCanvasSize(designJson);
   const isLeaderboard = designJson.kind === "LEADERBOARD" || designJson.dataSource.type === "leaderboard";
   const isHorizontal = designJson.layout.direction === "horizontal";
   const listAlign = align ?? (alignRight ? "end" : designJson.layout.align ?? "start");
-  const templateBounds = getRuntimeComponentBounds(designJson.components, dummyOverlayData, runtimeCanvas.width, runtimeCanvas.height);
-  const measuredItemBounds = items.map((item) => getRuntimeComponentBounds(designJson.components, item, runtimeCanvas.width, runtimeCanvas.height));
-  const itemBounds = isLeaderboard
-    ? measuredItemBounds.map((item) => ({
-      ...item,
-      left: templateBounds.left,
-      width: templateBounds.width
-    }))
-    : measuredItemBounds;
-  const bounds = isLeaderboard ? templateBounds : itemBounds[0] ?? templateBounds;
+  const runtimeCanvas = useMemo(() => getRuntimeCanvasSize(designJson), [designJson]);
+  const templateBounds = useMemo(
+    () => getRuntimeComponentBounds(designJson.components, dummyOverlayData, runtimeCanvas.width, runtimeCanvas.height),
+    [designJson.components, runtimeCanvas.height, runtimeCanvas.width]
+  );
+  const measuredItemBounds = useMemo(
+    () => items.map((item) => getRuntimeComponentBounds(designJson.components, item, runtimeCanvas.width, runtimeCanvas.height)),
+    [designJson.components, items, runtimeCanvas.height, runtimeCanvas.width]
+  );
+  const itemBounds = useMemo(
+    () => isLeaderboard
+      ? measuredItemBounds.map((item) => ({
+        ...item,
+        left: templateBounds.left,
+        width: templateBounds.width
+      }))
+      : measuredItemBounds,
+    [isLeaderboard, measuredItemBounds, templateBounds.left, templateBounds.width]
+  );
+  const bounds = useMemo(
+    () => isLeaderboard ? templateBounds : itemBounds[0] ?? templateBounds,
+    [isLeaderboard, itemBounds, templateBounds]
+  );
   const viewportWidth = runtimeCanvas.width;
   const viewportHeight = typeof height === "number" ? Math.max(height, runtimeCanvas.height) : runtimeCanvas.height;
   const renderedItemWidth = isLeaderboard ? bounds.width : Math.max(bounds.width, ...itemBounds.map((item) => item.width));

@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowDown, ArrowUp, ChevronsDown, ChevronsUp, Copy, Eye, EyeOff, Lock, Trash2, Unlock } from "lucide-react";
-import { useCallback, useEffect, useRef, useState, type CSSProperties, type DragEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type WheelEvent as ReactWheelEvent } from "react";
+import { Profiler, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent, type PointerEvent as ReactPointerEvent, type ProfilerOnRenderCallback, type ReactNode, type WheelEvent as ReactWheelEvent } from "react";
 import { OverlaySceneRenderer } from "@/components/overlay/OverlaySceneRenderer";
 import type {
   OverlayComponentSchema,
@@ -47,7 +47,7 @@ type CanvasEditorProps = {
 
 const SNAP_SIZE = 8;
 const SNAP_THRESHOLD = 6;
-const DEBUG_RESIZE = true;
+const DEBUG_RESIZE = false;
 
 type EditorPointerInteraction = {
   kind: "move" | "resize";
@@ -81,6 +81,11 @@ type SnapDelta = {
   delta: number;
   distance: number;
   target: SnapAxisTarget;
+};
+
+type PendingInteractionPatch = {
+  componentId: string;
+  layout: InteractionLayout;
 };
 
 const resizeHandles: ResizeHandle[] = ["nw", "n", "ne", "w", "e", "sw", "s", "se"];
@@ -120,16 +125,23 @@ export function CanvasEditor({
   const canvasRef = useRef<HTMLDivElement | null>(null);
   const panRef = useRef<{ pointerId: number; x: number; y: number; scrollLeft: number; scrollTop: number } | null>(null);
   const interactionRef = useRef<EditorPointerInteraction | null>(null);
+  const transientFrameRef = useRef<number | null>(null);
+  const pendingInteractionPatchRef = useRef<PendingInteractionPatch | null>(null);
+  const perfStatsRef = useRef({ commits: 0, totalDuration: 0, maxDuration: 0 });
   const spacePressedRef = useRef(false);
   const [fitScale, setFitScale] = useState(1);
   const [interactionScale, setInteractionScale] = useState<number | null>(null);
+  const [perfProfilerEnabled, setPerfProfilerEnabled] = useState(false);
   const [hoverContainerId, setHoverContainerId] = useState<string | null>(null);
   const [snapGuides, setSnapGuides] = useState<SnapGuide[]>([]);
   const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>(selectedComponentId ? [selectedComponentId] : []);
   const [spacePressed, setSpacePressed] = useState(false);
   const scale = interactionScale ?? fitScale * zoom;
-  const flatComponents = flattenComponents(designSchema.components);
-  const selectedNodes = flatComponents.filter((component) => selectedNodeIds.includes(component.id));
+  const flatComponents = useMemo(() => flattenComponents(designSchema.components), [designSchema.components]);
+  const selectedNodes = useMemo(
+    () => flatComponents.filter((component) => selectedNodeIds.includes(component.id)),
+    [flatComponents, selectedNodeIds]
+  );
 
   useEffect(() => {
     const area = areaRef.current;
@@ -144,7 +156,8 @@ export function CanvasEditor({
       }
 
       const width = area?.clientWidth ?? designSchema.canvas.width;
-      setFitScale(Math.min(1, Math.max(0.2, (width - 24) / Math.max(1, designSchema.canvas.width))));
+      const nextScale = Math.min(1, Math.max(0.2, (width - 24) / Math.max(1, designSchema.canvas.width)));
+      setFitScale((currentScale) => Math.abs(currentScale - nextScale) < 0.001 ? currentScale : nextScale);
     }
 
     updateScale();
@@ -153,6 +166,13 @@ export function CanvasEditor({
 
     return () => observer.disconnect();
   }, [designSchema.canvas.width]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setPerfProfilerEnabled(
+      params.get("perf") === "1" || window.localStorage.getItem("liplo:perf") === "1"
+    );
+  }, []);
 
   useEffect(() => {
     if (!selectedComponentId) {
@@ -176,6 +196,72 @@ export function CanvasEditor({
   const patchNode = useCallback((id: string, patch: Partial<OverlayComponentSchema>) => {
     (onUpdateComponentTransient ?? onUpdateComponent)(id, patch);
   }, [onUpdateComponent, onUpdateComponentTransient]);
+
+  const flushPendingInteractionPatch = useCallback(() => {
+    const pending = pendingInteractionPatchRef.current;
+
+    if (!pending) {
+      return;
+    }
+
+    pendingInteractionPatchRef.current = null;
+    patchNode(pending.componentId, pending.layout);
+  }, [patchNode]);
+
+  const scheduleInteractionPatch = useCallback((componentId: string, layout: InteractionLayout) => {
+    pendingInteractionPatchRef.current = { componentId, layout };
+
+    if (transientFrameRef.current !== null) {
+      return;
+    }
+
+    transientFrameRef.current = window.requestAnimationFrame(() => {
+      transientFrameRef.current = null;
+      flushPendingInteractionPatch();
+    });
+  }, [flushPendingInteractionPatch]);
+
+  const handleRendererProfile = useCallback<ProfilerOnRenderCallback>((
+    id,
+    phase,
+    actualDuration,
+    baseDuration,
+    startTime,
+    commitTime
+  ) => {
+    const stats = perfStatsRef.current;
+
+    stats.commits += 1;
+    stats.totalDuration += actualDuration;
+    stats.maxDuration = Math.max(stats.maxDuration, actualDuration);
+
+    if (actualDuration < 16 && stats.commits % 20 !== 0) {
+      return;
+    }
+
+    console.table({
+      id,
+      phase,
+      commits: stats.commits,
+      actualDurationMs: Number(actualDuration.toFixed(2)),
+      averageDurationMs: Number((stats.totalDuration / stats.commits).toFixed(2)),
+      maxDurationMs: Number(stats.maxDuration.toFixed(2)),
+      baseDurationMs: Number(baseDuration.toFixed(2)),
+      startTimeMs: Number(startTime.toFixed(2)),
+      commitTimeMs: Number(commitTime.toFixed(2)),
+      selectedNodes: selectedNodeIds.length,
+      components: flatComponents.length
+    });
+  }, [flatComponents.length, selectedNodeIds.length]);
+
+  useEffect(() => () => {
+    if (transientFrameRef.current !== null) {
+      window.cancelAnimationFrame(transientFrameRef.current);
+      transientFrameRef.current = null;
+    }
+
+    pendingInteractionPatchRef.current = null;
+  }, []);
 
   const deleteSelected = useCallback(() => {
     selectedNodes
@@ -360,8 +446,8 @@ export function CanvasEditor({
 
     interaction.currentPointer = { x: event.clientX, y: event.clientY };
     interaction.latestLayout = nextLayout;
-    setSnapGuides(snapResult.guides);
-    patchNode(interaction.componentId, nextLayout);
+    setSnapGuides((currentGuides) => areSnapGuidesEqual(currentGuides, snapResult.guides) ? currentGuides : snapResult.guides);
+    scheduleInteractionPatch(interaction.componentId, nextLayout);
     logInteraction("move", {
       viewportScale: interaction.viewportScale,
       startPointer: interaction.startPointer,
@@ -381,6 +467,12 @@ export function CanvasEditor({
 
     event.preventDefault();
     event.stopPropagation();
+    if (transientFrameRef.current !== null) {
+      window.cancelAnimationFrame(transientFrameRef.current);
+      transientFrameRef.current = null;
+    }
+
+    pendingInteractionPatchRef.current = null;
     patchNode(interaction.componentId, interaction.latestLayout);
 
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
@@ -673,73 +765,75 @@ export function CanvasEditor({
               transformOrigin: "top left"
             }}
           >
-            <OverlaySceneRenderer
-              schema={designSchema}
-              data={data}
-              enableRuntimeLayout={previewMode}
-              renderRuntime={false}
-              getComponentProps={(component) => ({
-                role: "button",
-                tabIndex: 0,
-                "data-node-id": component.id,
-                "data-node-locked": component.locked ? "true" : "false",
-                onPointerDown: (event) => {
-                  if (previewMode) {
-                    return;
+            <EditorRendererProfiler enabled={perfProfilerEnabled} onRender={handleRendererProfile}>
+              <OverlaySceneRenderer
+                schema={designSchema}
+                data={data}
+                enableRuntimeLayout={previewMode}
+                renderRuntime={false}
+                getComponentProps={(component) => ({
+                  role: "button",
+                  tabIndex: 0,
+                  "data-node-id": component.id,
+                  "data-node-locked": component.locked ? "true" : "false",
+                  onPointerDown: (event) => {
+                    if (previewMode) {
+                      return;
+                    }
+
+                    if (event.shiftKey) {
+                      selectNodes(
+                        selectedNodeIds.includes(component.id)
+                          ? selectedNodeIds.filter((id) => id !== component.id)
+                          : [...selectedNodeIds, component.id]
+                      );
+                    } else {
+                      selectNodes([component.id]);
+                    }
+
+                    startMove(event, component);
+                  },
+                  onPointerMove: moveInteraction,
+                  onPointerUp: stopInteraction,
+                  onPointerCancel: stopInteraction,
+                  className: previewMode ? "" : `overlay-editor-node select-none ${component.locked ? "cursor-not-allowed" : "cursor-move"}`
+                })}
+                renderDropIndicator={(component) => (
+                  hoverContainerId === component.id ? (
+                    <div className="pointer-events-none absolute inset-0 z-[9997] rounded-[inherit] border-2 border-primary bg-primary/10">
+                      <span className="absolute left-2 top-2 rounded bg-primary px-2 py-1 text-[11px] font-semibold text-primary-foreground">
+                        Drop inside card
+                      </span>
+                    </div>
+                  ) : null
+                )}
+                renderEditorOverlay={(component) => {
+                  if (previewMode || !selectedNodeIds.includes(component.id)) {
+                    return null;
                   }
 
-                  if (event.shiftKey) {
-                    selectNodes(
-                      selectedNodeIds.includes(component.id)
-                        ? selectedNodeIds.filter((id) => id !== component.id)
-                        : [...selectedNodeIds, component.id]
-                    );
-                  } else {
-                    selectNodes([component.id]);
-                  }
-
-                  startMove(event, component);
-                },
-                onPointerMove: moveInteraction,
-                onPointerUp: stopInteraction,
-                onPointerCancel: stopInteraction,
-                className: previewMode ? "" : `overlay-editor-node select-none ${component.locked ? "cursor-not-allowed" : "cursor-move"}`
-              })}
-              renderDropIndicator={(component) => (
-                hoverContainerId === component.id ? (
-                  <div className="pointer-events-none absolute inset-0 z-[9997] rounded-[inherit] border-2 border-primary bg-primary/10">
-                    <span className="absolute left-2 top-2 rounded bg-primary px-2 py-1 text-[11px] font-semibold text-primary-foreground">
-                      Drop inside card
-                    </span>
-                  </div>
-                ) : null
-              )}
-              renderEditorOverlay={(component) => {
-                if (previewMode || !selectedNodeIds.includes(component.id)) {
-                  return null;
-                }
-
-                return (
-                  <>
-                    <div className="pointer-events-none absolute inset-0 ring-2 ring-primary ring-offset-2" />
-                    {!component.locked ? resizeHandles.map((handle) => (
-                      <button
-                        key={`${component.id}-${handle}`}
-                        type="button"
-                        aria-label={`Resize ${handle}`}
-                        data-editor-resize-handle={handle}
-                        onPointerDown={(event) => startResize(event, component, handle)}
-                        onPointerMove={moveInteraction}
-                        onPointerUp={stopInteraction}
-                        onPointerCancel={stopInteraction}
-                        className="absolute z-[2147483000] size-3 rounded-full border border-primary bg-card shadow"
-                        style={getResizeHandleStyle(handle)}
-                      />
-                    )) : null}
-                  </>
-                );
-              }}
-            />
+                  return (
+                    <>
+                      <div className="pointer-events-none absolute inset-0 ring-2 ring-primary ring-offset-2" />
+                      {!component.locked ? resizeHandles.map((handle) => (
+                        <button
+                          key={`${component.id}-${handle}`}
+                          type="button"
+                          aria-label={`Resize ${handle}`}
+                          data-editor-resize-handle={handle}
+                          onPointerDown={(event) => startResize(event, component, handle)}
+                          onPointerMove={moveInteraction}
+                          onPointerUp={stopInteraction}
+                          onPointerCancel={stopInteraction}
+                          className="absolute z-[2147483000] size-3 rounded-full border border-primary bg-card shadow"
+                          style={getResizeHandleStyle(handle)}
+                        />
+                      )) : null}
+                    </>
+                  );
+                }}
+              />
+            </EditorRendererProfiler>
             {!previewMode && designSchema.components.length === 0 ? (
               <div className="absolute inset-0 grid place-items-center p-8">
                 <div className="max-w-md rounded-lg border border-dashed bg-card/95 p-5 text-center shadow">
@@ -781,6 +875,26 @@ export function CanvasEditor({
       </div>
       </div>
     </div>
+  );
+}
+
+function EditorRendererProfiler({
+  enabled,
+  onRender,
+  children
+}: {
+  enabled: boolean;
+  onRender: ProfilerOnRenderCallback;
+  children: ReactNode;
+}) {
+  if (!enabled) {
+    return <>{children}</>;
+  }
+
+  return (
+    <Profiler id="CanvasEditor.OverlaySceneRenderer" onRender={onRender}>
+      {children}
+    </Profiler>
   );
 }
 
@@ -1199,4 +1313,16 @@ function getKeyboardDelta(event: KeyboardEvent) {
 
 function clampZoom(value: number) {
   return Math.min(3, Math.max(0.25, Number(value.toFixed(2))));
+}
+
+function areSnapGuidesEqual(left: SnapGuide[], right: SnapGuide[]) {
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  return left.every((guide, index) => {
+    const other = right[index];
+
+    return other?.orientation === guide.orientation && other.position === guide.position;
+  });
 }

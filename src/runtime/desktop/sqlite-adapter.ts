@@ -9,9 +9,9 @@ export type DesktopSqliteAdapter = {
 
 export async function getDesktopSqliteAdapter(rootDir = process.cwd()): Promise<DesktopSqliteAdapter> {
   const config = await readDesktopLocalConfig(rootDir);
-  const filePath = path.isAbsolute(config.sqlitePath)
-    ? config.sqlitePath
-    : path.join(rootDir, config.sqlitePath);
+  const filePath = path.isAbsolute(config.sqlite.path)
+    ? config.sqlite.path
+    : path.join(rootDir, config.sqlite.path);
 
   return {
     provider: "sqlite",

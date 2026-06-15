@@ -1,6 +1,5 @@
 import { createServer } from "http";
 import { Server } from "socket.io";
-import { startTikTokConnection, stopTikTokConnection } from "./src/lib/tiktok/connection-manager";
 import { bindSocketServer } from "./src/server/realtime/socket-server";
 
 const hostname = process.env.REALTIME_HOSTNAME || process.env.HOSTNAME || "0.0.0.0";
@@ -12,7 +11,14 @@ const httpServer = createServer(async (request, response) => {
 
   if (request.method === "GET" && url.pathname === "/health") {
     response.writeHead(200, { "content-type": "application/json" });
-    response.end(JSON.stringify({ ok: true, service: "liplo-realtime" }));
+    response.end(JSON.stringify({
+      ok: true,
+      service: "liplo-realtime",
+      runtime: process.env.LIPLO_RUNTIME_MODE ?? "web",
+      socket: "ready",
+      tiktokConnector: "idle",
+      timestamp: new Date().toISOString()
+    }));
     return;
   }
 
@@ -28,6 +34,7 @@ const httpServer = createServer(async (request, response) => {
     try {
       const workspaceId = decodeURIComponent(match[1] ?? "");
       const intent = match[2];
+      const { startTikTokConnection, stopTikTokConnection } = await import("./src/lib/tiktok/connection-manager");
       const result = intent === "start"
         ? await startTikTokConnection(workspaceId)
         : await stopTikTokConnection(workspaceId);

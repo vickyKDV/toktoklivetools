@@ -1,6 +1,14 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  output: "standalone",
+  outputFileTracingExcludes: {
+    "*": [
+      "./.git/**",
+      "./src-tauri/**",
+      "./storage/**"
+    ]
+  },
   serverExternalPackages: ["tiktok-live-connector"],
   async rewrites() {
     return {
