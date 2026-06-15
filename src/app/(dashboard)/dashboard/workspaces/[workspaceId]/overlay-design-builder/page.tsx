@@ -1,7 +1,8 @@
 import { BuilderLayout, type BuilderSavedDesign } from "@/features/overlay-builder/components/BuilderLayout";
+import { ThemeStudio, type ThemeStudioSavedDesign, type ThemeStudioTemplate } from "@/features/overlay-builder/components/ThemeStudio";
 import { getWorkspaceOverlayDesign } from "@/features/overlay-builder/actions/getOverlayDesign";
 import { listBuilderOverlays } from "@/features/overlay-builder/actions/listBuilderOverlays";
-import { moderatorStackTemplate } from "@/features/overlay-builder/registry/templateRegistry";
+import { moderatorStackTemplate, overlayTemplates } from "@/features/overlay-builder/registry/templateRegistry";
 import { normalizeDesignSchema } from "@/core/overlay/normalizeDesignSchema";
 import { requireUser } from "@/server/auth/session";
 import { getWorkspaceMetaForUser } from "@/server/workspaces/service";
@@ -11,9 +12,13 @@ type OverlayDesignBuilderPageProps = {
     workspaceId: string;
   }>;
   searchParams?: Promise<{
+    advanced?: string;
+    kind?: string;
     overlayId?: string;
   }>;
 };
+
+const themeStudioKinds = ["CHAT", "GIFT", "LEADERBOARD", "STATIC", "GOAL"] as const;
 
 export default async function OverlayDesignBuilderPage({ params, searchParams }: OverlayDesignBuilderPageProps) {
   const user = await requireUser();
@@ -25,6 +30,36 @@ export default async function OverlayDesignBuilderPage({ params, searchParams }:
     ? await getWorkspaceOverlayDesign({ userId: user.id, workspaceId: workspace.id, overlayId: query.overlayId })
     : null;
   const active = mappedDesigns[0] ?? null;
+  const initialKind = themeStudioKinds.find((kind) => kind === query.kind) ?? "CHAT";
+
+  if (query.advanced !== "1") {
+    return (
+      <ThemeStudio
+        workspaceId={workspace.id}
+        workspaceName={workspace.name}
+        initialKind={initialKind}
+        initialDesignId={selected?.id ?? null}
+        initialDesigns={mappedDesigns.map((design): ThemeStudioSavedDesign => ({
+          id: design.id,
+          name: design.name,
+          schema: design.schema,
+          kind: design.kind,
+          publishedAt: design.publishedAt
+        }))}
+        templates={overlayTemplates.map((template): ThemeStudioTemplate => {
+          const schema = normalizeDesignSchema(template.schema);
+
+          return {
+            id: template.id,
+            name: template.name,
+            description: template.description,
+            kind: schema.kind,
+            schema
+          };
+        })}
+      />
+    );
+  }
 
   return (
     <BuilderLayout

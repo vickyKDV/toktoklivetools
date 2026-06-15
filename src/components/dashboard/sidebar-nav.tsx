@@ -296,7 +296,7 @@ export function DashboardSidebarNav({ workspaces }: DashboardSidebarNavProps) {
           <SidebarLink
             href={`/dashboard/workspaces/${workspace.id}/overlay-design-builder`}
             icon={Palette}
-            label="Design Builder"
+            label="Theme Studio"
             active={isActiveRoute(currentUrl, `/dashboard/workspaces/${workspace.id}/overlay-design-builder`)}
             pending={pendingHref === `/dashboard/workspaces/${workspace.id}/overlay-design-builder`}
             onNavigate={handleNavigate}

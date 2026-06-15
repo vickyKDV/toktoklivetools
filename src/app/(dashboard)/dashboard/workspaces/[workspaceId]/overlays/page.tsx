@@ -64,13 +64,13 @@ export default async function OverlaysPage({ params, searchParams }: OverlaysPag
         <div>
           <h1 className="text-2xl font-semibold tracking-normal">Overlays</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Semua overlay sekarang resource JSON mandiri dengan URL OBS unik per overlay id.
+            Pilih theme siap pakai, atur animasi show/hide, lalu pakai URL OBS unik per overlay.
           </p>
         </div>
         <Button asChild>
-          <Link href={`/dashboard/workspaces/${workspace.id}/overlay-design-builder`}>
+          <Link href={`/dashboard/workspaces/${workspace.id}/overlay-design-builder?kind=${selectedKind}`}>
             <Palette />
-            New Overlay
+            Choose Theme
           </Link>
         </Button>
       </div>
@@ -82,7 +82,7 @@ export default async function OverlaysPage({ params, searchParams }: OverlaysPag
             JSON Overlay Runtime
           </CardTitle>
           <CardDescription>
-            Draft bisa diedit tanpa mengubah OBS. Klik Publish di builder untuk memperbarui published schema pada URL yang sama.
+            Theme bisa dipublish ulang tanpa mengubah URL OBS yang sudah dipasang.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -97,9 +97,9 @@ export default async function OverlaysPage({ params, searchParams }: OverlaysPag
                 </div>
                 {isDockView ? null : (
                   <Button asChild variant="outline" size="sm">
-                    <Link href={`/dashboard/workspaces/${workspace.id}/overlay-design-builder`}>
+                    <Link href={`/dashboard/workspaces/${workspace.id}/overlay-design-builder?kind=${selectedKind}`}>
                       <Palette />
-                      New {selectedTab.label}
+                      New {selectedTab.label} Theme
                     </Link>
                   </Button>
                 )}
@@ -161,7 +161,7 @@ export default async function OverlaysPage({ params, searchParams }: OverlaysPag
                           <Button asChild variant="outline" size="sm">
                             <Link href={`/dashboard/workspaces/${workspace.id}/overlay-design-builder?overlayId=${overlay.id}`}>
                               <Palette />
-                              Edit
+                              Setup
                             </Link>
                           </Button>
                           <ExternalLinkButton href={`/overlay-preview/${overlay.id}`} variant="outline" size="sm">
@@ -179,11 +179,11 @@ export default async function OverlaysPage({ params, searchParams }: OverlaysPag
                 </div>
               ) : (
                 <div className="grid gap-3 rounded-lg border border-dashed p-5">
-                  <p className="text-sm text-muted-foreground">Belum ada overlay type {selectedKind}. Buat overlay baru dari builder.</p>
+                  <p className="text-sm text-muted-foreground">Belum ada overlay type {selectedKind}. Pilih theme preset untuk membuat overlay baru.</p>
                   <Button asChild className="w-fit">
-                    <Link href={`/dashboard/workspaces/${workspace.id}/overlay-design-builder`}>
+                    <Link href={`/dashboard/workspaces/${workspace.id}/overlay-design-builder?kind=${selectedKind}`}>
                       <Palette />
-                      Buka Overlay Builder
+                      Buka Theme Studio
                     </Link>
                   </Button>
                 </div>

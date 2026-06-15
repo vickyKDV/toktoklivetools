@@ -51,7 +51,7 @@ export default async function WorkspacePage({ params }: WorkspacePageProps) {
     },
     {
       href: `/dashboard/workspaces/${workspace.id}/overlay-design-builder`,
-      label: "Design Builder",
+      label: "Theme Studio",
       icon: Palette
     },
     {
