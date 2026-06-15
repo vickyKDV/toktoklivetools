@@ -1,5 +1,5 @@
 import { BuilderLayout, type BuilderSavedDesign } from "@/features/overlay-builder/components/BuilderLayout";
-import { ThemeStudio, type ThemeStudioSavedDesign, type ThemeStudioTemplate } from "@/features/overlay-builder/components/ThemeStudio";
+import { ThemeStudioPage, type ThemeStudioSavedDesign, type ThemeStudioTemplate } from "@/features/overlay-builder/components/ThemeStudio";
 import { getWorkspaceOverlayDesign } from "@/features/overlay-builder/actions/getOverlayDesign";
 import { listBuilderOverlays } from "@/features/overlay-builder/actions/listBuilderOverlays";
 import { moderatorStackTemplate, overlayTemplates } from "@/features/overlay-builder/registry/templateRegistry";
@@ -18,7 +18,7 @@ type OverlayDesignBuilderPageProps = {
   }>;
 };
 
-const themeStudioKinds = ["CHAT", "GIFT", "LEADERBOARD", "STATIC", "GOAL"] as const;
+const themeStudioKinds = ["CHAT", "GIFT", "LEADERBOARD", "DOCK", "GOAL", "STATIC"] as const;
 
 export default async function OverlayDesignBuilderPage({ params, searchParams }: OverlayDesignBuilderPageProps) {
   const user = await requireUser();
@@ -34,7 +34,7 @@ export default async function OverlayDesignBuilderPage({ params, searchParams }:
 
   if (query.advanced !== "1") {
     return (
-      <ThemeStudio
+      <ThemeStudioPage
         workspaceId={workspace.id}
         workspaceName={workspace.name}
         initialKind={initialKind}

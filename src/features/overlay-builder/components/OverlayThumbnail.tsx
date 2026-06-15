@@ -5,12 +5,14 @@ import { getSampleChatRenderData } from "@/features/overlay-builder/components/C
 import { OverlaySceneRenderer } from "@/features/overlay-builder/components/OverlaySceneRenderer";
 import { dummyOverlayData, type OverlayDesignSchema } from "@/core/overlay/schema";
 import { getRuntimeCanvasSize } from "@/core/overlay/runtimeCanvas";
+import { cn } from "@/lib/utils";
 
 type OverlayThumbnailProps = {
   schema: OverlayDesignSchema;
+  className?: string;
 };
 
-export function OverlayThumbnail({ schema }: OverlayThumbnailProps) {
+export function OverlayThumbnail({ schema, className }: OverlayThumbnailProps) {
   const frameRef = useRef<HTMLDivElement | null>(null);
   const [frame, setFrame] = useState({ width: 320, height: 150 });
   const runtimeCanvas = getRuntimeCanvasSize(schema);
@@ -61,7 +63,10 @@ export function OverlayThumbnail({ schema }: OverlayThumbnailProps) {
   return (
     <div
       ref={frameRef}
-      className="relative h-40 overflow-hidden rounded-md border bg-[radial-gradient(circle_at_center,rgba(148,163,184,.18),rgba(15,23,42,.08)_45%,rgba(15,23,42,.16))]"
+      className={cn(
+        "relative h-40 overflow-hidden rounded-md border bg-[radial-gradient(circle_at_center,rgba(148,163,184,.18),rgba(15,23,42,.08)_45%,rgba(15,23,42,.16))]",
+        className
+      )}
     >
       <div
         className="pointer-events-none absolute"

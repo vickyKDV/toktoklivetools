@@ -5,7 +5,6 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   Activity,
   Blocks,
-  Box,
   Cable,
   Gift,
   Images,
@@ -79,11 +78,6 @@ const overlaySubItems = [
     hrefSuffix: "GOAL",
     label: "Goal",
     icon: Target
-  },
-  {
-    hrefSuffix: "CUSTOM",
-    label: "Custom",
-    icon: Box
   }
 ];
 
@@ -114,7 +108,7 @@ export function DashboardSidebarNav({ workspaces }: DashboardSidebarNavProps) {
         `/dashboard/workspaces/${workspace.id}/overlays`,
         `/dashboard/workspaces/${workspace.id}/overlay-design-builder`,
         `/dashboard/workspaces/${workspace.id}/settings`,
-        ...overlaySubItems.map((item) => `/dashboard/workspaces/${workspace.id}/overlays?kind=${item.hrefSuffix}`)
+        ...overlaySubItems.map((item) => `/dashboard/workspaces/${workspace.id}/overlay-design-builder?kind=${item.hrefSuffix}`)
       );
     }
 
@@ -276,7 +270,7 @@ export function DashboardSidebarNav({ workspaces }: DashboardSidebarNavProps) {
           />
           <div className="ml-6 grid gap-1 border-l pl-2">
             {overlaySubItems.map((item) => {
-              const href = `/dashboard/workspaces/${workspace.id}/overlays?kind=${item.hrefSuffix}`;
+              const href = `/dashboard/workspaces/${workspace.id}/overlay-design-builder?kind=${item.hrefSuffix}`;
 
               return (
                 <SidebarLink
@@ -354,10 +348,10 @@ function SidebarLink({
 
 function getNavClassName(active: boolean, pending: boolean, className?: string) {
   return cn(
-    "relative justify-start transition-colors duration-150",
-    "before:absolute before:left-0 before:top-1.5 before:h-[calc(100%-0.75rem)] before:w-0.5 before:rounded-full before:bg-primary before:opacity-0 before:transition-opacity",
-    active && "bg-primary/[0.12] font-semibold text-foreground before:opacity-100 hover:bg-primary/[0.16]",
-    pending && "bg-primary/[0.18] text-foreground before:opacity-100",
+    "relative justify-start border border-transparent transition-colors duration-150",
+    "before:absolute before:left-0 before:top-1.5 before:h-[calc(100%-0.75rem)] before:w-0.5 before:rounded-full before:bg-cyan-300 before:opacity-0 before:transition-opacity",
+    active && "border border-violet-500/35 bg-[linear-gradient(135deg,rgba(124,58,237,.28),rgba(34,211,238,.08))] font-semibold text-foreground shadow-[0_0_22px_rgba(124,58,237,.16)] before:opacity-100 hover:bg-[linear-gradient(135deg,rgba(124,58,237,.34),rgba(34,211,238,.12))]",
+    pending && "border border-violet-500/40 bg-[linear-gradient(135deg,rgba(124,58,237,.34),rgba(34,211,238,.12))] text-foreground before:opacity-100",
     !active && !pending && "text-muted-foreground hover:bg-muted hover:text-foreground",
     className
   );
