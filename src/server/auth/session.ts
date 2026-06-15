@@ -46,10 +46,19 @@ export async function createSession(userId: string) {
     path: "/",
     expires: expiresAt
   });
+
+  return {
+    token,
+    expiresAt
+  };
 }
 
 function shouldUseSecureSessionCookie() {
   return process.env.NODE_ENV === "production" && process.env.LIPLO_APP_MODE !== "desktop";
+}
+
+export function isDesktopAppMode() {
+  return process.env.LIPLO_APP_MODE === "desktop";
 }
 
 export async function destroySession() {

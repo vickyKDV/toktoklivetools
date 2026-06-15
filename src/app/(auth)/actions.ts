@@ -1,7 +1,13 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { createSession, destroySession, hashPassword, verifyPassword } from "@/server/auth/session";
+import {
+  createSession,
+  destroySession,
+  hashPassword,
+  isDesktopAppMode,
+  verifyPassword
+} from "@/server/auth/session";
 import { databaseUnavailableMessage, isDatabaseUnavailableError } from "@/server/db/errors";
 import { prisma } from "@/server/db/prisma";
 import { loginSchema, registerSchema } from "@/lib/validation";
@@ -62,7 +68,9 @@ export async function registerAction(formData: FormData) {
       }
     });
 
-    await createSession(user.id);
+    const session = await createSession(user.id);
+
+    redirectAfterSessionCreated(session.token, "/dashboard");
   } catch (error) {
     if (isDatabaseUnavailableError(error)) {
       formError("/register", databaseUnavailableMessage());
@@ -101,7 +109,9 @@ export async function loginAction(formData: FormData) {
       formError("/login", "Invalid email or password");
     }
 
-    await createSession(user.id);
+    const session = await createSession(user.id);
+
+    redirectAfterSessionCreated(session.token, "/dashboard");
   } catch (error) {
     if (isDatabaseUnavailableError(error)) {
       formError("/login", databaseUnavailableMessage());
@@ -115,5 +125,18 @@ export async function loginAction(formData: FormData) {
 
 export async function logoutAction() {
   await destroySession();
+
+  if (isDesktopAppMode()) {
+    redirect("/desktop-session/logout");
+  }
+
   redirect("/login");
+}
+
+function redirectAfterSessionCreated(token: string, next: string): never {
+  if (isDesktopAppMode()) {
+    redirect(`/desktop-session?token=${encodeURIComponent(token)}&next=${encodeURIComponent(next)}`);
+  }
+
+  redirect(next);
 }
