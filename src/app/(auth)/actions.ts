@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { createSession, destroySession, hashPassword, verifyPassword } from "@/server/auth/session";
+import { databaseUnavailableMessage, isDatabaseUnavailableError } from "@/server/db/errors";
 import { prisma } from "@/server/db/prisma";
 import { loginSchema, registerSchema } from "@/lib/validation";
 import { slugify } from "@/lib/utils";
@@ -21,46 +22,55 @@ export async function registerAction(formData: FormData) {
     formError("/register", parsed.error.issues[0]?.message ?? "Registration failed");
   }
 
-  const existing = await prisma.user.findUnique({
-    where: {
-      email: parsed.data.email
-    },
-    select: {
-      id: true
+  try {
+    const existing = await prisma.user.findUnique({
+      where: {
+        email: parsed.data.email
+      },
+      select: {
+        id: true
+      }
+    });
+
+    if (existing) {
+      formError("/register", "Email is already registered");
     }
-  });
 
-  if (existing) {
-    formError("/register", "Email is already registered");
-  }
+    const passwordHash = await hashPassword(parsed.data.password);
+    const defaultSlug = slugify(`${parsed.data.name} live`);
 
-  const passwordHash = await hashPassword(parsed.data.password);
-  const defaultSlug = slugify(`${parsed.data.name} live`);
-
-  const user = await prisma.user.create({
-    data: {
-      name: parsed.data.name,
-      email: parsed.data.email,
-      passwordHash,
-      memberships: {
-        create: {
-          role: "OWNER",
-          workspace: {
-            create: {
-              name: `${parsed.data.name}'s Live`,
-              slug: `${defaultSlug}-${crypto.randomUUID().slice(0, 6)}`,
-              overlayKey: crypto.randomUUID().replaceAll("-", "")
+    const user = await prisma.user.create({
+      data: {
+        name: parsed.data.name,
+        email: parsed.data.email,
+        passwordHash,
+        memberships: {
+          create: {
+            role: "OWNER",
+            workspace: {
+              create: {
+                name: `${parsed.data.name}'s Live`,
+                slug: `${defaultSlug}-${crypto.randomUUID().slice(0, 6)}`,
+                overlayKey: crypto.randomUUID().replaceAll("-", "")
+              }
             }
           }
         }
+      },
+      select: {
+        id: true
       }
-    },
-    select: {
-      id: true
-    }
-  });
+    });
 
-  await createSession(user.id);
+    await createSession(user.id);
+  } catch (error) {
+    if (isDatabaseUnavailableError(error)) {
+      formError("/register", databaseUnavailableMessage());
+    }
+
+    throw error;
+  }
+
   redirect("/dashboard");
 }
 
@@ -74,23 +84,32 @@ export async function loginAction(formData: FormData) {
     formError("/login", parsed.error.issues[0]?.message ?? "Login failed");
   }
 
-  const user = await prisma.user.findUnique({
-    where: {
-      email: parsed.data.email
+  try {
+    const user = await prisma.user.findUnique({
+      where: {
+        email: parsed.data.email
+      }
+    });
+
+    if (!user) {
+      formError("/login", "Invalid email or password");
     }
-  });
 
-  if (!user) {
-    formError("/login", "Invalid email or password");
+    const isValid = await verifyPassword(parsed.data.password, user.passwordHash);
+
+    if (!isValid) {
+      formError("/login", "Invalid email or password");
+    }
+
+    await createSession(user.id);
+  } catch (error) {
+    if (isDatabaseUnavailableError(error)) {
+      formError("/login", databaseUnavailableMessage());
+    }
+
+    throw error;
   }
 
-  const isValid = await verifyPassword(parsed.data.password, user.passwordHash);
-
-  if (!isValid) {
-    formError("/login", "Invalid email or password");
-  }
-
-  await createSession(user.id);
   redirect("/dashboard");
 }
 

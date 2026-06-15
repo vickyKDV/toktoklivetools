@@ -5,6 +5,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
 import bcrypt from "bcryptjs";
+import { isDatabaseUnavailableError } from "@/server/db/errors";
 import { prisma } from "@/server/db/prisma";
 import type { AuthUser } from "@/core/auth/types";
 
@@ -70,25 +71,33 @@ export const getCurrentUser = cache(async (): Promise<AuthUser | null> => {
     return null;
   }
 
-  const session = await prisma.session.findFirst({
-    where: {
-      tokenHash: hashToken(sessionToken),
-      expiresAt: {
-        gt: new Date()
-      }
-    },
-    include: {
-      user: {
-        select: {
-          id: true,
-          email: true,
-          name: true
+  try {
+    const session = await prisma.session.findFirst({
+      where: {
+        tokenHash: hashToken(sessionToken),
+        expiresAt: {
+          gt: new Date()
+        }
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            name: true
+          }
         }
       }
-    }
-  });
+    });
 
-  return session?.user ?? null;
+    return session?.user ?? null;
+  } catch (error) {
+    if (isDatabaseUnavailableError(error)) {
+      return null;
+    }
+
+    throw error;
+  }
 });
 
 export async function requireUser() {
