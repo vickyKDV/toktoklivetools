@@ -12,6 +12,15 @@ import { setDesktopObsBrowserSourceUrl, testDesktopObsConnection } from "@/runti
 
 type DesktopSettingsPanelProps = {
   workspaceId: string;
+  overlayKey: string;
+  overlays: DesktopOverlayOption[];
+};
+
+type DesktopOverlayOption = {
+  id: string;
+  name: string;
+  kind: string;
+  publishedAt: string | null;
 };
 
 type StatusState = {
@@ -19,15 +28,19 @@ type StatusState = {
   message: string;
 };
 
-export function DesktopSettingsPanel({ workspaceId }: DesktopSettingsPanelProps) {
+export function DesktopSettingsPanel({ workspaceId, overlayKey, overlays }: DesktopSettingsPanelProps) {
   const bridge = useMemo(() => createTauriCommandBridge(), []);
   const [config, setConfig] = useState<DesktopLocalConfig | null>(null);
   const [health, setHealth] = useState<unknown>(null);
   const [sidecars, setSidecars] = useState<unknown>(null);
   const [status, setStatus] = useState<StatusState>({ kind: "idle", message: "" });
   const [busy, setBusy] = useState(false);
+  const [selectedOverlayId, setSelectedOverlayId] = useState(
+    () => overlays.find((overlay) => overlay.publishedAt)?.id ?? overlays[0]?.id ?? ""
+  );
 
-  const localOverlayUrl = config ? `${config.overlay.baseUrl.replace(/\/$/, "")}/overlay/...` : "";
+  const selectedOverlay = overlays.find((overlay) => overlay.id === selectedOverlayId) ?? overlays[0] ?? null;
+  const localOverlayUrl = config ? buildLocalOverlayUrl(config.overlay.baseUrl, selectedOverlay, overlayKey) : "";
 
   useEffect(() => {
     if (!bridge.available) {
@@ -143,7 +156,7 @@ export function DesktopSettingsPanel({ workspaceId }: DesktopSettingsPanelProps)
   }
 
   async function sendUrlToObs() {
-    if (!config) {
+    if (!config || !localOverlayUrl) {
       return;
     }
 
@@ -311,12 +324,27 @@ export function DesktopSettingsPanel({ workspaceId }: DesktopSettingsPanelProps)
 
             <section className="grid gap-3 rounded-md border bg-muted/20 p-3">
               <p className="text-sm font-semibold">Overlay</p>
+              <div className="grid gap-3 md:grid-cols-2">
+                <Field label="Overlay Base URL" value={config.overlay.baseUrl} onChange={(baseUrl) => patchNested("overlay", { baseUrl })} />
+                {overlays.length ? (
+                  <div className="space-y-1.5">
+                    <Label>OBS Overlay</Label>
+                    <select
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                      value={selectedOverlay?.id ?? ""}
+                      onChange={(event) => setSelectedOverlayId(event.currentTarget.value)}
+                    >
+                      {overlays.map((overlay) => (
+                        <option key={overlay.id} value={overlay.id}>
+                          {overlay.name} ({overlay.kind.toLowerCase()}{overlay.publishedAt ? "" : ", draft"})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ) : null}
+              </div>
               <div className="grid gap-3 md:grid-cols-[1fr_auto]">
-                <Field
-                  label="Overlay Base URL"
-                  value={config.overlay.baseUrl}
-                  onChange={(baseUrl) => patchNested("overlay", { baseUrl })}
-                />
+                <Input readOnly value={localOverlayUrl} className="font-mono text-xs" />
                 <div className="flex items-end">
                   <Button type="button" variant="outline" onClick={() => void navigator.clipboard.writeText(localOverlayUrl)}>
                     <Copy />
@@ -327,7 +355,11 @@ export function DesktopSettingsPanel({ workspaceId }: DesktopSettingsPanelProps)
               <p className="rounded-md border bg-background px-3 py-2 font-mono text-xs text-muted-foreground">
                 {localOverlayUrl}
               </p>
-              <p className="text-xs text-muted-foreground">Workspace: {workspaceId}</p>
+              <p className="text-xs text-muted-foreground">
+                {selectedOverlay
+                  ? `Workspace: ${workspaceId} · Overlay: ${selectedOverlay.name}`
+                  : `Workspace: ${workspaceId} · Fallback dock: ${overlayKey}`}
+              </p>
             </section>
 
             <section className="grid gap-3 rounded-md border bg-muted/20 p-3">
@@ -398,4 +430,14 @@ function Field({
 
 function toErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
+}
+
+function buildLocalOverlayUrl(baseUrl: string, overlay: DesktopOverlayOption | null, overlayKey: string) {
+  const normalizedBaseUrl = baseUrl.replace(/\/+$/, "");
+
+  if (overlay) {
+    return `${normalizedBaseUrl}/overlay/${overlay.kind.toLowerCase()}/${overlay.id}`;
+  }
+
+  return `${normalizedBaseUrl}/widgets/dock/chat/${overlayKey}`;
 }

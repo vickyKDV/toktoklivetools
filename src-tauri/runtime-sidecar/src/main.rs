@@ -67,7 +67,11 @@ fn serve(args: &[String]) -> Result<(), String> {
     let data_dir = read_arg(args, "--data-dir")
         .or_else(|| env::var("LIPLO_DESKTOP_DATA_DIR").ok())
         .map(PathBuf::from)
-        .unwrap_or_else(|| env::current_dir().unwrap_or_else(|_| PathBuf::from(".")).join("storage"));
+        .unwrap_or_else(|| {
+            env::current_dir()
+                .unwrap_or_else(|_| PathBuf::from("."))
+                .join("storage")
+        });
     let data_dir = absolute_path(data_dir)?;
 
     let log_dir = read_arg(args, "--log-dir")
@@ -116,11 +120,19 @@ fn serve(args: &[String]) -> Result<(), String> {
     }
 }
 
-fn start_web(node: &Path, runtime_root: &Path, data_dir: &Path, log_dir: &Path) -> Result<Child, String> {
+fn start_web(
+    node: &Path,
+    runtime_root: &Path,
+    data_dir: &Path,
+    log_dir: &Path,
+) -> Result<Child, String> {
     let web_root = runtime_root.join("web");
     let server = web_root.join("server.js");
     if !server.is_file() {
-        return Err(format!("Web standalone server not found at {}", server.display()));
+        return Err(format!(
+            "Web standalone server not found at {}",
+            server.display()
+        ));
     }
 
     let log = log_file(log_dir, "web")?;
@@ -131,14 +143,24 @@ fn start_web(node: &Path, runtime_root: &Path, data_dir: &Path, log_dir: &Path) 
         .arg("server.js")
         .current_dir(&web_root)
         .envs(runtime_env(data_dir))
-        .env("HOSTNAME", env::var("LIPLO_WEB_HOST").unwrap_or_else(|_| "127.0.0.1".to_string()))
-        .stdout(Stdio::from(log.try_clone().map_err(|error| error.to_string())?))
+        .env(
+            "HOSTNAME",
+            env::var("LIPLO_WEB_HOST").unwrap_or_else(|_| "127.0.0.1".to_string()),
+        )
+        .stdout(Stdio::from(
+            log.try_clone().map_err(|error| error.to_string())?,
+        ))
         .stderr(Stdio::from(log))
         .spawn()
         .map_err(|error| format!("Failed to start web runtime: {error}"))
 }
 
-fn start_realtime(node: &Path, runtime_root: &Path, data_dir: &Path, log_dir: &Path) -> Result<Child, String> {
+fn start_realtime(
+    node: &Path,
+    runtime_root: &Path,
+    data_dir: &Path,
+    log_dir: &Path,
+) -> Result<Child, String> {
     let realtime_root = runtime_root.join("realtime");
     let server = realtime_root.join("realtime-server.cjs");
     if !server.is_file() {
@@ -155,20 +177,31 @@ fn start_realtime(node: &Path, runtime_root: &Path, data_dir: &Path, log_dir: &P
         .arg("realtime-server.cjs")
         .current_dir(&realtime_root)
         .envs(runtime_env(data_dir))
-        .env("REALTIME_HOSTNAME", env::var("LIPLO_REALTIME_HOST").unwrap_or_else(|_| "127.0.0.1".to_string()))
+        .env(
+            "REALTIME_HOSTNAME",
+            env::var("LIPLO_REALTIME_HOST").unwrap_or_else(|_| "127.0.0.1".to_string()),
+        )
         .env("NODE_PATH", web_node_modules)
-        .stdout(Stdio::from(log.try_clone().map_err(|error| error.to_string())?))
+        .stdout(Stdio::from(
+            log.try_clone().map_err(|error| error.to_string())?,
+        ))
         .stderr(Stdio::from(log))
         .spawn()
         .map_err(|error| format!("Failed to start realtime runtime: {error}"))
 }
 
 fn node_command(node: &Path) -> Command {
-    let mut command = Command::new(node);
+    apply_platform_command_flags(Command::new(node))
+}
 
-    #[cfg(windows)]
+#[cfg(windows)]
+fn apply_platform_command_flags(mut command: Command) -> Command {
     command.creation_flags(CREATE_NO_WINDOW);
+    command
+}
 
+#[cfg(not(windows))]
+fn apply_platform_command_flags(command: Command) -> Command {
     command
 }
 
@@ -189,8 +222,14 @@ fn runtime_env(data_dir: &Path) -> Vec<(String, String)> {
         ("NEXT_TELEMETRY_DISABLED".to_string(), "1".to_string()),
         ("LIPLO_APP_MODE".to_string(), "desktop".to_string()),
         ("LIPLO_DATA_MODE".to_string(), "cloud".to_string()),
-        ("LIPLO_RUNTIME_MODE".to_string(), "desktop-cloud".to_string()),
-        ("LIPLO_DESKTOP_DATA_DIR".to_string(), data_dir.display().to_string()),
+        (
+            "LIPLO_RUNTIME_MODE".to_string(),
+            "desktop-cloud".to_string(),
+        ),
+        (
+            "LIPLO_DESKTOP_DATA_DIR".to_string(),
+            data_dir.display().to_string(),
+        ),
         ("PORT".to_string(), web_port),
         ("REALTIME_PORT".to_string(), realtime_port),
         ("REALTIME_CONTROL_URL".to_string(), socket_url.clone()),
@@ -216,9 +255,7 @@ fn runtime_env(data_dir: &Path) -> Vec<(String, String)> {
 }
 
 fn env_or_dotenv(key: &str) -> Option<String> {
-    env::var(key)
-        .ok()
-        .or_else(|| read_dotenv_value(key))
+    env::var(key).ok().or_else(|| read_dotenv_value(key))
 }
 
 fn read_dotenv_value(key: &str) -> Option<String> {
@@ -272,7 +309,11 @@ fn unquote_env_value(value: &str) -> String {
     value
         .strip_prefix('"')
         .and_then(|value| value.strip_suffix('"'))
-        .or_else(|| value.strip_prefix('\'').and_then(|value| value.strip_suffix('\'')))
+        .or_else(|| {
+            value
+                .strip_prefix('\'')
+                .and_then(|value| value.strip_suffix('\''))
+        })
         .unwrap_or(value)
         .to_string()
 }

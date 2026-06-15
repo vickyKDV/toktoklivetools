@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { DesktopSettingsPanel } from "@/features/desktop/DesktopSettingsPanel";
+import { listBuilderOverlays } from "@/features/overlay-builder/actions/listBuilderOverlays";
 import { requireUser } from "@/server/auth/session";
 import { getWorkspaceMetaForUser } from "@/server/workspaces/service";
 
@@ -31,6 +32,7 @@ export default async function WorkspaceSettingsPage({
   const { workspaceId } = await params;
   const query = searchParams ? await searchParams : {};
   const workspace = await getWorkspaceMetaForUser(user.id, workspaceId);
+  const overlays = await listBuilderOverlays(workspace.id);
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -91,7 +93,16 @@ export default async function WorkspaceSettingsPage({
         </CardContent>
       </Card>
 
-      <DesktopSettingsPanel workspaceId={workspace.id} />
+      <DesktopSettingsPanel
+        workspaceId={workspace.id}
+        overlayKey={workspace.overlayKey}
+        overlays={overlays.map((overlay) => ({
+          id: overlay.id,
+          name: overlay.name,
+          kind: overlay.kind,
+          publishedAt: overlay.publishedAt
+        }))}
+      />
     </div>
   );
 }

@@ -70,7 +70,8 @@ Desktop mode uses config-derived local URLs. Defaults:
 
 ```txt
 App/runtime: http://127.0.0.1:7050
-Overlay OBS URL: http://127.0.0.1:7050/overlay/...
+Overlay OBS URL: http://127.0.0.1:7050/overlay/{kind}/{overlayId}
+Dock URL: http://127.0.0.1:7050/widgets/dock/chat/{overlayKey}
 Realtime: http://127.0.0.1:7051
 Realtime health: http://127.0.0.1:7051/health
 OBS websocket: ws://127.0.0.1:4455
@@ -406,7 +407,7 @@ Manual checks:
 - Web health passes.
 - Realtime health passes.
 - OBS websocket test reaches `ws://127.0.0.1:4455`.
-- OBS Browser Source can use `http://127.0.0.1:7050/overlay/...`.
+- OBS Browser Source can use `http://127.0.0.1:7050/overlay/{kind}/{overlayId}`.
 - App can send local overlay URL to OBS Browser Source.
 - TikTok connector still runs through Node/runtime sidecar.
 - Global hotkey plugin is registered and uses `CommandOrControl+Shift+O`.

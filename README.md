@@ -48,7 +48,8 @@ Liplo Desktop is prepared for Windows + macOS through Tauri in desktop cloud-bac
 ```txt
 App/runtime: http://127.0.0.1:7050
 Realtime: http://127.0.0.1:7051
-OBS overlay URL: http://127.0.0.1:7050/overlay/...
+OBS overlay URL: http://127.0.0.1:7050/overlay/{kind}/{overlayId}
+Dock URL: http://127.0.0.1:7050/widgets/dock/chat/{overlayKey}
 OBS websocket: ws://127.0.0.1:4455
 ```
 
