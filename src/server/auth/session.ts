@@ -42,10 +42,14 @@ export async function createSession(userId: string) {
   cookieStore.set(SESSION_COOKIE, token, {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: shouldUseSecureSessionCookie(),
     path: "/",
     expires: expiresAt
   });
+}
+
+function shouldUseSecureSessionCookie() {
+  return process.env.NODE_ENV === "production" && process.env.LIPLO_APP_MODE !== "desktop";
 }
 
 export async function destroySession() {
