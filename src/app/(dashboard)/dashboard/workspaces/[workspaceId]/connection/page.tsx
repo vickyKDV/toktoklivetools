@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { requireUser } from "@/server/auth/session";
 import { formatDateTime } from "@/lib/utils";
-import { getWorkspaceForUser } from "@/server/workspaces/service";
+import { getWorkspaceMetaForUser } from "@/server/workspaces/service";
 
 type ConnectionPageProps = {
   params: Promise<{
@@ -32,7 +32,7 @@ export default async function ConnectionPage({ params, searchParams }: Connectio
   const user = await requireUser();
   const { workspaceId } = await params;
   const query = searchParams ? await searchParams : {};
-  const workspace = await getWorkspaceForUser(user.id, workspaceId);
+  const workspace = await getWorkspaceMetaForUser(user.id, workspaceId);
   const status = workspace.connection?.status ?? "IDLE";
   const isBusy = status === "LIVE" || status === "CONNECTING";
 

@@ -3,12 +3,13 @@ import { ArrowLeft, ExternalLink, Monitor, Palette } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { CopyButton } from "@/components/ui/copy-button";
+import { ExternalLinkButton } from "@/components/ui/external-link-button";
 import { Input } from "@/components/ui/input";
 import { listBuilderOverlays } from "@/features/overlay-builder/actions/listBuilderOverlays";
 import { OverlayThumbnail } from "@/features/overlay-builder/components/OverlayThumbnail";
 import { requireUser } from "@/server/auth/session";
 import { getWidgetBaseUrl } from "@/lib/utils";
-import { getWorkspaceForUser } from "@/server/workspaces/service";
+import { getWorkspaceMetaForUser } from "@/server/workspaces/service";
 
 type OverlaysPageProps = {
   params: Promise<{
@@ -33,7 +34,7 @@ export default async function OverlaysPage({ params, searchParams }: OverlaysPag
   const user = await requireUser();
   const { workspaceId } = await params;
   const query = await searchParams;
-  const workspace = await getWorkspaceForUser(user.id, workspaceId);
+  const workspace = await getWorkspaceMetaForUser(user.id, workspaceId);
   const widgetBaseUrl = getWidgetBaseUrl();
   const overlays = await listBuilderOverlays(workspace.id);
   const requestedKind = overlayKindTabs.find((tab) => tab.kind === query?.kind)?.kind;
@@ -118,12 +119,10 @@ export default async function OverlaysPage({ params, searchParams }: OverlaysPag
                   </div>
 
                   <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                    <Button asChild variant="outline" size="sm">
-                      <Link href={dockUrl} target="_blank">
-                        <ExternalLink />
-                        Open Dock
-                      </Link>
-                    </Button>
+                    <ExternalLinkButton href={dockUrl} variant="outline" size="sm">
+                      <ExternalLink />
+                      Open Dock
+                    </ExternalLinkButton>
                   </div>
                 </article>
               ) : selectedOverlays.length ? (
@@ -159,18 +158,14 @@ export default async function OverlaysPage({ params, searchParams }: OverlaysPag
                               Edit
                             </Link>
                           </Button>
-                          <Button asChild variant="outline" size="sm">
-                            <Link href={`/overlay-preview/${overlay.id}`} target="_blank">
-                              <ExternalLink />
-                              Preview
-                            </Link>
-                          </Button>
-                          <Button asChild variant="outline" size="sm">
-                            <Link href={outputUrl} target="_blank">
-                              <Monitor />
-                              OBS
-                            </Link>
-                          </Button>
+                          <ExternalLinkButton href={`/overlay-preview/${overlay.id}`} variant="outline" size="sm">
+                            <ExternalLink />
+                            Preview
+                          </ExternalLinkButton>
+                          <ExternalLinkButton href={outputUrl} variant="outline" size="sm">
+                            <Monitor />
+                            OBS
+                          </ExternalLinkButton>
                         </div>
                       </article>
                     );

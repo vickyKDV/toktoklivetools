@@ -17,6 +17,8 @@ await mkdir(realtimeRoot, { recursive: true });
 await mkdir(nodeRoot, { recursive: true });
 
 await cp(path.join(repoRoot, ".next", "standalone"), webRoot, { recursive: true, dereference: true });
+await rm(path.join(webRoot, "dist"), { recursive: true, force: true });
+await rm(path.join(webRoot, "src-tauri"), { recursive: true, force: true });
 await cp(path.join(repoRoot, ".next", "static"), path.join(webRoot, ".next", "static"), {
   recursive: true,
   dereference: true
@@ -93,6 +95,10 @@ async function removeEnvFiles(directory) {
 
 async function ensureNextRuntimeDependencies(directory) {
   const pnpmRoot = path.join(directory, "node_modules", ".pnpm");
+  if (!(await exists(pnpmRoot))) {
+    return;
+  }
+
   const pnpmEntries = await readdir(pnpmRoot, { withFileTypes: true });
   const nextPackage = pnpmEntries.find((entry) => entry.isDirectory() && entry.name.startsWith("next@"));
 

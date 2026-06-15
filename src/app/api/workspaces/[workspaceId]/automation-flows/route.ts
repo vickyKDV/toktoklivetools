@@ -8,6 +8,7 @@ import {
   sanitizeAutomationNodes
 } from "@/core/automation/flow";
 import { getCurrentUser } from "@/server/auth/session";
+import { invalidateAutomationFlowCache } from "@/server/automation/engine";
 import { prisma } from "@/server/db/prisma";
 
 export const runtime = "nodejs";
@@ -111,6 +112,7 @@ export async function POST(request: Request, context: RouteContext) {
       );
     }
 
+    invalidateAutomationFlowCache(auth.workspaceId);
     return NextResponse.json({
       ok: true,
       flowId: parsed.data.flowId,
@@ -122,6 +124,7 @@ export async function POST(request: Request, context: RouteContext) {
     data
   });
 
+  invalidateAutomationFlowCache(auth.workspaceId);
   return NextResponse.json({
     ok: true,
     flowId: flow.id,
@@ -169,6 +172,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     );
   }
 
+  invalidateAutomationFlowCache(auth.workspaceId);
   return NextResponse.json({
     ok: true,
     message: parsed.data.isActive ? "Flow diaktifkan." : "Flow dinonaktifkan."

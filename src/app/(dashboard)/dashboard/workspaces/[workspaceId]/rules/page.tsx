@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { requireUser } from "@/server/auth/session";
-import { getWorkspaceForUser } from "@/server/workspaces/service";
+import { getWorkspaceRulesForUser } from "@/server/workspaces/service";
 
 type RulesPageProps = {
   params: Promise<{
@@ -28,7 +28,7 @@ export default async function RulesPage({ params, searchParams }: RulesPageProps
   const user = await requireUser();
   const { workspaceId } = await params;
   const query = searchParams ? await searchParams : {};
-  const workspace = await getWorkspaceForUser(user.id, workspaceId);
+  const workspace = await getWorkspaceRulesForUser(user.id, workspaceId);
 
   return (
     <div className="mx-auto grid max-w-6xl gap-6 lg:grid-cols-[minmax(0,1fr)_24rem]">

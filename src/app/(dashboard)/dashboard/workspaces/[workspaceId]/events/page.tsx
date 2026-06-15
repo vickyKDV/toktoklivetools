@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { RealtimeEventFeed } from "@/components/dashboard/realtime-event-feed";
 import { requireUser } from "@/server/auth/session";
 import { formatDateTime } from "@/lib/utils";
-import { getWorkspaceEventsForUser, getWorkspaceForUser } from "@/server/workspaces/service";
+import { getWorkspaceMetaForUser, listWorkspaceEvents } from "@/server/workspaces/service";
 
 type EventsPageProps = {
   params: Promise<{
@@ -17,10 +17,8 @@ type EventsPageProps = {
 export default async function EventsPage({ params }: EventsPageProps) {
   const user = await requireUser();
   const { workspaceId } = await params;
-  const [workspace, events] = await Promise.all([
-    getWorkspaceForUser(user.id, workspaceId),
-    getWorkspaceEventsForUser(user.id, workspaceId)
-  ]);
+  const workspace = await getWorkspaceMetaForUser(user.id, workspaceId);
+  const events = await listWorkspaceEvents(workspace.id);
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-6">

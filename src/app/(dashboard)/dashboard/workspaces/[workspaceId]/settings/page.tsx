@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { DesktopSettingsPanel } from "@/features/desktop/DesktopSettingsPanel";
 import { requireUser } from "@/server/auth/session";
-import { getWorkspaceForUser } from "@/server/workspaces/service";
+import { getWorkspaceMetaForUser } from "@/server/workspaces/service";
 
 type WorkspaceSettingsPageProps = {
   params: Promise<{
@@ -30,7 +30,7 @@ export default async function WorkspaceSettingsPage({
   const user = await requireUser();
   const { workspaceId } = await params;
   const query = searchParams ? await searchParams : {};
-  const workspace = await getWorkspaceForUser(user.id, workspaceId);
+  const workspace = await getWorkspaceMetaForUser(user.id, workspaceId);
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">

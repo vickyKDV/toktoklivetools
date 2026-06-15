@@ -6,7 +6,7 @@ import { parseAutomationEdges, parseAutomationNodes } from "@/core/automation/fl
 import { requireUser } from "@/server/auth/session";
 import { prisma } from "@/server/db/prisma";
 import { getWidgetBaseUrl } from "@/lib/utils";
-import { getWorkspaceForUser } from "@/server/workspaces/service";
+import { getWorkspaceMetaForUser } from "@/server/workspaces/service";
 import type { AutomationExecutionRecord, AutomationFlowRecord } from "@/types/automation";
 
 type AutomationBuilderPageProps = {
@@ -18,7 +18,7 @@ type AutomationBuilderPageProps = {
 export default async function AutomationBuilderPage({ params }: AutomationBuilderPageProps) {
   const user = await requireUser();
   const { workspaceId } = await params;
-  const workspace = await getWorkspaceForUser(user.id, workspaceId);
+  const workspace = await getWorkspaceMetaForUser(user.id, workspaceId);
   const widgetBaseUrl = getWidgetBaseUrl();
 
   const [flows, executions] = await Promise.all([

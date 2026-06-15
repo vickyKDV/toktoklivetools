@@ -3,6 +3,7 @@ import "server-only";
 import { randomBytes, createHash } from "crypto";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { cache } from "react";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/server/db/prisma";
 import type { AuthUser } from "@/core/auth/types";
@@ -61,7 +62,7 @@ export async function destroySession() {
   cookieStore.delete(SESSION_COOKIE);
 }
 
-export async function getCurrentUser(): Promise<AuthUser | null> {
+export const getCurrentUser = cache(async (): Promise<AuthUser | null> => {
   const cookieStore = await cookies();
   const sessionToken = cookieStore.get(SESSION_COOKIE)?.value;
 
@@ -88,7 +89,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
   });
 
   return session?.user ?? null;
-}
+});
 
 export async function requireUser() {
   const user = await getCurrentUser();

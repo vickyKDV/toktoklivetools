@@ -4,7 +4,7 @@ use std::{
     fs::{self, OpenOptions},
     io::{Read, Write},
     net::{SocketAddr, TcpStream},
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::Mutex,
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
@@ -460,6 +460,11 @@ fn runtime_env(config: &Value) -> Vec<(String, String)> {
 
     let mut envs = vec![
         ("NODE_ENV".to_string(), "production".to_string()),
+        (
+            "NODE_OPTIONS".to_string(),
+            "--no-experimental-webstorage".to_string(),
+        ),
+        ("NEXT_TELEMETRY_DISABLED".to_string(), "1".to_string()),
         ("LIPLO_APP_MODE".to_string(), "desktop".to_string()),
         ("LIPLO_DATA_MODE".to_string(), "cloud".to_string()),
         (
@@ -480,12 +485,74 @@ fn runtime_env(config: &Value) -> Vec<(String, String)> {
     // Internal desktop builds can receive DB/API secrets from the launcher
     // environment, but packaged releases must not bake these into resources.
     for key in ["DATABASE_URL"] {
-        if let Ok(value) = std::env::var(key) {
+        if let Some(value) = env_or_dotenv(key) {
             envs.push((key.to_string(), value));
         }
     }
 
     envs
+}
+
+fn env_or_dotenv(key: &str) -> Option<String> {
+    std::env::var(key)
+        .ok()
+        .or_else(|| read_dotenv_value(key))
+}
+
+fn read_dotenv_value(key: &str) -> Option<String> {
+    dotenv_candidates()
+        .into_iter()
+        .find_map(|path| read_dotenv_value_from(&path, key))
+}
+
+fn dotenv_candidates() -> Vec<PathBuf> {
+    let mut bases = Vec::new();
+
+    if let Ok(path) = std::env::current_exe() {
+        if let Some(parent) = path.parent() {
+            bases.push(parent.to_path_buf());
+        }
+    }
+
+    if let Ok(path) = std::env::current_dir() {
+        bases.push(path);
+    }
+
+    let mut candidates = Vec::new();
+    for base in bases {
+        for ancestor in base.ancestors() {
+            candidates.push(ancestor.join(".env"));
+        }
+    }
+
+    candidates
+}
+
+fn read_dotenv_value_from(path: &Path, key: &str) -> Option<String> {
+    let raw = fs::read_to_string(path).ok()?;
+
+    for line in raw.lines() {
+        let line = line.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+
+        let (name, value) = line.split_once('=')?;
+        if name.trim() == key {
+            return Some(unquote_env_value(value.trim()));
+        }
+    }
+
+    None
+}
+
+fn unquote_env_value(value: &str) -> String {
+    value
+        .strip_prefix('"')
+        .and_then(|value| value.strip_suffix('"'))
+        .or_else(|| value.strip_prefix('\'').and_then(|value| value.strip_suffix('\'')))
+        .unwrap_or(value)
+        .to_string()
 }
 
 fn check_http_health(url: &str) -> Value {

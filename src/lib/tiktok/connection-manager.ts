@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { runAutomationFlows } from "@/server/automation/engine";
 import { prisma } from "@/server/db/prisma";
+import { getActiveRules } from "@/server/rules/active-rules";
 import { emitDashboardEvent, emitOverlayEvent, emitOverlayLiveEvent } from "@/server/realtime/socket-server";
 import { evaluateRule, getRuleActions } from "@/core/rules/engine";
 import { mapTikTokEvent, socialEventName } from "@/lib/tiktok/map-event";
@@ -76,6 +77,12 @@ export async function startTikTokConnection(workspaceId: string) {
     };
   }
 
+  if (existingState && !existingState.stopped) {
+    return {
+      status: "connecting" as const
+    };
+  }
+
   const workspace = await prisma.workspace.findUnique({
     where: {
       id: workspaceId
@@ -120,25 +127,13 @@ export async function startTikTokConnection(workspaceId: string) {
 
   activeConnections.set(workspaceId, state);
 
-  try {
-    await connectManagedTikTokConnection(state, true);
+  void connectManagedTikTokConnection(state, false).catch((error) => {
+    console.error("TikTok background connection failed", error);
+  });
 
-    return {
-      status: "started" as const
-    };
-  } catch (error) {
-    await prisma.tikTokConnection.update({
-      where: {
-        workspaceId
-      },
-      data: {
-        status: "ERROR",
-        lastError: error instanceof Error ? error.message : "Unable to connect to TikTok LIVE"
-      }
-    });
-    activeConnections.delete(workspaceId);
-    throw error;
-  }
+  return {
+    status: "connecting" as const
+  };
 }
 
 export async function stopTikTokConnection(workspaceId: string) {
@@ -152,9 +147,10 @@ export async function stopTikTokConnection(workspaceId: string) {
       state.retryTimer = null;
     }
 
-    state.connection?.disconnect();
+    const connection = state.connection;
     state.connection = null;
     activeConnections.delete(workspaceId);
+    disconnectTikTokConnectionSoon(connection);
   }
 
   await prisma.tikTokConnection.updateMany({
@@ -163,7 +159,8 @@ export async function stopTikTokConnection(workspaceId: string) {
     },
     data: {
       status: "STOPPED",
-      stoppedAt: new Date()
+      stoppedAt: new Date(),
+      lastError: null
     }
   });
 
@@ -270,7 +267,7 @@ function handleTikTokConnectionLost(state: ManagedTikTokConnection, message: str
     return;
   }
 
-  state.connection?.disconnect();
+  disconnectTikTokConnectionSoon(state.connection);
   state.connection = null;
   void markTikTokConnectionError(state, message);
   scheduleTikTokReconnect(state, message);
@@ -321,7 +318,7 @@ async function closeTikTokConnectionAfterStreamEnd(state: ManagedTikTokConnectio
     state.retryTimer = null;
   }
 
-  state.connection?.disconnect();
+  disconnectTikTokConnectionSoon(state.connection);
   state.connection = null;
   activeConnections.delete(state.workspaceId);
 
@@ -396,16 +393,7 @@ async function persistAndBroadcastEvent(
     overlayPayload
   });
 
-  const rules = await prisma.rule.findMany({
-    where: {
-      workspaceId,
-      triggerType: liveEvent.type,
-      enabled: true
-    },
-    orderBy: {
-      createdAt: "asc"
-    }
-  });
+  const rules = await getActiveRules(workspaceId, liveEvent.type);
 
   for (const rule of rules) {
     if (!evaluateRule(rule, liveEvent)) {
@@ -433,6 +421,24 @@ async function persistAndBroadcastEvent(
         }
       });
     }
+  }
+}
+
+function disconnectTikTokConnectionSoon(connection: TikTokConnection | null) {
+  if (!connection) {
+    return;
+  }
+
+  const timer = setTimeout(() => {
+    try {
+      connection.disconnect();
+    } catch (error) {
+      console.error("TikTok disconnect failed", error);
+    }
+  }, 0);
+
+  if (typeof timer === "object" && "unref" in timer && typeof timer.unref === "function") {
+    timer.unref();
   }
 }
 

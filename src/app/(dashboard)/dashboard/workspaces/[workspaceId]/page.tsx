@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireUser } from "@/server/auth/session";
 import { prisma } from "@/server/db/prisma";
 import { formatDateTime } from "@/lib/utils";
-import { getWorkspaceForUser } from "@/server/workspaces/service";
+import { getWorkspaceSummaryForUser } from "@/server/workspaces/service";
 
 type WorkspacePageProps = {
   params: Promise<{
@@ -17,7 +17,7 @@ type WorkspacePageProps = {
 export default async function WorkspacePage({ params }: WorkspacePageProps) {
   const user = await requireUser();
   const { workspaceId } = await params;
-  const workspace = await getWorkspaceForUser(user.id, workspaceId);
+  const workspace = await getWorkspaceSummaryForUser(user.id, workspaceId);
   const latestEvents = await prisma.liveEvent.findMany({
     where: {
       workspaceId

@@ -2,7 +2,7 @@ import "server-only";
 
 import { Prisma, type OverlayKind } from "@prisma/client";
 import { prisma } from "@/server/db/prisma";
-import { getWorkspaceForUser } from "@/server/workspaces/service";
+import { assertWorkspaceAccess, getWorkspaceMetaForUser } from "@/server/workspaces/service";
 import { normalizeDesignSchema } from "@/core/overlay/normalizeDesignSchema";
 import type { OverlayDesignSchema } from "@/core/overlay/schema";
 
@@ -30,7 +30,7 @@ export type OverlayRecordForMap = {
 };
 
 export async function listWorkspaceOverlaysForUser(userId: string, workspaceId: string) {
-  const workspace = await getWorkspaceForUser(userId, workspaceId);
+  const workspace = await assertWorkspaceAccess(userId, workspaceId);
   return listWorkspaceOverlays(workspace.id);
 }
 
@@ -52,7 +52,7 @@ export async function getOverlayDesignForUser(input: {
   workspaceId: string;
   overlayId: string;
 }) {
-  const workspace = await getWorkspaceForUser(input.userId, input.workspaceId);
+  const workspace = await assertWorkspaceAccess(input.userId, input.workspaceId);
   const overlay = await prisma.overlay.findFirst({
     where: {
       id: input.overlayId,
@@ -118,7 +118,7 @@ export async function getPublishedOverlayById(overlayId: string) {
 }
 
 export async function saveOverlayDesign(input: SaveOverlayDesignInput) {
-  const workspace = await getWorkspaceForUser(input.userId, input.workspaceId);
+  const workspace = await getWorkspaceMetaForUser(input.userId, input.workspaceId);
   const kind = resolveKind(input);
   const schema = normalizeDesignSchema({
     ...(input.schema as Partial<OverlayDesignSchema>),
@@ -160,7 +160,7 @@ export async function saveOverlayDesign(input: SaveOverlayDesignInput) {
 }
 
 export async function publishOverlayDesign(input: { id: string; userId: string; workspaceId: string }) {
-  const workspace = await getWorkspaceForUser(input.userId, input.workspaceId);
+  const workspace = await assertWorkspaceAccess(input.userId, input.workspaceId);
   const overlay = await prisma.overlay.findFirst({
     where: {
       id: input.id,
@@ -207,7 +207,7 @@ export async function updateOverlayForUser(input: {
     return null;
   }
 
-  await getWorkspaceForUser(input.userId, existing.workspaceId);
+  await assertWorkspaceAccess(input.userId, existing.workspaceId);
 
   return saveOverlayDesign({
     id: existing.id,
@@ -234,7 +234,7 @@ export async function deleteOverlayForUser(input: { overlayId: string; userId: s
     return false;
   }
 
-  await getWorkspaceForUser(input.userId, existing.workspaceId);
+  await assertWorkspaceAccess(input.userId, existing.workspaceId);
   await prisma.overlay.delete({
     where: { id: existing.id }
   });

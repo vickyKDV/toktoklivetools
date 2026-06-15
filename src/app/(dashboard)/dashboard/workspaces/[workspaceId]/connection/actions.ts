@@ -6,7 +6,7 @@ import { z } from "zod";
 import { requireUser } from "@/server/auth/session";
 import { prisma } from "@/server/db/prisma";
 import { startTikTokConnection, stopTikTokConnection } from "@/server/tiktok/connection-manager";
-import { getWorkspaceForUser } from "@/server/workspaces/service";
+import { assertWorkspaceAccess, getWorkspaceMetaForUser } from "@/server/workspaces/service";
 
 const connectionFormSchema = z.object({
   workspaceId: z.string().min(1),
@@ -38,7 +38,7 @@ async function updateWorkspaceTikTokUsername({
   workspaceId: string;
   tiktokUsername: string | null;
 }) {
-  const workspace = await getWorkspaceForUser(userId, workspaceId);
+  const workspace = await getWorkspaceMetaForUser(userId, workspaceId);
 
   if (workspace.connection?.status === "LIVE" && workspace.tiktokUsername !== tiktokUsername) {
     redirect(path(workspace.id, "Stop connection before changing TikTok username"));
@@ -124,7 +124,7 @@ export async function startConnectionAction(formData: FormData) {
     redirect("/dashboard/workspaces");
   }
 
-  const workspace = await getWorkspaceForUser(user.id, workspaceId);
+  const workspace = await assertWorkspaceAccess(user.id, workspaceId);
 
   const startResult = await startConnectionOrRedirect(workspace.id);
 
@@ -141,10 +141,6 @@ async function startConnectionOrRedirect(workspaceId: string) {
 }
 
 function redirectToStartResult(workspaceId: string, status: Awaited<ReturnType<typeof startTikTokConnection>>["status"]) {
-  if (status === "started") {
-    redirect(path(workspaceId, undefined, "started"));
-  }
-
   if (status === "already-running") {
     redirect(path(workspaceId, undefined, "alreadyRunning"));
   }
@@ -160,7 +156,7 @@ export async function stopConnectionAction(formData: FormData) {
     redirect("/dashboard/workspaces");
   }
 
-  const workspace = await getWorkspaceForUser(user.id, workspaceId);
+  const workspace = await assertWorkspaceAccess(user.id, workspaceId);
   await stopTikTokConnection(workspace.id);
 
   revalidatePath(path(workspace.id));

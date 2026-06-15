@@ -5,9 +5,11 @@
   "windows": ["main"],
   "permissions": [
     "core:default",
+    "desktop-runtime",
     "global-shortcut:allow-is-registered",
     "global-shortcut:allow-register",
     "global-shortcut:allow-unregister",
-    "global-shortcut:allow-unregister-all"
+    "global-shortcut:allow-unregister-all",
+    "shell:allow-open"
   ]
 }

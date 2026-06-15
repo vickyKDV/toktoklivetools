@@ -8,6 +8,7 @@ import { createRealtimeSocket } from "@/lib/realtime/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { CopyButton } from "@/components/ui/copy-button";
+import { ExternalLinkButton } from "@/components/ui/external-link-button";
 import { Input } from "@/components/ui/input";
 import { LayerPanel } from "@/components/overlay/editor/LayerPanel";
 import { ComponentLibrary } from "@/features/overlay-builder/components/ComponentLibrary";
@@ -805,18 +806,14 @@ export function BuilderLayout({
             </div>
             {designId ? (
               <div className="flex flex-wrap items-center gap-4">
-                <Button asChild variant="outline">
-                  <Link href={`/overlay-preview/${designId}`} target="_blank">
-                    <Eye />
-                    Public Preview
-                  </Link>
-                </Button>
-                <Button asChild variant="outline">
-                  <Link href={`/overlay/${overlayKind.toLowerCase()}/${designId}`} target="_blank">
-                    <Monitor />
-                    OBS
-                  </Link>
-                </Button>
+                <ExternalLinkButton href={`/overlay-preview/${designId}`} variant="outline">
+                  <Eye />
+                  Public Preview
+                </ExternalLinkButton>
+                <ExternalLinkButton href={`/overlay/${overlayKind.toLowerCase()}/${designId}`} variant="outline">
+                  <Monitor />
+                  OBS
+                </ExternalLinkButton>
               </div>
             ) : null}
             <div className="flex flex-wrap items-center gap-4">

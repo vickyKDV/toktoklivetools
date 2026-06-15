@@ -37,13 +37,13 @@ import {
   Volume2,
   Zap
 } from "lucide-react";
-import Link from "next/link";
 import { createRealtimeSocket } from "@/lib/realtime/client";
 import { ThreeTextOverlay } from "@/app/overlay-action/[overlayKey]/three-text-overlay";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { CopyButton } from "@/components/ui/copy-button";
+import { ExternalLinkButton } from "@/components/ui/external-link-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -796,11 +796,9 @@ function AutomationBuilderCanvas({
                 {actionOverlayUrl ? (
                   <>
                     <CopyButton value={actionOverlayUrl} />
-                    <Button asChild variant="outline">
-                      <Link href={actionOverlayUrl} target="_blank">
-                        Open
-                      </Link>
-                    </Button>
+                    <ExternalLinkButton href={actionOverlayUrl} variant="outline">
+                      Open
+                    </ExternalLinkButton>
                   </>
                 ) : (
                   <Button type="button" variant="outline" disabled>

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/server/auth/session";
 import { getOverlayDesignById } from "@/server/overlays/service";
-import { getWorkspaceForUser } from "@/server/workspaces/service";
+import { assertWorkspaceAccess } from "@/server/workspaces/service";
 
 type RouteContext = {
   params: Promise<{
@@ -23,7 +23,7 @@ export async function GET(_request: Request, context: RouteContext) {
     return NextResponse.json({ ok: false, message: "Overlay tidak ditemukan." }, { status: 404 });
   }
 
-  await getWorkspaceForUser(user.id, design.workspaceId);
+  await assertWorkspaceAccess(user.id, design.workspaceId);
 
   return NextResponse.json({ ok: true, design });
 }

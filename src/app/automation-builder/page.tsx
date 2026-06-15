@@ -3,12 +3,11 @@ import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireUser } from "@/server/auth/session";
-import { getUserWorkspaces } from "@/server/workspaces/service";
+import { getFirstUserWorkspace } from "@/server/workspaces/service";
 
 export default async function AutomationBuilderEntryPage() {
   const user = await requireUser();
-  const workspaces = await getUserWorkspaces(user.id);
-  const workspace = workspaces[0];
+  const workspace = await getFirstUserWorkspace(user.id);
 
   if (workspace) {
     redirect(`/dashboard/workspaces/${workspace.id}/automation-builder`);

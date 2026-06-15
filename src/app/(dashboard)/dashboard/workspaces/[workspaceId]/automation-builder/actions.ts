@@ -5,8 +5,9 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { parseAutomationEdges, parseAutomationNodes, sanitizeAutomationEdges, sanitizeAutomationNodes } from "@/core/automation/flow";
 import { requireUser } from "@/server/auth/session";
+import { invalidateAutomationFlowCache } from "@/server/automation/engine";
 import { prisma } from "@/server/db/prisma";
-import { getWorkspaceForUser } from "@/server/workspaces/service";
+import { getWorkspaceMetaForUser } from "@/server/workspaces/service";
 import type { SaveAutomationFlowInput } from "@/types/automation";
 
 const saveFlowSchema = z.object({
@@ -38,7 +39,7 @@ export async function saveAutomationFlowAction(input: SaveAutomationFlowInput) {
     };
   }
 
-  const workspace = await getWorkspaceForUser(user.id, parsed.data.workspaceId);
+  const workspace = await getWorkspaceMetaForUser(user.id, parsed.data.workspaceId);
   const nodes = sanitizeAutomationNodes(parseAutomationNodes(parsed.data.nodes));
   const edges = sanitizeAutomationEdges(parseAutomationEdges(parsed.data.edges));
 
@@ -77,6 +78,7 @@ export async function saveAutomationFlowAction(input: SaveAutomationFlowInput) {
         data
       });
 
+  invalidateAutomationFlowCache(workspace.id);
   revalidatePath(`/dashboard/workspaces/${workspace.id}/automation-builder`);
 
   return {
@@ -92,7 +94,7 @@ export async function toggleAutomationFlowAction(
   isActive: boolean
 ) {
   const user = await requireUser();
-  const workspace = await getWorkspaceForUser(user.id, workspaceId);
+  const workspace = await getWorkspaceMetaForUser(user.id, workspaceId);
 
   await prisma.automationFlow.update({
     where: {
@@ -104,6 +106,7 @@ export async function toggleAutomationFlowAction(
     }
   });
 
+  invalidateAutomationFlowCache(workspace.id);
   revalidatePath(`/dashboard/workspaces/${workspace.id}/automation-builder`);
 
   return {

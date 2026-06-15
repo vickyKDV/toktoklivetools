@@ -1,9 +1,74 @@
 import "server-only";
 
 import { notFound } from "next/navigation";
+import { cache } from "react";
 import { prisma } from "@/server/db/prisma";
 
-export async function getUserWorkspaces(userId: string) {
+export const getSidebarWorkspaces = cache(async (userId: string) => {
+  return prisma.workspace.findMany({
+    where: {
+      members: {
+        some: {
+          userId
+        }
+      }
+    },
+    select: {
+      id: true,
+      name: true,
+      tiktokUsername: true,
+      overlayKey: true
+    },
+    orderBy: {
+      updatedAt: "desc"
+    },
+    take: 6
+  });
+});
+
+export const getFirstUserWorkspace = cache(async (userId: string) => {
+  return prisma.workspace.findFirst({
+    where: {
+      members: {
+        some: {
+          userId
+        }
+      }
+    },
+    select: {
+      id: true,
+      name: true,
+      tiktokUsername: true,
+      overlayKey: true
+    },
+    orderBy: {
+      updatedAt: "desc"
+    }
+  });
+});
+
+export const getUserWorkspaceMetas = cache(async (userId: string) => {
+  return prisma.workspace.findMany({
+    where: {
+      members: {
+        some: {
+          userId
+        }
+      }
+    },
+    select: {
+      id: true,
+      name: true,
+      tiktokUsername: true,
+      overlayKey: true
+    },
+    orderBy: {
+      updatedAt: "desc"
+    }
+  });
+});
+
+export const getUserWorkspaces = cache(async (userId: string) => {
   return prisma.workspace.findMany({
     where: {
       members: {
@@ -26,9 +91,9 @@ export async function getUserWorkspaces(userId: string) {
       updatedAt: "desc"
     }
   });
-}
+});
 
-export async function getWorkspaceForUser(userId: string, workspaceId: string) {
+export const getWorkspaceForUser = cache(async (userId: string, workspaceId: string) => {
   const workspace = await prisma.workspace.findFirst({
     where: {
       id: workspaceId,
@@ -61,11 +126,128 @@ export async function getWorkspaceForUser(userId: string, workspaceId: string) {
   }
 
   return workspace;
-}
+});
+
+export const getWorkspaceSummaryForUser = cache(async (userId: string, workspaceId: string) => {
+  const workspace = await prisma.workspace.findFirst({
+    where: {
+      id: workspaceId,
+      members: {
+        some: {
+          userId
+        }
+      }
+    },
+    select: {
+      id: true,
+      name: true,
+      overlayKey: true,
+      tiktokUsername: true,
+      updatedAt: true,
+      connection: true,
+      _count: {
+        select: {
+          liveEvents: true,
+          rules: true,
+          overlays: true
+        }
+      }
+    }
+  });
+
+  if (!workspace) {
+    notFound();
+  }
+
+  return workspace;
+});
+
+export const getWorkspaceMetaForUser = cache(async (userId: string, workspaceId: string) => {
+  const workspace = await prisma.workspace.findFirst({
+    where: {
+      id: workspaceId,
+      members: {
+        some: {
+          userId
+        }
+      }
+    },
+    select: {
+      id: true,
+      name: true,
+      overlayKey: true,
+      tiktokUsername: true,
+      updatedAt: true,
+      connection: true
+    }
+  });
+
+  if (!workspace) {
+    notFound();
+  }
+
+  return workspace;
+});
+
+export const getWorkspaceRulesForUser = cache(async (userId: string, workspaceId: string) => {
+  const workspace = await prisma.workspace.findFirst({
+    where: {
+      id: workspaceId,
+      members: {
+        some: {
+          userId
+        }
+      }
+    },
+    select: {
+      id: true,
+      name: true,
+      overlayKey: true,
+      tiktokUsername: true,
+      rules: {
+        orderBy: {
+          createdAt: "desc"
+        }
+      }
+    }
+  });
+
+  if (!workspace) {
+    notFound();
+  }
+
+  return workspace;
+});
+
+export const assertWorkspaceAccess = cache(async (userId: string, workspaceId: string) => {
+  const workspace = await prisma.workspace.findFirst({
+    where: {
+      id: workspaceId,
+      members: {
+        some: {
+          userId
+        }
+      }
+    },
+    select: {
+      id: true
+    }
+  });
+
+  if (!workspace) {
+    notFound();
+  }
+
+  return workspace;
+});
 
 export async function getWorkspaceEventsForUser(userId: string, workspaceId: string) {
-  await getWorkspaceForUser(userId, workspaceId);
+  await assertWorkspaceAccess(userId, workspaceId);
 
+  return listWorkspaceEvents(workspaceId);
+}
+
+export async function listWorkspaceEvents(workspaceId: string) {
   return prisma.liveEvent.findMany({
     where: {
       workspaceId

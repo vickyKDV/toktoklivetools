@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/server/auth/session";
 import { stopTikTokConnection } from "@/server/tiktok/connection-manager";
-import { getWorkspaceForUser } from "@/server/workspaces/service";
+import { assertWorkspaceAccess } from "@/server/workspaces/service";
 
 type RouteContext = {
   params: Promise<{
@@ -17,7 +17,7 @@ export async function POST(_request: Request, context: RouteContext) {
   }
 
   const { workspaceId } = await context.params;
-  const workspace = await getWorkspaceForUser(user.id, workspaceId);
+  const workspace = await assertWorkspaceAccess(user.id, workspaceId);
   const result = await stopTikTokConnection(workspace.id);
 
   return NextResponse.json(result);

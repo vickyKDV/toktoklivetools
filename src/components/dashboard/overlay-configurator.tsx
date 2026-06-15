@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CopyButton } from "@/components/ui/copy-button";
+import { ExternalLinkButton } from "@/components/ui/external-link-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -1034,12 +1035,10 @@ export function OverlayConfigurator({
               Pilih tipe overlay, tema, posisi, dan sumber data. URL yang muncul bisa langsung dipakai di OBS.
             </p>
           </div>
-          <Button asChild variant="outline">
-            <Link href={activePreviewUrl} target="_blank">
-              <ExternalLink />
-              Open Preview
-            </Link>
-          </Button>
+          <ExternalLinkButton href={activePreviewUrl} variant="outline">
+            <ExternalLink />
+            Open Preview
+          </ExternalLinkButton>
         </div>
 
         <div className="mt-5 grid gap-3 md:grid-cols-3">
@@ -1092,12 +1091,10 @@ export function OverlayConfigurator({
                       </p>
                     </div>
                     <CopyButton value={liveOverlayUrl} />
-                    <Button asChild variant="outline">
-                      <Link href={previewOverlayUrl} target="_blank">
-                        <ExternalLink />
-                        Preview
-                      </Link>
-                    </Button>
+                    <ExternalLinkButton href={previewOverlayUrl} variant="outline">
+                      <ExternalLink />
+                      Preview
+                    </ExternalLinkButton>
                   </div>
                 ) : null}
 
@@ -1109,12 +1106,10 @@ export function OverlayConfigurator({
                         <Input id="focusChatOverlayUrl" readOnly value={focusChatOverlayUrl} />
                       </div>
                       <CopyButton value={focusChatOverlayUrl} />
-                      <Button asChild variant="outline">
-                        <Link href={addPreviewFlag(focusChatOverlayUrl)} target="_blank">
-                          <ExternalLink />
-                          Preview
-                        </Link>
-                      </Button>
+                      <ExternalLinkButton href={addPreviewFlag(focusChatOverlayUrl)} variant="outline">
+                        <ExternalLink />
+                        Preview
+                      </ExternalLinkButton>
                     </div>
 
                     <div className="grid gap-3 border-t pt-3 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-end">
@@ -1123,12 +1118,10 @@ export function OverlayConfigurator({
                         <Input id="chatDockUrl" readOnly value={chatDockUrl} />
                       </div>
                       <CopyButton value={chatDockUrl} />
-                      <Button asChild variant="outline">
-                        <Link href={chatDockUrl} target="_blank">
-                          <ExternalLink />
-                          Buka Dock
-                        </Link>
-                      </Button>
+                      <ExternalLinkButton href={chatDockUrl} variant="outline">
+                        <ExternalLink />
+                        Buka Dock
+                      </ExternalLinkButton>
                     </div>
                   </div>
                 ) : null}
@@ -1140,12 +1133,10 @@ export function OverlayConfigurator({
                   <Input id="overlayUrl" readOnly value={liveOverlayUrl} />
                 </div>
                 <CopyButton value={liveOverlayUrl} />
-                <Button asChild variant="outline">
-                  <Link href={previewOverlayUrl} target="_blank">
-                    <ExternalLink />
-                    Preview
-                  </Link>
-                </Button>
+                <ExternalLinkButton href={previewOverlayUrl} variant="outline">
+                  <ExternalLink />
+                  Preview
+                </ExternalLinkButton>
               </div>
             )}
           </div>

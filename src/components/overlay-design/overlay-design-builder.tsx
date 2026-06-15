@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import {
   BadgeIcon,
   Check,
@@ -21,6 +20,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type DragEven
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ExternalLinkButton } from "@/components/ui/external-link-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -518,9 +518,9 @@ export function OverlayDesignBuilder({
             <Button type="button" variant={mode === "focus" ? "default" : "outline"} onClick={() => switchMode("focus")}>
               Focus Chat
             </Button>
-            <Button asChild variant="outline">
-              <Link href={liveUrl} target="_blank">Preview Aktif</Link>
-            </Button>
+            <ExternalLinkButton href={liveUrl} variant="outline">
+              Preview Aktif
+            </ExternalLinkButton>
           </div>
         </CardContent>
       </Card>

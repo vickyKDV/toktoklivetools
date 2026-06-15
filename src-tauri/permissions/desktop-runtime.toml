@@ -1,0 +1,28 @@
+[[permission]]
+identifier = "desktop-runtime"
+description = "Allows the main window to manage Liplo desktop runtime configuration, sidecars, health checks, OBS helpers, and hotkeys."
+commands.allow = [
+  "liplo_read_config",
+  "liplo_write_config",
+  "liplo_start_sidecar",
+  "liplo_stop_sidecar",
+  "start_sidecars",
+  "stop_sidecars",
+  "restart_sidecars",
+  "get_sidecar_status",
+  "liplo_web_health",
+  "liplo_realtime_health",
+  "check_web_health",
+  "check_realtime_health",
+  "check_desktop_health",
+  "connect_obs_websocket",
+  "disconnect_obs_websocket",
+  "test_obs_websocket_connection",
+  "get_obs_status",
+  "set_obs_browser_source_url",
+  "set_obs_scene_item_transform",
+  "liplo_connect_obs",
+  "liplo_disconnect_obs",
+  "liplo_set_obs_browser_source",
+  "toggle_overlay",
+]

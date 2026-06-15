@@ -6,7 +6,8 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireUser } from "@/server/auth/session";
 import { prisma } from "@/server/db/prisma";
-import { getWorkspaceForUser } from "@/server/workspaces/service";
+import { invalidateActiveRuleCache } from "@/server/rules/active-rules";
+import { assertWorkspaceAccess, getWorkspaceMetaForUser } from "@/server/workspaces/service";
 
 const ruleSchema = z.object({
   workspaceId: z.string().min(1),
@@ -37,7 +38,7 @@ export async function createRuleAction(formData: FormData) {
     fail(workspaceId, parsed.error.issues[0]?.message ?? "Invalid rule");
   }
 
-  const workspace = await getWorkspaceForUser(user.id, parsed.data.workspaceId);
+  const workspace = await getWorkspaceMetaForUser(user.id, parsed.data.workspaceId);
 
   await prisma.rule.create({
     data: {
@@ -57,6 +58,7 @@ export async function createRuleAction(formData: FormData) {
     }
   });
 
+  invalidateActiveRuleCache(workspace.id);
   revalidatePath(`/dashboard/workspaces/${workspace.id}/rules`);
   redirect(`/dashboard/workspaces/${workspace.id}/rules?created=1`);
 }
@@ -67,7 +69,7 @@ export async function toggleRuleAction(formData: FormData) {
   const ruleId = String(formData.get("ruleId") ?? "");
   const enabled = String(formData.get("enabled") ?? "") !== "true";
 
-  await getWorkspaceForUser(user.id, workspaceId);
+  await assertWorkspaceAccess(user.id, workspaceId);
 
   await prisma.rule.update({
     where: {
@@ -79,6 +81,7 @@ export async function toggleRuleAction(formData: FormData) {
     }
   });
 
+  invalidateActiveRuleCache(workspaceId);
   revalidatePath(`/dashboard/workspaces/${workspaceId}/rules`);
 }
 
@@ -87,7 +90,7 @@ export async function deleteRuleAction(formData: FormData) {
   const workspaceId = String(formData.get("workspaceId") ?? "");
   const ruleId = String(formData.get("ruleId") ?? "");
 
-  await getWorkspaceForUser(user.id, workspaceId);
+  await assertWorkspaceAccess(user.id, workspaceId);
 
   await prisma.rule.delete({
     where: {
@@ -96,5 +99,6 @@ export async function deleteRuleAction(formData: FormData) {
     }
   });
 
+  invalidateActiveRuleCache(workspaceId);
   revalidatePath(`/dashboard/workspaces/${workspaceId}/rules`);
 }

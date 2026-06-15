@@ -8,7 +8,7 @@ import { listBuilderOverlays } from "@/features/overlay-builder/actions/listBuil
 import { moderatorStackTemplate } from "@/features/overlay-builder/registry/templateRegistry";
 import { normalizeDesignSchema } from "@/core/overlay/normalizeDesignSchema";
 import { requireUser } from "@/server/auth/session";
-import { getUserWorkspaces } from "@/server/workspaces/service";
+import { getUserWorkspaceMetas } from "@/server/workspaces/service";
 
 type DesignBuilderPageProps = {
   searchParams?: Promise<{
@@ -19,7 +19,7 @@ type DesignBuilderPageProps = {
 export default async function DesignBuilderPage({ searchParams }: DesignBuilderPageProps) {
   const user = await requireUser();
   const query = searchParams ? await searchParams : {};
-  const workspaces = await getUserWorkspaces(user.id);
+  const workspaces = await getUserWorkspaceMetas(user.id);
   const selected = query.overlayId ? await getOverlayDesign(query.overlayId) : null;
   const workspace = selected ? workspaces.find((item) => item.id === selected.workspaceId) : workspaces[0];
 

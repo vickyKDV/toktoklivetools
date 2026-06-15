@@ -29,26 +29,37 @@ type FlowRunResult = {
   reason?: string;
 };
 
+type CachedAutomationFlow = {
+  id: string;
+  nodes: AutomationFlowNode[];
+  edges: AutomationFlowEdge[];
+};
+
+type FlowCacheEntry = {
+  expiresAt: number;
+  flows: CachedAutomationFlow[];
+};
+
+type FlowCacheGlobal = typeof globalThis & {
+  __liploActiveAutomationFlowCache?: Map<string, FlowCacheEntry>;
+};
+
+const activeFlowCacheTtlMs = 3_000;
+const flowCacheGlobal = globalThis as FlowCacheGlobal;
+const activeAutomationFlowCache =
+  flowCacheGlobal.__liploActiveAutomationFlowCache ?? new Map<string, FlowCacheEntry>();
+flowCacheGlobal.__liploActiveAutomationFlowCache = activeAutomationFlowCache;
+
 export async function runAutomationFlows({
   workspaceId,
   overlayKey,
   event,
   overlayPayload
 }: RunAutomationFlowsInput) {
-  const flows = await prisma.automationFlow.findMany({
-    where: {
-      workspaceId,
-      isActive: true
-    },
-    orderBy: {
-      updatedAt: "desc"
-    }
-  });
+  const flows = await getActiveAutomationFlows(workspaceId);
 
   for (const flow of flows) {
-    const nodes = parseAutomationNodes(flow.nodes);
-    const edges = parseAutomationEdges(flow.edges);
-    const triggers = nodes.filter((node) => isMatchingTrigger(node, event.type));
+    const triggers = flow.nodes.filter((node) => isMatchingTrigger(node, event.type));
 
     if (!triggers.length) {
       continue;
@@ -58,8 +69,8 @@ export async function runAutomationFlows({
       try {
         const result = await runFlowFromNode({
           flowId: flow.id,
-          nodes,
-          edges,
+          nodes: flow.nodes,
+          edges: flow.edges,
           node: trigger,
           event,
           overlayKey,
@@ -98,6 +109,51 @@ export async function runAutomationFlows({
       }
     }
   }
+}
+
+export function invalidateAutomationFlowCache(workspaceId?: string) {
+  if (workspaceId) {
+    activeAutomationFlowCache.delete(workspaceId);
+    return;
+  }
+
+  activeAutomationFlowCache.clear();
+}
+
+async function getActiveAutomationFlows(workspaceId: string) {
+  const cached = activeAutomationFlowCache.get(workspaceId);
+
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.flows;
+  }
+
+  const records = await prisma.automationFlow.findMany({
+    where: {
+      workspaceId,
+      isActive: true
+    },
+    select: {
+      id: true,
+      nodes: true,
+      edges: true
+    },
+    orderBy: {
+      updatedAt: "desc"
+    }
+  });
+
+  const flows = records.map((flow) => ({
+    id: flow.id,
+    nodes: parseAutomationNodes(flow.nodes),
+    edges: parseAutomationEdges(flow.edges)
+  }));
+
+  activeAutomationFlowCache.set(workspaceId, {
+    expiresAt: Date.now() + activeFlowCacheTtlMs,
+    flows
+  });
+
+  return flows;
 }
 
 async function runFlowFromNode({

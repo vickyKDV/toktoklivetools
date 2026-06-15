@@ -40,7 +40,9 @@ async function cleanGeneratedDesktopArtifacts() {
 function run(args, env) {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
+      cwd: repoRoot,
       env,
+      shell: process.platform === "win32",
       stdio: "inherit"
     });
 

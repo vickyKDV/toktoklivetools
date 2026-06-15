@@ -1,3 +1,5 @@
+#![cfg_attr(all(not(debug_assertions), windows), windows_subsystem = "windows")]
+
 use serde_json::json;
 use std::{
     env,
@@ -7,6 +9,12 @@ use std::{
     process::{Child, Command, Stdio},
     time::{SystemTime, UNIX_EPOCH},
 };
+
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
+
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x08000000;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -118,8 +126,9 @@ fn start_web(node: &Path, runtime_root: &Path, data_dir: &Path, log_dir: &Path) 
     let log = log_file(log_dir, "web")?;
     append_log(&log, "starting web runtime");
 
-    Command::new(node)
-        .arg(server)
+    let mut command = node_command(node);
+    command
+        .arg("server.js")
         .current_dir(&web_root)
         .envs(runtime_env(data_dir))
         .env("HOSTNAME", env::var("LIPLO_WEB_HOST").unwrap_or_else(|_| "127.0.0.1".to_string()))
@@ -141,8 +150,9 @@ fn start_realtime(node: &Path, runtime_root: &Path, data_dir: &Path, log_dir: &P
 
     let web_node_modules = runtime_root.join("web").join("node_modules");
 
-    Command::new(node)
-        .arg(server)
+    let mut command = node_command(node);
+    command
+        .arg("realtime-server.cjs")
         .current_dir(&realtime_root)
         .envs(runtime_env(data_dir))
         .env("REALTIME_HOSTNAME", env::var("LIPLO_REALTIME_HOST").unwrap_or_else(|_| "127.0.0.1".to_string()))
@@ -151,6 +161,15 @@ fn start_realtime(node: &Path, runtime_root: &Path, data_dir: &Path, log_dir: &P
         .stderr(Stdio::from(log))
         .spawn()
         .map_err(|error| format!("Failed to start realtime runtime: {error}"))
+}
+
+fn node_command(node: &Path) -> Command {
+    let mut command = Command::new(node);
+
+    #[cfg(windows)]
+    command.creation_flags(CREATE_NO_WINDOW);
+
+    command
 }
 
 fn runtime_env(data_dir: &Path) -> Vec<(String, String)> {
@@ -163,6 +182,11 @@ fn runtime_env(data_dir: &Path) -> Vec<(String, String)> {
 
     let mut values = vec![
         ("NODE_ENV".to_string(), "production".to_string()),
+        (
+            "NODE_OPTIONS".to_string(),
+            "--no-experimental-webstorage".to_string(),
+        ),
+        ("NEXT_TELEMETRY_DISABLED".to_string(), "1".to_string()),
         ("LIPLO_APP_MODE".to_string(), "desktop".to_string()),
         ("LIPLO_DATA_MODE".to_string(), "cloud".to_string()),
         ("LIPLO_RUNTIME_MODE".to_string(), "desktop-cloud".to_string()),
@@ -183,12 +207,74 @@ fn runtime_env(data_dir: &Path) -> Vec<(String, String)> {
         "TIKTOK_REQUEST_POLLING_INTERVAL_MS",
         "REALTIME_CONTROL_TOKEN",
     ] {
-        if let Ok(value) = env::var(key) {
+        if let Some(value) = env_or_dotenv(key) {
             values.push((key.to_string(), value));
         }
     }
 
     values
+}
+
+fn env_or_dotenv(key: &str) -> Option<String> {
+    env::var(key)
+        .ok()
+        .or_else(|| read_dotenv_value(key))
+}
+
+fn read_dotenv_value(key: &str) -> Option<String> {
+    dotenv_candidates()
+        .into_iter()
+        .find_map(|path| read_dotenv_value_from(&path, key))
+}
+
+fn dotenv_candidates() -> Vec<PathBuf> {
+    let mut bases = Vec::new();
+
+    if let Ok(path) = env::current_exe() {
+        if let Some(parent) = path.parent() {
+            bases.push(parent.to_path_buf());
+        }
+    }
+
+    if let Ok(path) = env::current_dir() {
+        bases.push(path);
+    }
+
+    let mut candidates = Vec::new();
+    for base in bases {
+        for ancestor in base.ancestors() {
+            candidates.push(ancestor.join(".env"));
+        }
+    }
+
+    candidates
+}
+
+fn read_dotenv_value_from(path: &Path, key: &str) -> Option<String> {
+    let raw = fs::read_to_string(path).ok()?;
+
+    for line in raw.lines() {
+        let line = line.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+
+        let (name, value) = line.split_once('=')?;
+        if name.trim() == key {
+            return Some(unquote_env_value(value.trim()));
+        }
+    }
+
+    None
+}
+
+fn unquote_env_value(value: &str) -> String {
+    value
+        .strip_prefix('"')
+        .and_then(|value| value.strip_suffix('"'))
+        .or_else(|| value.strip_prefix('\'').and_then(|value| value.strip_suffix('\'')))
+        .unwrap_or(value)
+        .to_string()
 }
 
 fn node_path(runtime_root: &Path) -> PathBuf {

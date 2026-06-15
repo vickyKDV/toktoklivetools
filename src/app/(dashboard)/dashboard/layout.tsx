@@ -1,7 +1,7 @@
 import { DashboardHeader } from "@/components/dashboard/header";
 import { DashboardSidebar } from "@/components/dashboard/sidebar";
 import { requireUser } from "@/server/auth/session";
-import { getUserWorkspaces } from "@/server/workspaces/service";
+import { getSidebarWorkspaces } from "@/server/workspaces/service";
 
 export const dynamic = "force-dynamic";
 
@@ -11,7 +11,7 @@ export default async function DashboardLayout({
   children: React.ReactNode;
 }) {
   const user = await requireUser();
-  const workspaces = await getUserWorkspaces(user.id);
+  const workspaces = await getSidebarWorkspaces(user.id);
 
   return (
     <div className="dashboard-grid min-h-screen">
