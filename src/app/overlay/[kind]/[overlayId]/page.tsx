@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { OverlayRuntimeClient } from "@/features/overlay-builder/components/OverlayRuntimeClient";
+import { ChatOverlayRuntimeClient } from "@/features/overlay-runtime/chat/ChatOverlayRuntimeClient";
 import { getInitialGoalOverlayMetrics } from "@/features/overlay-builder/actions/getGoalOverlayMetrics";
 import { getPublishedOverlay } from "@/features/overlay-builder/actions/getOverlayDesign";
 
@@ -44,6 +44,31 @@ export default async function OverlayRuntimePage({ params, searchParams }: Overl
     ? await getInitialGoalOverlayMetrics(overlay.workspaceId)
     : undefined;
 
+  if (overlay.kind === "CHAT") {
+    return (
+      <main
+        style={{
+          width: "100vw",
+          height: "100vh",
+          margin: 0,
+          padding: 0,
+          overflow: "hidden",
+          background: "transparent"
+        }}
+      >
+        <ChatOverlayRuntimeClient
+          schema={overlay.schema}
+          overlayKey={overlay.overlayKey}
+          preview={query.preview === "1"}
+          debug={query.debug === "1"}
+        />
+        <OverlayRuntimeDocumentStyle />
+      </main>
+    );
+  }
+
+  const { OverlayRuntimeClient } = await import("@/features/overlay-builder/components/OverlayRuntimeClient");
+
   return (
     <main
       style={{
@@ -62,7 +87,14 @@ export default async function OverlayRuntimePage({ params, searchParams }: Overl
         preview={query.preview === "1"}
         debug={query.debug === "1"}
       />
-      <style dangerouslySetInnerHTML={{ __html: `
+      <OverlayRuntimeDocumentStyle />
+    </main>
+  );
+}
+
+function OverlayRuntimeDocumentStyle() {
+  return (
+    <style dangerouslySetInnerHTML={{ __html: `
         html,
         body,
         #__next {
@@ -74,6 +106,5 @@ export default async function OverlayRuntimePage({ params, searchParams }: Overl
           overflow: hidden;
         }
       ` }} />
-    </main>
   );
 }

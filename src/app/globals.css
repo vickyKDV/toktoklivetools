@@ -181,89 +181,179 @@
   }
 
   @keyframes themePreviewFade {
-    from {
+    0% {
       opacity: 0;
+      transform: translate3d(0, 16px, 0) scale(.96);
     }
 
-    to {
+    70% {
       opacity: 1;
+      transform: translate3d(0, -2px, 0) scale(1.005);
+    }
+
+    100% {
+      opacity: 1;
+      transform: translate3d(0, 0, 0) scale(1);
     }
   }
 
   @keyframes themePreviewSlideRight {
-    from {
+    0% {
       opacity: 0;
-      transform: translate3d(-34px, 0, 0) scale(.98);
+      transform: translate3d(-14px, 16px, 0) scale(.96);
     }
 
-    to {
+    70% {
+      opacity: 1;
+      transform: translate3d(0, -2px, 0) scale(1.005);
+    }
+
+    100% {
       opacity: 1;
       transform: translate3d(0, 0, 0) scale(1);
     }
   }
 
   @keyframes themePreviewSlideLeft {
-    from {
+    0% {
       opacity: 0;
-      transform: translate3d(34px, 0, 0) scale(.98);
+      transform: translate3d(14px, 16px, 0) scale(.96);
     }
 
-    to {
+    70% {
+      opacity: 1;
+      transform: translate3d(0, -2px, 0) scale(1.005);
+    }
+
+    100% {
       opacity: 1;
       transform: translate3d(0, 0, 0) scale(1);
     }
   }
 
   @keyframes themePreviewSlideUp {
-    from {
+    0% {
       opacity: 0;
-      transform: translate3d(0, 28px, 0) scale(.98);
+      transform: translate3d(0, 16px, 0) scale(.96);
     }
 
-    to {
+    70% {
+      opacity: 1;
+      transform: translate3d(0, -2px, 0) scale(1.005);
+    }
+
+    100% {
       opacity: 1;
       transform: translate3d(0, 0, 0) scale(1);
     }
   }
 
   @keyframes themePreviewSlideDown {
-    from {
+    0% {
       opacity: 0;
-      transform: translate3d(0, -28px, 0) scale(.98);
+      transform: translate3d(0, -16px, 0) scale(.96);
     }
 
-    to {
+    70% {
+      opacity: 1;
+      transform: translate3d(0, 2px, 0) scale(1.005);
+    }
+
+    100% {
       opacity: 1;
       transform: translate3d(0, 0, 0) scale(1);
     }
   }
 
   @keyframes themePreviewScale {
-    from {
+    0% {
       opacity: 0;
-      transform: scale(.9);
+      transform: translate3d(0, 16px, 0) scale(.96);
     }
 
-    to {
+    70% {
       opacity: 1;
-      transform: scale(1);
+      transform: translate3d(0, -2px, 0) scale(1.005);
+    }
+
+    100% {
+      opacity: 1;
+      transform: translate3d(0, 0, 0) scale(1);
     }
   }
 
   @keyframes themePreviewPop {
     0% {
       opacity: 0;
-      transform: scale(.86);
+      transform: translate3d(0, 16px, 0) scale(.96);
     }
 
     70% {
       opacity: 1;
-      transform: scale(1.035);
+      transform: translate3d(0, -2px, 0) scale(1.012);
     }
 
     100% {
       opacity: 1;
       transform: scale(1);
+    }
+  }
+
+  @keyframes themePreviewFadeOut {
+    from {
+      opacity: 1;
+      transform: translate3d(0, 0, 0) scale(1);
+    }
+
+    to {
+      opacity: 0;
+      transform: translate3d(0, 14px, 0) scale(.96);
+    }
+  }
+
+  @keyframes themePreviewSlideLeftOut {
+    0% {
+      opacity: 1;
+      transform: translate3d(0, 0, 0) scale(1);
+    }
+
+    28% {
+      opacity: 1;
+      transform: translate3d(12px, 0, 0) scale(1.004);
+    }
+
+    100% {
+      opacity: 0;
+      transform: translate3d(-34px, -4px, 0) scale(.95);
+    }
+  }
+
+  @keyframes themePreviewSlideDownOut {
+    0% {
+      opacity: 1;
+      transform: translate3d(0, 0, 0) scale(1);
+    }
+
+    28% {
+      opacity: 1;
+      transform: translate3d(0, -10px, 0) scale(1.004);
+    }
+
+    100% {
+      opacity: 0;
+      transform: translate3d(0, 34px, 0) scale(.95);
+    }
+  }
+
+  @keyframes themePreviewScaleOut {
+    from {
+      opacity: 1;
+      transform: translate3d(0, 0, 0) scale(1);
+    }
+
+    to {
+      opacity: 0;
+      transform: translate3d(0, 14px, 0) scale(.96);
     }
   }
 }
@@ -329,9 +419,54 @@
       radial-gradient(circle at center, transparent 42%, rgba(0, 0, 0, .34));
   }
 
+  .theme-preview-grid,
+  .theme-thumbnail-grid {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  .theme-preview-grid {
+    background:
+      linear-gradient(rgba(168, 85, 247, .14) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(168, 85, 247, .14) 1px, transparent 1px);
+    background-size: 62px 62px;
+    mask-image: linear-gradient(to top, #000 0%, transparent 72%);
+  }
+
+  .theme-thumbnail-grid {
+    background:
+      linear-gradient(rgba(148, 163, 184, .08) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(148, 163, 184, .08) 1px, transparent 1px);
+    background-size: 22px 22px;
+    opacity: .42;
+  }
+
   .theme-preview-overlay {
     animation-fill-mode: both;
     animation-timing-function: cubic-bezier(.2, .8, .2, 1);
     will-change: opacity, transform;
   }
+
+  @keyframes themePreviewChatIn {
+    from {
+      opacity: 0;
+      transform: translate3d(0, 16px, 0) scale(.96);
+    }
+    to {
+      opacity: 1;
+      transform: translate3d(0, 0, 0) scale(1);
+    }
+  }
+
+  @keyframes themeGamingNeonBorder {
+    from {
+      background-position: 0% 50%;
+    }
+
+    to {
+      background-position: 260% 50%;
+    }
+  }
+
 }

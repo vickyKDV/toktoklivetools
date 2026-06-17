@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "postinstall": "pnpm prisma:generate",
     "dev": "tsx server.ts",
     "dev:web": "next dev -p 7050",
     "dev:next": "next dev -p 7050",
@@ -62,7 +63,7 @@
     "socket.io": "^4.8.1",
     "socket.io-client": "^4.8.1",
     "tailwind-merge": "^2.5.5",
-    "tiktok-live-connector": "^1.2.3",
+    "tiktok-live-connector": "^2.4.0",
     "zod": "^3.24.1"
   },
   "devDependencies": {

@@ -8,16 +8,54 @@ import { mapTikTokEvent, socialEventName } from "@/lib/tiktok/map-event";
 import type { OverlayEventPayload } from "@/types/live";
 
 type TikTokConnection = {
-  connect: () => Promise<unknown>;
+  connect: (roomId?: string | null) => Promise<unknown>;
   disconnect: () => void;
+  fetchRoomId?: () => Promise<string>;
   on: (eventName: string, handler: (payload: unknown) => void) => void;
 };
+
+type TikTokConnectionConstructor = new (
+  username: string,
+  options?: TikTokConnectionOptions
+) => TikTokConnection;
 
 type TikTokConnectionOptions = {
   processInitialData: boolean;
   enableExtendedGiftInfo: boolean;
-  enableWebsocketUpgrade: boolean;
-  requestPollingIntervalMs: number;
+  fetchRoomInfoOnConnect: boolean;
+  webClientOptions?: {
+    timeout?: {
+      request?: number;
+    };
+  };
+  wsClientOptions?: {
+    handshakeTimeout?: number;
+  };
+  signApiKey?: string;
+  session?: {
+    cookie: {
+      type: "cookie";
+      value: {
+        sessionId: string;
+        ttTargetIdc: string;
+      };
+    };
+  };
+};
+
+type TikTokSignConfig = {
+  apiKey?: string;
+  basePath?: string;
+  baseOptions?: {
+    headers?: Record<string, string>;
+  };
+  cachedInstance?: unknown;
+};
+
+type TikTokConnectorModule = {
+  WebcastPushConnection?: TikTokConnectionConstructor;
+  TikTokLiveConnection?: TikTokConnectionConstructor;
+  SignConfig?: TikTokSignConfig;
 };
 
 type ManagedTikTokConnection = {
@@ -44,13 +82,23 @@ const recentEventFingerprints: Map<string, number> =
   connectionGlobal.__tlaTikTokEventFingerprints ?? new Map<string, number>();
 connectionGlobal.__tlaTikTokEventFingerprints = recentEventFingerprints;
 
-const eventNames = ["chat", "gift", "like", "social", "member", "subscribe", "roomUser", "streamEnd"];
+const eventNames = ["chat", "gift", "like", "social", "follow", "share", "member", "subscribe", "roomUser", "streamEnd"];
 const reconnectEventNames = ["disconnected", "disconnect", "error"];
 const maxReconnectAttempts = readNonNegativeInteger(process.env.TIKTOK_RECONNECT_MAX_ATTEMPTS, 0);
 const maxReconnectDelayMs = readNonNegativeInteger(process.env.TIKTOK_RECONNECT_MAX_DELAY_MS, 30_000);
 const tiktokConnectionMode = (process.env.TIKTOK_CONNECTION_MODE ?? "auto").toLowerCase();
-const requestPollingIntervalMs = readNonNegativeInteger(process.env.TIKTOK_REQUEST_POLLING_INTERVAL_MS, 1_000);
+const enableSignedPrefetch = process.env.TIKTOK_ENABLE_SIGNED_PREFETCH === "true";
+const connectTimeoutMs = readNonNegativeInteger(process.env.TIKTOK_CONNECT_TIMEOUT_MS, 25_000);
+const tiktokSignProviderHost = process.env.TIKTOK_SIGN_PROVIDER_HOST?.trim() || undefined;
+const tiktokSessionId = process.env.TIKTOK_SESSION_ID?.trim() || undefined;
+const tiktokSignApiKey = process.env.TIKTOK_SIGN_API_KEY?.trim() || undefined;
+const tiktokTargetIdc = process.env.TIKTOK_TT_TARGET_IDC?.trim() || undefined;
 const duplicateEventWindowMs = 30_000;
+const sessionBundle = parseTikTokSessionBundle({
+  rawSessionId: tiktokSessionId,
+  targetIdc: tiktokTargetIdc
+});
+const signProviderHost = tiktokSignProviderHost || process.env.SIGN_API_URL?.trim();
 
 function readNonNegativeInteger(value: string | undefined, fallback: number) {
   const parsed = Number(value);
@@ -127,12 +175,10 @@ export async function startTikTokConnection(workspaceId: string) {
 
   activeConnections.set(workspaceId, state);
 
-  void connectManagedTikTokConnection(state, false).catch((error) => {
-    console.error("TikTok background connection failed", error);
-  });
+  await connectManagedTikTokConnection(state, true);
 
   return {
-    status: "connecting" as const
+    status: "started" as const
   };
 }
 
@@ -177,13 +223,23 @@ async function connectManagedTikTokConnection(state: ManagedTikTokConnection, th
   state.connecting = true;
 
   try {
-    const connector = (await import("tiktok-live-connector")) as {
-      WebcastPushConnection: new (username: string, options?: TikTokConnectionOptions) => TikTokConnection;
-    };
-    const connection = new connector.WebcastPushConnection(state.tiktokUsername, getTikTokConnectionOptions());
+    const connector = (await import("tiktok-live-connector")) as TikTokConnectorModule;
+    const ConnectionConstructor = connector.WebcastPushConnection ?? connector.TikTokLiveConnection;
+
+    if (!ConnectionConstructor) {
+      throw new Error("Unsupported tiktok-live-connector API: connection constructor is missing.");
+    }
+
+    configureSignConfig(connector);
+    const connection = new ConnectionConstructor(state.tiktokUsername, getTikTokConnectionOptions());
 
     bindTikTokConnectionEvents(state, connection);
-    await connection.connect();
+    const roomId = await resolveTikTokRoomId(connection);
+    await withTimeout(
+      () => roomId ? connection.connect(roomId) : connection.connect(),
+      connectTimeoutMs,
+      `TikTok connection timed out after ${connectTimeoutMs}ms`
+    );
 
     if (state.stopped) {
       connection.disconnect();
@@ -207,11 +263,13 @@ async function connectManagedTikTokConnection(state: ManagedTikTokConnection, th
   } catch (error) {
     const message = formatTikTokConnectionError(error);
 
+    await markTikTokConnectionError(state, message);
+
     if (throwOnFailure) {
+      activeConnections.delete(state.workspaceId);
       throw new Error(message);
     }
 
-    await markTikTokConnectionError(state, message);
     scheduleTikTokReconnect(state, message);
   } finally {
     state.connecting = false;
@@ -219,12 +277,77 @@ async function connectManagedTikTokConnection(state: ManagedTikTokConnection, th
 }
 
 function getTikTokConnectionOptions(): TikTokConnectionOptions {
-  return {
+  const options: TikTokConnectionOptions = {
     processInitialData: false,
-    enableExtendedGiftInfo: true,
-    enableWebsocketUpgrade: tiktokConnectionMode !== "polling",
-    requestPollingIntervalMs
+    enableExtendedGiftInfo: enableSignedPrefetch,
+    fetchRoomInfoOnConnect: enableSignedPrefetch && tiktokConnectionMode !== "nofetch",
+    webClientOptions: {
+      timeout: {
+        request: connectTimeoutMs
+      }
+    },
+    wsClientOptions: {
+      handshakeTimeout: connectTimeoutMs
+    }
   };
+
+  if (tiktokSignApiKey) {
+    options.signApiKey = tiktokSignApiKey;
+  }
+
+  if (sessionBundle) {
+    options.session = sessionBundle;
+  }
+
+  return options;
+}
+
+async function resolveTikTokRoomId(connection: TikTokConnection) {
+  if (!connection.fetchRoomId) {
+    return null;
+  }
+
+  return withTimeout(
+    () => connection.fetchRoomId?.() ?? Promise.resolve(null),
+    connectTimeoutMs,
+    `TikTok room lookup timed out after ${connectTimeoutMs}ms`
+  );
+}
+
+async function withTimeout<T>(task: () => Promise<T>, timeoutMs: number, message: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+
+  try {
+    return await Promise.race([
+      task(),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(message)), timeoutMs);
+      })
+    ]);
+  } finally {
+    if (timer) {
+      clearTimeout(timer);
+    }
+  }
+}
+
+function configureSignConfig(connector: TikTokConnectorModule) {
+  const { SignConfig } = connector;
+  if (!SignConfig) {
+    return;
+  }
+
+  if (signProviderHost) {
+    SignConfig.basePath = signProviderHost;
+  }
+
+  if (tiktokSignApiKey) {
+    SignConfig.apiKey = tiktokSignApiKey;
+  }
+
+  if (typeof SignConfig.cachedInstance !== "undefined") {
+    SignConfig.cachedInstance = undefined;
+  }
 }
 
 function formatTikTokConnectionError(error: unknown) {
@@ -232,6 +355,10 @@ function formatTikTokConnectionError(error: unknown) {
 
   if (/websocket upgrade/i.test(message)) {
     return `${message}. This server connector cannot use session-cookie polling by design. Use websocket mode when available, or add a browser bridge connector for Social Stream Ninja-style capture.`;
+  }
+
+  if (/Failed to sign request/i.test(message)) {
+    return `${message} | TikTok signature service gagal sign request. Cek mode koneksi, aktifkan TIKTOK_SESSION_ID, atau set TIKTOK_SIGN_PROVIDER_HOST jika memakai host signer custom.`;
   }
 
   return message;
@@ -278,9 +405,15 @@ function scheduleTikTokReconnect(state: ManagedTikTokConnection, message: string
     return;
   }
 
+  if (maxReconnectAttempts === 0) {
+    activeConnections.delete(state.workspaceId);
+    void markTikTokConnectionError(state, `Reconnect disabled. Last error: ${message}`);
+    return;
+  }
+
   state.retryAttempt += 1;
 
-  if (maxReconnectAttempts > 0 && state.retryAttempt > maxReconnectAttempts) {
+  if (state.retryAttempt > maxReconnectAttempts) {
     activeConnections.delete(state.workspaceId);
     void markTikTokConnectionError(state, `Reconnect stopped after ${maxReconnectAttempts} attempts. Last error: ${message}`);
     return;
@@ -300,10 +433,67 @@ async function markTikTokConnectionError(state: ManagedTikTokConnection, message
       workspaceId: state.workspaceId
     },
     data: {
-      status: "CONNECTING",
+      status: "ERROR",
       lastError: message
     }
   });
+}
+
+function parseTikTokSessionBundle({
+  rawSessionId,
+  targetIdc
+}: {
+  rawSessionId: string | undefined;
+  targetIdc: string | undefined;
+}): TikTokConnectionOptions["session"] | null {
+  if (!rawSessionId) {
+    return null;
+  }
+
+  const normalized = rawSessionId.trim();
+  if (!normalized) {
+    return null;
+  }
+
+  const cookiePairs = new Map<string, string>();
+  if (rawSessionId.includes("=")) {
+    for (const token of normalized.split(";")) {
+      const trimmed = token.trim();
+      const separatorIndex = trimmed.indexOf("=");
+      if (separatorIndex <= 0) {
+        continue;
+      }
+      const rawKey = trimmed.slice(0, separatorIndex);
+      const rest = trimmed.slice(separatorIndex + 1);
+      const key = rawKey.trim().toLowerCase();
+      const value = rest.trim();
+      if (key && value) {
+        cookiePairs.set(key, value);
+      }
+    }
+  }
+
+  const sessionId = cookiePairs.get("sessionid");
+  if (!sessionId && rawSessionId.includes("=")) {
+    return null;
+  }
+
+  const resolvedSessionId = sessionId || normalized;
+  const resolvedTargetIdc = cookiePairs.get("tt-target-idc") || targetIdc;
+
+  if (!resolvedSessionId || !resolvedTargetIdc) {
+    return null;
+  }
+
+  return {
+    cookie: {
+      type: "cookie",
+      value: {
+        sessionId: resolvedSessionId,
+        ttTargetIdc: resolvedTargetIdc
+      }
+    }
+  };
 }
 
 async function closeTikTokConnectionAfterStreamEnd(state: ManagedTikTokConnection) {

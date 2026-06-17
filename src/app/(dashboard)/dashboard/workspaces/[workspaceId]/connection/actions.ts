@@ -145,6 +145,10 @@ function redirectToStartResult(workspaceId: string, status: Awaited<ReturnType<t
     redirect(path(workspaceId, undefined, "alreadyRunning"));
   }
 
+  if (status === "started") {
+    redirect(path(workspaceId, undefined, "started"));
+  }
+
   redirect(path(workspaceId, undefined, "connecting"));
 }
 

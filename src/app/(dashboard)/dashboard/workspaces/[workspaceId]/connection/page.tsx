@@ -34,6 +34,7 @@ export default async function ConnectionPage({ params, searchParams }: Connectio
   const query = searchParams ? await searchParams : {};
   const workspace = await getWorkspaceMetaForUser(user.id, workspaceId);
   const status = workspace.connection?.status ?? "IDLE";
+  const isConnectingStatus = status === "CONNECTING";
   const isBusy = status === "LIVE" || status === "CONNECTING";
 
   return (
@@ -80,7 +81,7 @@ export default async function ConnectionPage({ params, searchParams }: Connectio
               Connection live.
             </div>
           ) : null}
-          {query.connecting ? (
+          {query.connecting && isConnectingStatus ? (
             <div className="rounded-md border border-amber-300/50 bg-amber-100 px-3 py-2 text-sm text-amber-900">
               Connection request sent. Waiting for TikTok LIVE handshake.
             </div>

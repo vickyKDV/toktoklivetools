@@ -14,10 +14,32 @@ const defaultSocketOptions: ClientSocketOptions = {
 };
 
 export function createRealtimeSocket(options: ClientSocketOptions = {}): Socket {
-  const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || window.location.origin;
+  const socketUrl = resolveRealtimeSocketUrl();
 
   return io(socketUrl, {
     ...defaultSocketOptions,
     ...options
   });
+}
+
+function resolveRealtimeSocketUrl() {
+  const configuredSocketUrl = process.env.NEXT_PUBLIC_SOCKET_URL?.trim();
+
+  if (!configuredSocketUrl) {
+    return window.location.origin;
+  }
+
+  try {
+    const configuredUrl = new URL(configuredSocketUrl);
+    const isLocalhostConfig = configuredUrl.hostname === "localhost" || configuredUrl.hostname === "127.0.0.1";
+    const isLocalhostPage = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+
+    if (isLocalhostConfig && !isLocalhostPage) {
+      return window.location.origin;
+    }
+  } catch {
+    return window.location.origin;
+  }
+
+  return configuredSocketUrl;
 }

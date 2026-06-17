@@ -22,82 +22,83 @@ type MappedEvent = {
 
 export function mapTikTokEvent(eventName: string, payload: unknown): MappedEvent {
   const data = safeRecord(payload);
+  const user = getPayloadUser(data);
 
   switch (eventName) {
     case "chat":
       return {
         type: LiveEventType.CHAT,
-        tiktokUserId: pickString(data.userId),
-        username: pickString(data.uniqueId),
-        displayName: pickString(data.nickname),
+        tiktokUserId: pickUserId(data, user),
+        username: pickUsername(data, user),
+        displayName: pickDisplayName(data, user),
         avatarUrl: findAvatarUrl(data),
-        userRole: getUserRole(data),
-        comment: pickString(data.comment),
+        userRole: getUserRole(user ?? data),
+        comment: pickString(data.comment) ?? pickString(data.content) ?? pickString(data.text),
         rawJson: toJsonSafe(payload)
       };
     case "gift":
       return {
         type: LiveEventType.GIFT,
-        tiktokUserId: pickString(data.userId),
-        username: pickString(data.uniqueId),
-        displayName: pickString(data.nickname),
+        tiktokUserId: pickUserId(data, user),
+        username: pickUsername(data, user),
+        displayName: pickDisplayName(data, user),
         avatarUrl: findAvatarUrl(data),
-        userRole: getUserRole(data),
-        giftName: pickString(data.giftName),
+        userRole: getUserRole(user ?? data),
+        giftName: pickString(data.giftName) ?? pickString(safeRecord(data.gift).name) ?? pickString(safeRecord(data.giftDetails).giftName),
         giftImageUrl: findGiftImageUrl(data),
-        giftId: pickString(data.giftId),
-        giftCount: pickNumber(data.diamondCount) ?? pickNumber(data.repeatCount) ?? 1,
+        giftId: pickString(data.giftId) ?? pickString(safeRecord(data.gift).id),
+        giftCount: pickNumber(data.diamondCount) ?? pickNumber(data.repeatCount) ?? pickNumber(data.comboCount) ?? 1,
         repeatCount: pickNumber(data.repeatCount),
         rawJson: toJsonSafe(payload)
       };
     case "like":
       return {
         type: LiveEventType.LIKE,
-        tiktokUserId: pickString(data.userId),
-        username: pickString(data.uniqueId),
-        displayName: pickString(data.nickname),
+        tiktokUserId: pickUserId(data, user),
+        username: pickUsername(data, user),
+        displayName: pickDisplayName(data, user),
         avatarUrl: findAvatarUrl(data),
-        userRole: getUserRole(data),
-        likeCount: pickNumber(data.likeCount) ?? pickNumber(data.totalLikeCount),
+        userRole: getUserRole(user ?? data),
+        likeCount: pickNumber(data.likeCount) ?? pickNumber(data.count) ?? pickNumber(data.totalLikeCount),
         rawJson: toJsonSafe(payload)
       };
     case "share":
       return {
         type: LiveEventType.SHARE,
-        tiktokUserId: pickString(data.userId),
-        username: pickString(data.uniqueId),
-        displayName: pickString(data.nickname),
+        tiktokUserId: pickUserId(data, user),
+        username: pickUsername(data, user),
+        displayName: pickDisplayName(data, user),
         avatarUrl: findAvatarUrl(data),
-        userRole: getUserRole(data),
-        shareCount: pickNumber(data.shareCount),
+        userRole: getUserRole(user ?? data),
+        shareCount: pickNumber(data.shareCount) ?? pickNumber(data.count),
         rawJson: toJsonSafe(payload)
       };
     case "follow":
       return {
         type: LiveEventType.FOLLOW,
-        tiktokUserId: pickString(data.userId),
-        username: pickString(data.uniqueId),
-        displayName: pickString(data.nickname),
+        tiktokUserId: pickUserId(data, user),
+        username: pickUsername(data, user),
+        displayName: pickDisplayName(data, user),
         avatarUrl: findAvatarUrl(data),
-        userRole: getUserRole(data),
+        userRole: getUserRole(user ?? data),
         rawJson: toJsonSafe(payload)
       };
     case "member":
       return {
         type: LiveEventType.MEMBER,
-        tiktokUserId: pickString(data.userId),
-        username: pickString(data.uniqueId),
-        displayName: pickString(data.nickname),
+        tiktokUserId: pickUserId(data, user),
+        username: pickUsername(data, user),
+        displayName: pickDisplayName(data, user),
         avatarUrl: findAvatarUrl(data),
-        userRole: getUserRole(data),
+        userRole: getUserRole(user ?? data),
         rawJson: toJsonSafe(payload)
       };
     case "subscribe":
       return {
         type: LiveEventType.SUBSCRIBE,
-        tiktokUserId: pickString(data.userId),
-        username: pickString(data.uniqueId),
-        displayName: pickString(data.nickname),
+        tiktokUserId: pickUserId(data, user),
+        username: pickUsername(data, user),
+        displayName: pickDisplayName(data, user),
         avatarUrl: findAvatarUrl(data),
         userRole: "subscriber",
         rawJson: toJsonSafe(payload)
@@ -140,6 +141,49 @@ export function socialEventName(payload: unknown) {
 
 function safeRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+}
+
+function getPayloadUser(data: Record<string, unknown>) {
+  const directUser = safeRecord(data.user);
+  if (Object.keys(directUser).length > 0) {
+    return directUser;
+  }
+
+  const eventUser = safeRecord(safeRecord(data.event).user);
+  if (Object.keys(eventUser).length > 0) {
+    return eventUser;
+  }
+
+  return null;
+}
+
+function pickUserId(data: Record<string, unknown>, user: Record<string, unknown> | null) {
+  const direct = pickString(data.userId) ?? pickString(data.user_id);
+  const nested = pickString(user?.id) ?? pickString(user?.userId) ?? pickString(user?.idStr);
+
+  return direct && direct !== "0" ? direct : nested ?? direct;
+}
+
+function pickUsername(data: Record<string, unknown>, user: Record<string, unknown> | null) {
+  return pickString(data.uniqueId) ??
+    pickString(data.unique_id) ??
+    pickString(data.displayId) ??
+    pickString(user?.uniqueId) ??
+    pickString(user?.unique_id) ??
+    pickString(user?.displayId) ??
+    pickString(user?.display_id) ??
+    pickString(data.nickname) ??
+    pickString(user?.nickname);
+}
+
+function pickDisplayName(data: Record<string, unknown>, user: Record<string, unknown> | null) {
+  return pickString(data.nickname) ??
+    pickString(data.displayName) ??
+    pickString(data.display_name) ??
+    pickString(user?.nickname) ??
+    pickString(user?.displayName) ??
+    pickString(user?.display_name) ??
+    pickUsername(data, user);
 }
 
 function pickString(value: unknown) {
@@ -223,6 +267,19 @@ function getUserRole(data: Record<string, unknown>): ChatUserRole {
 }
 
 function findAvatarUrl(data: Record<string, unknown>) {
+  const user = getPayloadUser(data);
+  const nestedUserAvatar =
+    findNestedAvatarUrl(safeRecord(user?.avatarThumb).urlList) ??
+    findNestedAvatarUrl(safeRecord(user?.avatarMedium).urlList) ??
+    findNestedAvatarUrl(safeRecord(user?.avatarLarger).urlList) ??
+    findNestedAvatarUrl(user?.avatarThumb) ??
+    findNestedAvatarUrl(user?.avatarMedium) ??
+    findNestedAvatarUrl(user?.avatarLarger);
+
+  if (nestedUserAvatar) {
+    return nestedUserAvatar;
+  }
+
   const direct =
     pickString(data.profilePictureUrl) ??
     pickString(data.profilePicture) ??
@@ -297,6 +354,7 @@ function findNestedAvatarUrl(value: unknown, depth = 0): string | null {
     "avatarThumb",
     "avatarMedium",
     "avatarLarger",
+    "urlList",
     "url"
   ];
 
@@ -360,6 +418,7 @@ function findNestedGiftImageUrl(value: unknown, depth = 0): string | null {
     "image",
     "iconUrl",
     "icon",
+    "urlList",
     "url"
   ];
 
